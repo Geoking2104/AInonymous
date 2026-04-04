@@ -1,0 +1,16 @@
+---
+manifest_version: "1"
+name: agent-registry
+integrity:
+  network_seed: ~
+  properties: ~
+  origin_time: "2024-01-01T00:00:00Z"
+  zomes:
+    - name: agent-registry-integrity
+      bundled: ../zomes/agent-registry-integrity.wasm
+coordinator:
+  zomes:
+    - name: agent-registry-coordinator
+      bundled: ../zomes/agent-registry-coordinator.wasm
+      dependencies:
+        - name: agent-registry-integrity

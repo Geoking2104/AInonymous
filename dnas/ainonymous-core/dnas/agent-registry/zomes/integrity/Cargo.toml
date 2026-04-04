@@ -1,0 +1,13 @@
+[package]
+name = "agent-registry-integrity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "agent_registry_integrity"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = "0.5"
+serde = { version = "1", features = ["derive"] }

@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "dnas/inference-mesh/zomes/integrity",
+    "dnas/inference-mesh/zomes/coordinator",
+    "dnas/agent-registry/zomes/integrity",
+    "dnas/agent-registry/zomes/coordinator",
+    "dnas/blackboard/zomes/integrity",
+    "dnas/blackboard/zomes/coordinator",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+lto = "thin"
+panic = "abort"
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0

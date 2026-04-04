@@ -1,0 +1,14 @@
+[package]
+name = "blackboard-coordinator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "blackboard_coordinator"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.4"
+blackboard-integrity = { path = "../integrity" }
+serde = { version = "1", features = ["derive"] }
