@@ -1,0 +1,49 @@
+# Rust build artifacts
+target/
+**/*.wasm
+Cargo.lock
+
+# Holochain build artifacts
+*.dna
+*.happ
+*.webhapp
+*.hc
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+
+# Models (trop volumineux pour git)
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+.models/
+
+# Config locale (peut contenir des secrets)
+config.toml
+*.key
+*.pem
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporaires
+tmp/
+temp/

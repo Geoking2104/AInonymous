@@ -1,0 +1,30 @@
+[package]
+name = "ainonymous-quic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ainonymous-types = { path = "../ainonymous-types" }
+
+tokio = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+zstd = { workspace = true }
+sha2 = { workspace = true }
+
+# QUIC
+quinn = { workspace = true }
+
+# iroh pour NAT traversal (optionnel, fallback quinn direct)
+iroh = { workspace = true, optional = true }
+
+[features]
+default = ["nat-traversal"]
+nat-traversal = ["iroh"]

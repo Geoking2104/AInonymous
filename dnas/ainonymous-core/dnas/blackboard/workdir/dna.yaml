@@ -1,0 +1,16 @@
+---
+manifest_version: "1"
+name: blackboard
+integrity:
+  network_seed: ~
+  properties: ~
+  origin_time: "2024-01-01T00:00:00Z"
+  zomes:
+    - name: blackboard-integrity
+      bundled: ../zomes/blackboard-integrity.wasm
+coordinator:
+  zomes:
+    - name: blackboard-coordinator
+      bundled: ../zomes/blackboard-coordinator.wasm
+      dependencies:
+        - name: blackboard-integrity

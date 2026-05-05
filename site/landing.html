@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AInonymous — L'IA qui vous appartient</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #12121a;
+      --bg3: #1a1a28;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0eff8;
+      --muted: #8887a0;
+      --accent: #7c6deb;
+      --accent2: #5dd8a8;
+      --accent3: #eb6d7c;
+      --accent-glow: rgba(124,109,235,0.18);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      line-height: 1.7; -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 40px;
+      background: rgba(10,10,15,0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 28px; font-size: 14px; color: var(--muted); }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: #fff;
+      padding: 8px 18px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; transition: opacity .15s;
+    }
+    .nav-cta:hover { opacity: .85; }
+
+    /* LAYOUT */
+    .section { padding: 96px 40px; max-width: 1080px; margin: 0 auto; }
+    .eyebrow {
+      font-size: 12px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--accent2); margin-bottom: 14px;
+    }
+    h2 {
+      font-size: clamp(28px, 4vw, 44px); font-weight: 800;
+      letter-spacing: -1.5px; line-height: 1.15; margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 18px; color: var(--muted); max-width: 560px;
+      line-height: 1.6; margin-bottom: 56px;
+    }
+
+    /* HERO */
+    .hero {
+      text-align: center;
+      padding: 120px 40px 96px; max-width: 860px; margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--accent2); font-weight: 500;
+      background: rgba(93,216,168,0.1); border: 1px solid rgba(93,216,168,0.3);
+      padding: 5px 14px; border-radius: 20px; margin-bottom: 32px;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+    h1 {
+      font-size: clamp(40px, 7vw, 72px); font-weight: 800;
+      line-height: 1.08; letter-spacing: -2.5px; margin-bottom: 24px;
+    }
+    .a1 { color: var(--accent); }
+    .a2 { color: var(--accent2); }
+    .hero-sub {
+      font-size: clamp(17px, 2.2vw, 21px); color: var(--muted);
+      max-width: 600px; margin: 0 auto 44px; line-height: 1.6;
+    }
+    .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-p {
+      background: var(--accent); color: #fff;
+      padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 15px;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: transform .15s, opacity .15s;
+    }
+    .btn-p:hover { transform: translateY(-1px); opacity: .9; }
+    .btn-g {
+      border: 1px solid var(--border2); color: var(--muted);
+      padding: 14px 28px; border-radius: 10px; font-weight: 600; font-size: 15px;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-g:hover { border-color: var(--accent); color: var(--text); }
+
+    /* STATS BAR */
+    .stats-bar {
+      display: flex; justify-content: center; gap: 60px; flex-wrap: wrap;
+      padding: 40px; background: var(--bg2);
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .stat { text-align: center; }
+    .stat-num { font-size: 32px; font-weight: 800; letter-spacing: -1px; color: var(--accent); }
+    .stat-lbl { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* PROBLEM CARDS */
+    .prob-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px; margin-top: 48px;
+    }
+    .prob-card {
+      background: var(--bg2); border: 1px solid rgba(235,109,124,0.25);
+      border-radius: 14px; padding: 28px 22px;
+    }
+    .prob-icon { font-size: 26px; margin-bottom: 12px; }
+    .prob-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 7px; }
+    .prob-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* MESH VISUAL */
+    .mesh-wrap {
+      position: relative; height: 260px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 56px 0;
+    }
+    .mesh-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .mesh-node {
+      position: absolute; border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center;
+      font-size: 11px; font-weight: 600; border: 1px solid; line-height: 1.3;
+    }
+    .n-you {
+      width: 80px; height: 80px;
+      background: rgba(124,109,235,0.2); border-color: var(--accent); color: var(--accent);
+      left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 2; font-size: 13px;
+    }
+    .n-peer {
+      width: 56px; height: 56px;
+      background: rgba(93,216,168,0.1); border-color: var(--accent2); color: var(--accent2);
+    }
+    .p1{left:13%;top:18%} .p2{right:15%;top:14%} .p3{left:6%;top:54%}
+    .p4{right:10%;top:50%} .p5{left:26%;bottom:8%} .p6{right:25%;bottom:6%}
+
+    /* STEPS */
+    .steps { display: flex; flex-direction: column; }
+    .step {
+      display: grid; grid-template-columns: 72px 1fr; gap: 24px;
+      padding: 36px 0; border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 50px; height: 50px; border-radius: 13px; flex-shrink: 0;
+      background: var(--accent-glow); border: 1px solid rgba(124,109,235,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: var(--accent);
+    }
+    .step h3 { font-size: 19px; font-weight: 700; margin-bottom: 7px; }
+    .step p { font-size: 14px; color: var(--muted); line-height: 1.7; }
+    .tag {
+      display: inline-block; margin-top: 10px; font-size: 12px;
+      padding: 3px 10px; border-radius: 6px; font-weight: 600;
+    }
+    .t-p { background: rgba(124,109,235,0.15); color: #a89cf5; }
+    .t-t { background: rgba(93,216,168,0.15); color: #5dd8a8; }
+    .t-c { background: rgba(235,109,124,0.15); color: #eb8090; }
+
+    /* FEATURES */
+    .feat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+    }
+    .feat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 30px 26px; transition: border-color .2s;
+    }
+    .feat-card:hover { border-color: var(--border2); }
+    .feat-icon {
+      width: 42px; height: 42px; border-radius: 11px; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: center; font-size: 19px;
+    }
+    .fi-p { background: rgba(124,109,235,0.15); }
+    .fi-t { background: rgba(93,216,168,0.15); }
+    .fi-c { background: rgba(235,109,124,0.15); }
+    .fi-a { background: rgba(250,199,117,0.15); }
+    .feat-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feat-card p { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+    /* VS TABLE */
+    .vs-wrap {
+      background: var(--bg2); padding: 80px 40px;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .vs-inner { max-width: 900px; margin: 0 auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 48px; font-size: 14px; }
+    th {
+      text-align: left; padding: 12px 18px; font-weight: 700;
+      border-bottom: 2px solid var(--border2); color: var(--muted);
+    }
+    th.hl { color: var(--accent); }
+    td { padding: 12px 18px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    .ok { color: var(--accent2); font-weight: 600; }
+    .no { color: var(--accent3); }
+    .col { background: rgba(124,109,235,0.06); }
+
+    /* MODELS */
+    .models-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px; margin-top: 48px;
+    }
+    .model-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px 18px;
+    }
+    .model-name { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+    .model-meta { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .bar-bg { background: var(--bg3); border-radius: 4px; height: 5px; }
+    .bar { height: 5px; border-radius: 4px; background: var(--accent2); }
+    .bar-p { background: #a89cf5; }
+    .bar-c { background: #f5c4b3; }
+    .model-use { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* INSTALL */
+    .install-box {
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 14px; padding: 32px;
+    }
+    pre {
+      font-family: 'JetBrains Mono','Fira Code',monospace;
+      font-size: 13px; line-height: 2; color: var(--accent2);
+      overflow-x: auto; white-space: pre;
+    }
+    .comment { color: rgba(136,135,160,0.45); }
+
+    /* FOOTER */
+    footer {
+      padding: 48px 40px; border-top: 1px solid var(--border);
+      text-align: center; color: var(--muted); font-size: 14px;
+    }
+    .f-logo { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+    .f-logo span { color: var(--accent); }
+    footer a { color: var(--muted); margin: 0 12px; }
+    footer a:hover { color: var(--text); }
+
+    /* BUSINESS CASE */
+    .biz-banner {
+      background: linear-gradient(135deg, #0e0e1a 0%, #13102a 100%);
+      border-top: 1px solid rgba(124,109,235,0.25);
+      border-bottom: 1px solid rgba(124,109,235,0.25);
+      padding: 80px 40px;
+    }
+    .biz-inner { max-width: 1080px; margin: 0 auto; }
+    .biz-top {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+      align-items: start; margin-bottom: 56px;
+    }
+    .biz-kpi-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    }
+    .biz-kpi {
+      background: rgba(124,109,235,0.08); border: 1px solid rgba(124,109,235,0.2);
+      border-radius: 12px; padding: 20px 18px;
+    }
+    .biz-kpi-num {
+      font-size: 30px; font-weight: 800; color: var(--accent);
+      letter-spacing: -1px; margin-bottom: 4px;
+    }
+    .biz-kpi-lbl { font-size: 12px; color: var(--muted); line-height: 1.4; }
+    .biz-adv-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px; margin-bottom: 48px;
+    }
+    .biz-adv {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 26px 22px;
+      transition: border-color .2s;
+    }
+    .biz-adv:hover { border-color: rgba(124,109,235,0.4); }
+    .biz-adv-icon { font-size: 22px; margin-bottom: 12px; }
+    .biz-adv h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .biz-adv p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .biz-cta-box {
+      background: rgba(124,109,235,0.07); border: 1px solid rgba(124,109,235,0.3);
+      border-radius: 16px; padding: 36px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
+    }
+    .biz-cta-box h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
+    .biz-cta-box p { font-size: 14px; color: var(--muted); max-width: 500px; }
+    .btn-enterprise {
+      background: var(--accent); color: #fff; white-space: nowrap;
+      padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 15px;
+      display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
+      transition: transform .15s, opacity .15s;
+    }
+    .btn-enterprise:hover { transform: translateY(-1px); opacity: .9; }
+
+    /* CLOSED LOOP DIAGRAM */
+    .loop-diagram {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; margin: 40px 0 16px; flex-wrap: wrap;
+    }
+    .loop-node {
+      background: var(--bg2); border: 1px solid rgba(124,109,235,0.3);
+      border-radius: 12px; padding: 14px 18px; text-align: center;
+      min-width: 120px;
+    }
+    .loop-node-icon { font-size: 22px; margin-bottom: 6px; }
+    .loop-node-lbl { font-size: 11px; font-weight: 700; color: var(--text); }
+    .loop-node-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .loop-arrow {
+      font-size: 18px; color: rgba(124,109,235,0.5); padding: 0 10px;
+      flex-shrink: 0;
+    }
+    .loop-shield {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; color: var(--accent2);
+      background: rgba(93,216,168,0.08); border: 1px solid rgba(93,216,168,0.2);
+      padding: 4px 12px; border-radius: 20px; margin-top: 16px;
+    }
+
+    @media (max-width: 680px) {
+      nav { padding: 12px 20px; }
+      .nav-links { display: none; }
+      .section { padding: 60px 20px; }
+      .stats-bar { gap: 30px; padding: 28px 20px; }
+      .vs-wrap { padding: 60px 20px; }
+      .step { grid-template-columns: 56px 1fr; gap: 16px; }
+      .install-box { padding: 20px 16px; }
+      .biz-banner { padding: 60px 20px; }
+      .biz-top { grid-template-columns: 1fr; gap: 36px; }
+      .biz-cta-box { flex-direction: column; }
+      .loop-diagram { gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">AI<span>n</span>onymous</div>
+  <div class="nav-links">
+    <a href="#comment">Comment ça marche</a>
+    <a href="#pourquoi">Pourquoi nous</a>
+    <a href="#installer">Installer</a>
+    <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
+    <a href="enterprise.html" style="color: var(--accent2); font-weight: 600;">Entreprises ✦</a>
+  </div>
+  <a href="https://github.com/Geoking2104/AInonymous" class="nav-cta">Démarrer →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge"><div class="dot"></div>Open source · Apache 2.0 · Bêta publique</div>
+  <h1>L'IA puissante,<br><span class="a1">sans serveur.</span><br><span class="a2">Sans compte.</span></h1>
+  <p class="hero-sub">
+    AInonymous est un réseau pair-à-pair où vos voisins font tourner l'IA pour vous, et vous pour eux — sans aucune entreprise au milieu.
+  </p>
+  <div class="hero-actions">
+    <a href="#installer" class="btn-p">⚡ Rejoindre le réseau</a>
+    <a href="#comment" class="btn-g">Voir comment ça marche</a>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Serveur central</div></div>
+  <div class="stat"><div class="stat-num">0€</div><div class="stat-lbl">Abonnement</div></div>
+  <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Données collectées</div></div>
+  <div class="stat"><div class="stat-num">100%</div><div class="stat-lbl">Open source</div></div>
+</div>
+
+<!-- PROBLEM -->
+<div class="section">
+  <div class="eyebrow">Le problème</div>
+  <h2>L'IA actuelle vous surveille.<br>Et vous le payez cher.</h2>
+  <p class="section-sub">ChatGPT, Claude, Gemini — ces services sont excellents, mais ils passent par des serveurs centralisés qui enregistrent vos conversations et vous facturent chaque mois.</p>
+  <div class="prob-grid">
+    <div class="prob-card">
+      <div class="prob-icon">👁️</div>
+      <h3>Vos conversations sont lues</h3>
+      <p>Tout ce que vous tapez est stocké et analysé pour entraîner les prochains modèles.</p>
+    </div>
+    <div class="prob-card">
+      <div class="prob-icon">🏦</div>
+      <h3>Un abonnement à vie</h3>
+      <p>20€/mois en moyenne. Si vous arrêtez de payer, vous perdez l'accès. Pour toujours.</p>
+    </div>
+    <div class="prob-card">
+      <div class="prob-icon">🔒</div>
+      <h3>Un seul point de défaillance</h3>
+      <p>Si OpenAI tombe, vous tombez aussi. Si les conditions changent, vous n'avez rien à dire.</p>
+    </div>
+    <div class="prob-card">
+      <div class="prob-icon">🌍</div>
+      <h3>Hors de portée pour beaucoup</h3>
+      <p>Dans de nombreux pays, 20€/mois représente un salaire hebdomadaire entier.</p>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="section" id="comment" style="padding-top: 0">
+  <div class="eyebrow">La solution</div>
+  <h2>Un réseau IA comme BitTorrent,<br>mais pour votre cerveau.</h2>
+  <p class="section-sub">Imaginez un village où chacun prête un peu de sa puissance de calcul aux autres. En échange, quand vous avez besoin d'IA, le village travaille pour vous.</p>
+
+  <div class="mesh-wrap">
+    <svg class="mesh-svg" viewBox="0 0 700 260" preserveAspectRatio="none">
+      <line x1="350" y1="130" x2="105" y2="55"  stroke="rgba(124,109,235,0.3)" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <line x1="350" y1="130" x2="595" y2="46"  stroke="rgba(124,109,235,0.3)" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <line x1="350" y1="130" x2="68"  y2="160" stroke="rgba(93,216,168,0.22)" stroke-width="1"   stroke-dasharray="6,4"/>
+      <line x1="350" y1="130" x2="632" y2="155" stroke="rgba(93,216,168,0.22)" stroke-width="1"   stroke-dasharray="6,4"/>
+      <line x1="350" y1="130" x2="204" y2="238" stroke="rgba(93,216,168,0.22)" stroke-width="1"   stroke-dasharray="6,4"/>
+      <line x1="350" y1="130" x2="500" y2="240" stroke="rgba(93,216,168,0.22)" stroke-width="1"   stroke-dasharray="6,4"/>
+    </svg>
+    <div class="mesh-node n-you">⚡<br>Vous</div>
+    <div class="mesh-node n-peer p1">🖥️<br>GPU A</div>
+    <div class="mesh-node n-peer p2">💻<br>GPU B</div>
+    <div class="mesh-node n-peer p3">🖥️<br>CPU C</div>
+    <div class="mesh-node n-peer p4">💻<br>GPU D</div>
+    <div class="mesh-node n-peer p5">🖥️<br>CPU E</div>
+    <div class="mesh-node n-peer p6">💻<br>GPU F</div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <h3>Vous rejoignez le réseau en 30 secondes</h3>
+        <p>Une seule commande installe AInonymous. Votre machine reçoit une identité cryptographique unique — pas de nom, pas d'e-mail, pas de mot de passe. Vous êtes souverain.</p>
+        <span class="tag t-p">Holochain · clé ed25519</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <h3>Votre machine contribue, les autres aussi</h3>
+        <p>Quand vous n'utilisez pas votre ordinateur, il prête sa puissance de calcul aux autres membres. En échange, vous accumulez du crédit de calcul. Aucun argent ne s'échange — c'est du troc de GPU.</p>
+        <span class="tag t-t">Mesh P2P · DHT Holochain</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <h3>Vous utilisez l'IA comme si c'était local</h3>
+        <p>Envoyez votre question. Le réseau la distribue entre plusieurs machines — chacune traite une partie du modèle IA. Vous recevez la réponse en temps réel. Aucun serveur central n'a vu votre question.</p>
+        <span class="tag t-c">Pipeline-splitting · Gemma 4</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="section" id="pourquoi" style="padding-top: 0">
+  <div class="eyebrow">Pourquoi AInonymous</div>
+  <h2>Tout ce qu'on vous a retiré,<br>on vous le rend.</h2>
+  <p class="section-sub">Pas un concurrent de ChatGPT — une alternative fondamentalement différente dans sa philosophie.</p>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon fi-p">🔐</div>
+      <h3>Confidentialité absolue</h3>
+      <p>Vos questions ne quittent jamais le réseau chiffré. Aucune entreprise, aucun gouvernement ne peut lire votre conversation. Pas de logs, pas de cookies, pas de profil.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-t">⚡</div>
+      <h3>Gratuit par construction</h3>
+      <p>Il n'y a personne à payer. Pas d'actionnaires, pas d'infrastructure cloud à financer. Vous échangez de la puissance de calcul, pas de l'argent.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-c">🌐</div>
+      <h3>Indestructible</h3>
+      <p>Il n'y a pas de bouton «off». Aucune entreprise ne peut fermer le réseau, censurer un utilisateur ou modifier les règles du jeu du jour au lendemain.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-a">🤖</div>
+      <h3>Les meilleurs modèles ouverts</h3>
+      <p>Gemma 4 (Google), Qwen3, Llama 3.3 — les modèles utilisés rivalisent avec GPT-4 sur de nombreuses tâches, et ils sont 100% open source.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-p">🔌</div>
+      <h3>Compatible avec vos outils</h3>
+      <p>L'API locale est compatible OpenAI. Branchez n'importe quel outil qui parle à ChatGPT — il parlera automatiquement à AInonymous, sans modification.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-t">🌍</div>
+      <h3>Accessible partout</h3>
+      <p>Pas de carte de crédit, pas de compte, pas de frontières. Si vous avez un ordinateur et Internet, vous accédez à l'IA la plus puissante du moment.</p>
+    </div>
+  </div>
+</div>
+
+<!-- VS TABLE -->
+<div class="vs-wrap">
+  <div class="vs-inner">
+    <div class="eyebrow">Comparaison</div>
+    <h2>AInonymous vs. les alternatives</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Critère</th>
+          <th>ChatGPT / Claude</th>
+          <th>Ollama (local)</th>
+          <th class="hl">AInonymous ✦</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Prix</td><td>20€/mois</td><td>Gratuit</td><td class="col ok">Gratuit</td></tr>
+        <tr><td>Confidentialité</td><td><span class="no">✗ Données envoyées</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ Chiffré P2P</td></tr>
+        <tr><td>GPU requis</td><td>Non (cloud)</td><td>Oui (≥8 GB VRAM)</td><td class="col ok">Non (mutualisé)</td></tr>
+        <tr><td>Résistance censure</td><td><span class="no">✗ Centralisé</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Décentralisé</td></tr>
+        <tr><td>Qualité modèle</td><td>Très haute</td><td>Haute (selon GPU)</td><td class="col ok">Haute (Gemma 4)</td></tr>
+        <tr><td>Création de compte</td><td><span class="no">✗ Obligatoire</span></td><td><span class="ok">✓ Aucun</span></td><td class="col ok">✓ Aucun</td></tr>
+        <tr><td>Compatible OpenAI API</td><td>Oui (payant)</td><td>Oui</td><td class="col ok">Oui (localhost)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODELS -->
+<div class="section">
+  <div class="eyebrow">Modèles disponibles</div>
+  <h2>Des modèles de pointe,<br>totalement libres.</h2>
+  <p class="section-sub">AInonymous priorise Gemma 4 de Google — performant, compact, Apache 2.0. Chaque modèle est distribué automatiquement selon la puissance disponible dans le réseau.</p>
+  <div class="models-grid">
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · E2B</div>
+      <div class="model-meta">~3 GB · Edge</div>
+      <div class="bar-bg"><div class="bar" style="width:28%"></div></div>
+      <div class="model-use">Nœuds légers · draft</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · E4B</div>
+      <div class="model-meta">~5 GB · Edge</div>
+      <div class="bar-bg"><div class="bar" style="width:42%"></div></div>
+      <div class="model-use">Rapidité + qualité</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · 26B MoE</div>
+      <div class="model-meta">~18 GB · Multi-nœuds</div>
+      <div class="bar-bg"><div class="bar" style="width:70%"></div></div>
+      <div class="model-use">Tâches complexes</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · 31B</div>
+      <div class="model-meta">~20 GB · Flagship</div>
+      <div class="bar-bg"><div class="bar" style="width:82%"></div></div>
+      <div class="model-use">Meilleure qualité</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Qwen3 · 32B</div>
+      <div class="model-meta">~20 GB · Code</div>
+      <div class="bar-bg"><div class="bar bar-p" style="width:80%"></div></div>
+      <div class="model-use">Code · Raisonnement</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Llama 3.3 · 70B</div>
+      <div class="model-meta">~43 GB · Multi-nœuds</div>
+      <div class="bar-bg"><div class="bar bar-c" style="width:94%"></div></div>
+      <div class="model-use">Puissance maximale</div>
+    </div>
+  </div>
+</div>
+
+<!-- BUSINESS CASE -->
+<div class="biz-banner" id="entreprises">
+  <div class="biz-inner">
+    <div class="eyebrow">Pour les entreprises</div>
+    <h2 style="margin-bottom: 14px">Vos serveurs travaillent déjà.<br>Faites-les travailler pour vous.</h2>
+    <p style="font-size:17px;color:var(--muted);max-width:600px;margin-bottom:48px;line-height:1.6">
+      AInonymous Enterprise crée un réseau d'IA fermé et souverain à l'intérieur de votre infrastructure.
+      Vos machines partagent leur puissance de calcul pour faire tourner des modèles de pointe — sans un seul octet qui quitte votre réseau.
+    </p>
+
+    <!-- Closed loop diagram -->
+    <div style="text-align:center;margin-bottom:48px">
+      <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Boucle P2P fermée — 100% on-premises</p>
+      <div class="loop-diagram">
+        <div class="loop-node">
+          <div class="loop-node-icon">🖥️</div>
+          <div class="loop-node-lbl">Workstations</div>
+          <div class="loop-node-sub">GPU / CPU idle</div>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-node" style="border-color:rgba(124,109,235,0.6);background:rgba(124,109,235,0.08)">
+          <div class="loop-node-icon">⚡</div>
+          <div class="loop-node-lbl">Mesh privé</div>
+          <div class="loop-node-sub">DHT Holochain interne</div>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-node">
+          <div class="loop-node-icon">🤖</div>
+          <div class="loop-node-lbl">Modèles IA</div>
+          <div class="loop-node-sub">Gemma 4 · Qwen3</div>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-node">
+          <div class="loop-node-icon">👥</div>
+          <div class="loop-node-lbl">Vos équipes</div>
+          <div class="loop-node-sub">API OpenAI-compat.</div>
+        </div>
+        <div class="loop-arrow" style="color:rgba(93,216,168,0.6)">↺</div>
+      </div>
+      <div class="loop-shield">🔒 Données confinées au réseau d'entreprise — aucun trafic externe</div>
+    </div>
+
+    <!-- KPIs + description -->
+    <div class="biz-top">
+      <div>
+        <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Le calcul que vous payez déjà dort la nuit.</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">
+          Une entreprise de 200 personnes dispose en moyenne de plusieurs téraflops dormants entre 19h et 8h. AInonymous les transforme en infrastructure d'inférence IA — sans acheter un seul GPU supplémentaire.
+        </p>
+        <p style="font-size:14px;color:var(--muted);line-height:1.7">
+          Plus votre organisation grandit, plus votre IA est puissante. Chaque nouvelle machine est une unité de calcul supplémentaire. Le réseau s'améliore avec vous — pas avec la carte bancaire d'un fournisseur cloud.
+        </p>
+      </div>
+      <div class="biz-kpi-grid">
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">~70%</div>
+          <div class="biz-kpi-lbl">des CPU/GPU d'entreprise inutilisés en dehors des heures de travail</div>
+        </div>
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">0€</div>
+          <div class="biz-kpi-lbl">de coût cloud IA supplémentaire avec les ressources existantes</div>
+        </div>
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">100%</div>
+          <div class="biz-kpi-lbl">des données restent dans votre périmètre RGPD</div>
+        </div>
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">×N</div>
+          <div class="biz-kpi-lbl">la puissance augmente avec chaque nouveau collaborateur</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Business advantages -->
+    <div class="biz-adv-grid">
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🏛️</div>
+        <h3>Souveraineté totale des données</h3>
+        <p>Conformité RGPD, HIPAA, SOC 2 garantie par architecture. Aucune donnée ne sort de votre infrastructure — pas besoin de Data Processing Agreement avec un tiers.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">📈</div>
+        <h3>L'IA grandit avec votre flotte</h3>
+        <p>Chaque machine ajoutée augmente la capacité d'inférence. Pas de paliers tarifaires, pas de négociation de quotas — la puissance scale linéairement avec vos effectifs.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🔐</div>
+        <h3>Identités cryptographiques d'entreprise</h3>
+        <p>Chaque nœud est authentifié via ed25519. Les Membrane Proofs Holochain permettent un contrôle d'accès granulaire : qui peut soumettre des tâches, qui peut exécuter des modèles.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🧠</div>
+        <h3>Fine-tuning sur vos données internes</h3>
+        <p>Les modèles peuvent être affinés sur vos documents, vos process, votre jargon métier — sans jamais quitter le réseau. Votre IA devient experte de votre secteur.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🔌</div>
+        <h3>Intégration transparente</h3>
+        <p>API locale compatible OpenAI sur <code style="font-size:12px;color:var(--accent2)">localhost:9337</code>. Vos outils actuels (Copilot, n8n, LangChain, Cursor) s'y connectent sans modification.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">📋</div>
+        <h3>Audit trail immuable</h3>
+        <p>Chaque tâche d'inférence est chainée cryptographiquement dans la source chain Holochain. Traçabilité complète pour la conformité et les audits internes.</p>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="biz-cta-box">
+      <div>
+        <h3>Réseau d'IA privé pour votre entreprise</h3>
+        <p>Découvrez l'architecture technique, les cas d'usage et le modèle économique détaillé sur notre page dédiée aux déploiements enterprise.</p>
+      </div>
+      <a href="enterprise.html" class="btn-enterprise">Voir la page Enterprise →</a>
+    </div>
+  </div>
+</div>
+
+<!-- INSTALL -->
+<div class="section" id="installer" style="padding-top: 0">
+  <div class="eyebrow">Installation</div>
+  <h2>Prêt en 30 secondes.</h2>
+  <p class="section-sub">Une ligne de commande. Votre machine rejoint le réseau, choisit un modèle adapté à sa puissance, et commence à contribuer — et à recevoir.</p>
+  <div class="install-box">
+    <pre><span class="comment"># 1. Installer AInonymous</span>
+curl -fsSL https://ainonymous.network/install.sh | sh
+
+<span class="comment"># 2. Rejoindre le réseau automatiquement</span>
+ainonymous --auto
+
+<span class="comment"># 3. Ou choisir votre modèle</span>
+ainonymous --model gemma4-26b-moe
+
+<span class="comment"># 4. Tester en 5 secondes</span>
+curl http://localhost:9337/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gemma4-31b","messages":[{"role":"user","content":"Bonjour !"}]}'</pre>
+  </div>
+  <div style="margin-top: 24px; display: flex; gap: 14px; flex-wrap: wrap;">
+    <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Voir sur GitHub →</a>
+    <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Documentation technique</a>
+  </div>
+</div>
+
+<footer>
+  <div class="f-logo">AI<span>n</span>onymous</div>
+  <p style="margin-bottom: 16px">L'IA décentralisée, pour tous, pour toujours.</p>
+  <div>
+    <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
+    <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">Docs</a>
+    <a href="enterprise.html">Enterprise</a>
+    <a href="https://github.com/Geoking2104/AInonymous/blob/main/LICENSE">Apache 2.0</a>
+  </div>
+  <p style="margin-top: 28px; font-size: 12px; opacity: .4">Construit avec Holochain · Gemma 4 · Goose · llama.cpp</p>
+</footer>
+
+</body>
+</html>

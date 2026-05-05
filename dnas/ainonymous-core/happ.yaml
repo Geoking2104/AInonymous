@@ -1,0 +1,40 @@
+---
+manifest_version: "1"
+name: ainonymous-core
+description: "AInonymous — Inférence LLM décentralisée sur Holochain"
+roles:
+  - name: inference-mesh
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: dnas/inference-mesh/workdir/inference-mesh.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0
+
+  - name: agent-registry
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: dnas/agent-registry/workdir/agent-registry.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0
+
+  - name: blackboard
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: dnas/blackboard/workdir/blackboard.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0
