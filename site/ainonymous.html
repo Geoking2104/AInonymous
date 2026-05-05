@@ -5,357 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>AInonymous — Decentralized AI</title>
   <style>
-    :root{--bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a28;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#f0eff8;--muted:#8887a0;--accent:#7c6deb;--accent2:#5dd8a8;--accent3:#eb6d7c;--amber:#f5c475;--accent-glow:rgba(124,109,235,0.18)}
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{scroll-behavior:smooth}
-    body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
-    a{color:inherit;text-decoration:none}
-    code{font-family:"JetBrains Mono","Fira Code",monospace;font-size:.9em;color:var(--accent2)}
 
-    /* NAV */
-    nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 40px;background:rgba(10,10,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-    .nav-logo{font-size:18px;font-weight:700;letter-spacing:-.5px;cursor:pointer}
-    .nav-logo span{color:var(--accent)}
-    .nav-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(124,109,235,0.15);color:var(--accent);margin-left:10px;border:1px solid rgba(124,109,235,0.3)}
-    .nav-center{display:flex;align-items:center;gap:6px}
-    .nav-tab{padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border:1px solid transparent;background:none;font-family:inherit;transition:all .15s}
-    .nav-tab:hover{color:var(--text)}
-    .nav-tab.active{background:var(--accent);color:#fff}
-    .nav-right{display:flex;align-items:center;gap:14px}
-    .nav-links{display:flex;gap:22px;font-size:13px;color:var(--muted);align-items:center}
-    .nav-links a{cursor:pointer;transition:color .15s}
-    .nav-links a:hover{color:var(--text)}
-    .lang-sw{display:flex;align-items:center;gap:2px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;overflow:hidden}
-    .lang-sw button{padding:5px 10px;color:var(--muted);background:none;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:background .15s,color .15s}
-    .lang-sw button.active{background:var(--accent);color:#fff}
-    .lang-sw button:hover:not(.active){color:var(--text)}
-    .nav-cta{background:var(--accent);color:#fff;padding:8px 18px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
-    .nav-cta:hover{opacity:.85}
-
-    /* PAGES */
-    .page{display:none}
-    .page.active{display:block}
-
-    /* LAYOUT */
-    .section{padding:96px 40px;max-width:1080px;margin:0 auto}
-    .section-narrow{padding:88px 40px;max-width:820px;margin:0 auto}
-    .full{padding:72px 40px}
-    .full-inner{max-width:1080px;margin:0 auto}
-    .eyebrow{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:14px}
-    h2{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-1.5px;line-height:1.15;margin-bottom:16px}
-    h3{font-size:18px;font-weight:700;margin-bottom:8px}
-    .section-sub{font-size:18px;color:var(--muted);max-width:560px;line-height:1.6;margin-bottom:56px}
-
-    /* HERO */
-    .hero{text-align:center;padding:120px 40px 96px;max-width:860px;margin:0 auto}
-    .hero-ent{padding:110px 40px 80px;text-align:center;max-width:900px;margin:0 auto}
-    .hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--accent2);font-weight:500;background:rgba(93,216,168,0.1);border:1px solid rgba(93,216,168,0.3);padding:5px 14px;border-radius:20px;margin-bottom:32px}
-    .hero-badge-ent{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--accent);background:rgba(124,109,235,0.1);border:1px solid rgba(124,109,235,0.3);padding:5px 14px;border-radius:20px;margin-bottom:28px}
-    .hero-badge-ent::before{content:"🏢";font-size:14px}
-    .dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite;display:inline-block}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-    h1{font-size:clamp(40px,7vw,72px);font-weight:800;line-height:1.08;letter-spacing:-2.5px;margin-bottom:24px}
-    .h1-ent{font-size:clamp(36px,6vw,64px);font-weight:800;letter-spacing:-2px;line-height:1.08;margin-bottom:22px}
-    .a1{color:var(--accent)}.a2{color:var(--accent2)}
-    .hero-sub{font-size:clamp(17px,2.2vw,21px);color:var(--muted);max-width:600px;margin:0 auto 44px;line-height:1.6}
-    .hero-sub-ent{font-size:clamp(16px,2.2vw,20px);color:var(--muted);max-width:620px;margin:0 auto 40px;line-height:1.6}
-    .hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-
-    /* BUTTONS */
-    .btn-p{background:var(--accent);color:#fff;padding:14px 28px;border-radius:10px;font-weight:700;font-size:15px;display:inline-flex;align-items:center;gap:8px;transition:transform .15s,opacity .15s;cursor:pointer;border:none;font-family:inherit}
-    .btn-p:hover{transform:translateY(-1px);opacity:.9}
-    .btn-g{border:1px solid var(--border2);color:var(--muted);padding:14px 28px;border-radius:10px;font-weight:600;font-size:15px;display:inline-flex;align-items:center;gap:8px;transition:border-color .15s,color .15s;background:none;font-family:inherit;cursor:pointer}
-    .btn-g:hover{border-color:var(--accent);color:var(--text)}
-    .btn-p-sm{background:var(--accent);color:#fff;padding:13px 26px;border-radius:10px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,transform .15s;cursor:pointer;border:none;font-family:inherit}
-    .btn-p-sm:hover{opacity:.88;transform:translateY(-1px)}
-    .btn-g-sm{border:1px solid var(--border2);color:var(--muted);padding:13px 26px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,color .15s;cursor:pointer;background:none;font-family:inherit}
-    .btn-g-sm:hover{border-color:var(--accent);color:var(--text)}
-    .btn-enterprise{background:var(--accent);color:#fff;white-space:nowrap;padding:14px 28px;border-radius:10px;font-weight:700;font-size:15px;display:inline-flex;align-items:center;gap:8px;flex-shrink:0;transition:transform .15s,opacity .15s;cursor:pointer;border:none;font-family:inherit}
-    .btn-enterprise:hover{transform:translateY(-1px);opacity:.9}
-
-    /* STATS */
-    .stats-bar{display:flex;justify-content:center;gap:60px;flex-wrap:wrap;padding:40px;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-    .stat{text-align:center}
-    .stat-num{font-size:32px;font-weight:800;letter-spacing:-1px;color:var(--accent)}
-    .stat-lbl{font-size:13px;color:var(--muted);margin-top:2px}
-
-    /* PROOF STRIP */
-    .proof-strip{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:32px 40px;display:flex;justify-content:center;gap:48px;flex-wrap:wrap}
-    .proof-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
-    .proof-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);flex-shrink:0}
-
-    /* PROB CARDS */
-    .prob-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:48px}
-    .prob-card{background:var(--bg2);border:1px solid rgba(235,109,124,0.25);border-radius:14px;padding:28px 22px}
-    .prob-icon{font-size:26px;margin-bottom:12px}
-    .prob-card h3{font-size:15px;font-weight:700;margin-bottom:7px}
-    .prob-card p{font-size:13px;color:var(--muted);line-height:1.6}
-
-    /* MESH */
-    .mesh-wrap{position:relative;height:260px;display:flex;align-items:center;justify-content:center;margin:56px 0}
-    .mesh-svg{position:absolute;inset:0;width:100%;height:100%}
-    .mesh-node{position:absolute;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:11px;font-weight:600;border:1px solid;line-height:1.3}
-    .n-you{width:80px;height:80px;background:rgba(124,109,235,0.2);border-color:var(--accent);color:var(--accent);left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;font-size:13px}
-    .n-peer{width:56px;height:56px;background:rgba(93,216,168,0.1);border-color:var(--accent2);color:var(--accent2)}
-    .p1{left:13%;top:18%}.p2{right:15%;top:14%}.p3{left:6%;top:54%}
-    .p4{right:10%;top:50%}.p5{left:26%;bottom:8%}.p6{right:25%;bottom:6%}
-
-    /* STEPS */
-    .steps{display:flex;flex-direction:column}
-    .step{display:grid;grid-template-columns:72px 1fr;gap:24px;padding:36px 0;border-bottom:1px solid var(--border)}
-    .step:last-child{border-bottom:none}
-    .step-num{width:50px;height:50px;border-radius:13px;flex-shrink:0;background:var(--accent-glow);border:1px solid rgba(124,109,235,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--accent)}
-    .step h3{font-size:19px;font-weight:700;margin-bottom:7px}
-    .step p{font-size:14px;color:var(--muted);line-height:1.7}
-    .tag{display:inline-block;margin-top:10px;font-size:12px;padding:3px 10px;border-radius:6px;font-weight:600}
-    .t-p{background:rgba(124,109,235,0.15);color:#a89cf5}
-    .t-t{background:rgba(93,216,168,0.15);color:#5dd8a8}
-    .t-c{background:rgba(235,109,124,0.15);color:#eb8090}
-
-    /* FEATURES */
-    .feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
-    .feat-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:30px 26px;transition:border-color .2s}
-    .feat-card:hover{border-color:var(--border2)}
-    .feat-icon{width:42px;height:42px;border-radius:11px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;font-size:19px}
-    .fi-p{background:rgba(124,109,235,0.15)}.fi-t{background:rgba(93,216,168,0.15)}
-    .fi-c{background:rgba(235,109,124,0.15)}.fi-a{background:rgba(250,199,117,0.15)}
-    .feat-card h3{font-size:16px;font-weight:700;margin-bottom:8px}
-    .feat-card p{font-size:13px;color:var(--muted);line-height:1.65}
-
-    /* VS TABLE */
-    .vs-wrap{background:var(--bg2);padding:80px 40px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-    .vs-inner{max-width:900px;margin:0 auto}
-    table{width:100%;border-collapse:collapse;margin-top:48px;font-size:14px;min-width:500px}
-    th{text-align:left;padding:12px 18px;font-weight:700;border-bottom:2px solid var(--border2);color:var(--muted)}
-    th.hl{color:var(--accent)}
-    td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top}
-    tr:last-child td{border-bottom:none}
-    .ok{color:var(--accent2);font-weight:600}.no{color:var(--accent3)}
-    .col{background:rgba(124,109,235,0.06)}
-    .v-ok{color:var(--accent2)}.v-no{color:var(--accent3)}
-    tr.section-row td{background:var(--bg3);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:8px 16px}
-    .bc-table-wrap{overflow-x:auto;margin-top:44px}
-
-    /* MODELS */
-    .models-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-top:48px}
-    .model-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 18px}
-    .model-name{font-size:14px;font-weight:700;margin-bottom:3px}
-    .model-meta{font-size:12px;color:var(--muted);margin-bottom:12px}
-    .bar-bg{background:var(--bg3);border-radius:4px;height:5px}
-    .bar{height:5px;border-radius:4px;background:var(--accent2)}
-    .bar-p{background:#a89cf5}.bar-c{background:#f5c4b3}
-    .model-use{font-size:12px;color:var(--muted);margin-top:6px}
-
-    /* INSTALL */
-    .install-box{background:var(--bg3);border:1px solid var(--border2);border-radius:14px;padding:32px}
-    pre{font-family:"JetBrains Mono","Fira Code",monospace;font-size:13px;line-height:2;color:var(--accent2);overflow-x:auto;white-space:pre}
-    .comment{color:rgba(136,135,160,0.45)}
-
-    /* BIZ */
-    .biz-banner{background:linear-gradient(135deg,#0e0e1a 0%,#13102a 100%);border-top:1px solid rgba(124,109,235,0.25);border-bottom:1px solid rgba(124,109,235,0.25);padding:80px 40px}
-    .biz-inner{max-width:1080px;margin:0 auto}
-    .biz-top{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;margin-bottom:56px}
-    .biz-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .biz-kpi{background:rgba(124,109,235,0.08);border:1px solid rgba(124,109,235,0.2);border-radius:12px;padding:20px 18px}
-    .biz-kpi-num{font-size:30px;font-weight:800;color:var(--accent);letter-spacing:-1px;margin-bottom:4px}
-    .biz-kpi-lbl{font-size:12px;color:var(--muted);line-height:1.4}
-    .biz-adv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:48px}
-    .biz-adv{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px 22px;transition:border-color .2s}
-    .biz-adv:hover{border-color:rgba(124,109,235,0.4)}
-    .biz-adv-icon{font-size:22px;margin-bottom:12px}
-    .biz-adv h3{font-size:15px;font-weight:700;margin-bottom:6px}
-    .biz-adv p{font-size:13px;color:var(--muted);line-height:1.6}
-    .biz-cta-box{background:rgba(124,109,235,0.07);border:1px solid rgba(124,109,235,0.3);border-radius:16px;padding:36px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
-    .biz-cta-box h3{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
-    .biz-cta-box p{font-size:14px;color:var(--muted);max-width:500px}
-
-    /* LOOP LANDING */
-    .loop-diagram{display:flex;align-items:center;justify-content:center;gap:0;margin:40px 0 16px;flex-wrap:wrap}
-    .loop-node{background:var(--bg2);border:1px solid rgba(124,109,235,0.3);border-radius:12px;padding:14px 18px;text-align:center;min-width:120px}
-    .loop-node-icon{font-size:22px;margin-bottom:6px}
-    .loop-node-lbl{font-size:11px;font-weight:700;color:var(--text)}
-    .loop-node-sub{font-size:10px;color:var(--muted);margin-top:2px}
-    .loop-arrow{font-size:18px;color:rgba(124,109,235,0.5);padding:0 10px;flex-shrink:0}
-    .loop-shield{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--accent2);background:rgba(93,216,168,0.08);border:1px solid rgba(93,216,168,0.2);padding:4px 12px;border-radius:20px;margin-top:16px}
-
-    /* LOOP ENTERPRISE */
-    .loop-section{background:var(--bg2);padding:72px 40px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-    .loop-inner{max-width:960px;margin:0 auto}
-    .loop-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin-top:48px}
-    .loop-diagram-v{display:flex;flex-direction:column;gap:0;align-items:center}
-    .lnode{background:var(--bg3);border:1px solid rgba(124,109,235,0.25);border-radius:12px;padding:14px 20px;width:100%;text-align:center}
-    .lnode-icon{font-size:20px;margin-bottom:5px}
-    .lnode-title{font-size:13px;font-weight:700}
-    .lnode-sub{font-size:11px;color:var(--muted);margin-top:2px}
-    .lnode.accent{background:rgba(124,109,235,0.1);border-color:rgba(124,109,235,0.5)}
-    .lnode.accent2{background:rgba(93,216,168,0.08);border-color:rgba(93,216,168,0.4)}
-    .larrow{text-align:center;font-size:16px;color:rgba(124,109,235,0.4);padding:6px 0}
-    .larrow-closed{color:rgba(93,216,168,0.5)}
-    .loop-desc h3{font-size:20px;font-weight:700;margin-bottom:14px}
-    .loop-desc p{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:14px}
-    .loop-bullets{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:20px}
-    .loop-bullets li{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--muted);line-height:1.5}
-    .bullet-ok{color:var(--accent2);font-size:14px;margin-top:1px;flex-shrink:0}
-
-    /* ARCH */
-    .arch-box{background:var(--bg3);border:1px solid var(--border2);border-radius:14px;padding:32px;font-family:"JetBrains Mono","Fira Code",monospace;font-size:12px;line-height:1.8;color:var(--muted);overflow-x:auto}
-    .arch-box .c-acc{color:var(--accent)}.arch-box .c-teal{color:var(--accent2)}
-    .arch-box .c-amber{color:var(--amber)}.arch-box .c-muted{color:rgba(136,135,160,0.4)}
-
-    /* TECH CARDS */
-    .tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
-    .tech-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px 24px;transition:border-color .2s}
-    .tech-card:hover{border-color:rgba(124,109,235,0.3)}
-    .tech-layer{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 9px;border-radius:5px;display:inline-block;margin-bottom:14px}
-    .layer-infra{background:rgba(124,109,235,0.12);color:var(--accent)}
-    .layer-model{background:rgba(93,216,168,0.12);color:var(--accent2)}
-    .layer-sec{background:rgba(235,109,124,0.12);color:var(--accent3)}
-    .layer-api{background:rgba(245,196,117,0.12);color:var(--amber)}
-    .tech-card h3{font-size:15px;font-weight:700;margin-bottom:8px}
-    .tech-card p{font-size:13px;color:var(--muted);line-height:1.65}
-    .tech-tag{font-size:11px;color:var(--muted);margin-top:12px;font-family:monospace}
-
-    /* FLOW */
-    .flow-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2px;margin-top:48px}
-    .flow-step{background:var(--bg2);border:1px solid var(--border);padding:24px 18px;position:relative;text-align:center}
-    .flow-step:first-child{border-radius:14px 0 0 14px}
-    .flow-step:last-child{border-radius:0 14px 14px 0}
-    .flow-step::after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:1;font-size:18px;color:rgba(124,109,235,0.4)}
-    .flow-step:last-child::after{display:none}
-    .fs-num{width:28px;height:28px;border-radius:8px;margin:0 auto 10px;background:rgba(124,109,235,0.15);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--accent)}
-    .flow-step h4{font-size:12px;font-weight:700;margin-bottom:5px}
-    .flow-step p{font-size:11px;color:var(--muted);line-height:1.5}
-
-    /* SECURITY */
-    .sec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:40px}
-    .sec-card{background:var(--bg2);border:1px solid rgba(235,109,124,0.18);border-radius:12px;padding:22px 20px}
-    .sec-icon{font-size:20px;margin-bottom:10px}
-    .sec-card h3{font-size:14px;font-weight:700;margin-bottom:6px}
-    .sec-card p{font-size:12px;color:var(--muted);line-height:1.6}
-    .sec-badge{display:inline-block;margin-top:10px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;background:rgba(93,216,168,0.12);color:var(--accent2)}
-    .compliance-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:32px}
-    .comp-badge{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
-    .comp-check{color:var(--accent2);font-size:14px}
-
-    /* ROI */
-    .roi-strip{background:var(--bg2);padding:72px 40px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-    .roi-inner{max-width:1080px;margin:0 auto}
-    .roi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:44px}
-    .roi-card{background:var(--bg);border:1px solid rgba(93,216,168,0.2);border-radius:12px;padding:22px 18px;text-align:center}
-    .roi-num{font-size:32px;font-weight:800;color:var(--accent2);letter-spacing:-1px}
-    .roi-label{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
-    .roi-scenario{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:28px;margin-top:28px}
-    .roi-scenario h3{font-size:16px;font-weight:700;margin-bottom:16px;color:var(--accent2)}
-    .roi-row{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
-    .roi-row:last-child{border-bottom:none;font-weight:700;color:var(--accent2);font-size:15px}
-    .roi-row span:first-child{color:var(--muted)}
-    .roi-row span:last-child{font-weight:600}
-
-    /* DEPLOY */
-    .deploy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:44px}
-    .deploy-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px 24px;position:relative;overflow:hidden}
-    .deploy-card.featured{border-color:rgba(124,109,235,0.45)}
-    .deploy-card.featured::before{content:attr(data-label);position:absolute;top:14px;right:14px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:rgba(124,109,235,0.18);color:var(--accent)}
-    .deploy-icon{font-size:26px;margin-bottom:14px}
-    .deploy-card h3{font-size:16px;font-weight:700;margin-bottom:8px}
-    .deploy-card p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px}
-    .deploy-tags{display:flex;flex-wrap:wrap;gap:6px}
-    .dtag{font-size:11px;padding:2px 8px;border-radius:5px;font-weight:600}
-    .dtag-p{background:rgba(124,109,235,0.12);color:var(--accent)}
-    .dtag-t{background:rgba(93,216,168,0.12);color:var(--accent2)}
-    .dtag-a{background:rgba(245,196,117,0.12);color:var(--amber)}
-
-    /* CTA */
-    .cta-section{background:var(--bg2);padding:80px 40px;text-align:center;border-top:1px solid var(--border)}
-    .cta-inner{max-width:680px;margin:0 auto}
-    .cta-section h2{margin-bottom:16px}
-    .cta-section p{font-size:16px;color:var(--muted);margin-bottom:36px;line-height:1.6}
-    .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-
-    /* FOOTER */
-    footer{padding:48px 40px;border-top:1px solid var(--border);text-align:center;color:var(--muted);font-size:14px}
-    .f-logo{font-size:20px;font-weight:800;margin-bottom:10px;cursor:pointer}
-    .f-logo span{color:var(--accent)}
-    footer a{color:var(--muted);margin:0 12px}
-    footer a:hover{color:var(--text)}
-
-    /* RESPONSIVE */
-    @media(max-width:720px){
-      nav{padding:12px 16px;flex-wrap:wrap;gap:10px}
-      .nav-links{display:none}
-      .nav-center{gap:3px}
-      .nav-tab{padding:5px 10px;font-size:12px}
-      .section,.section-narrow{padding:60px 20px}
-      .full{padding:56px 20px}
-      .stats-bar{gap:30px;padding:28px 20px}
-      .vs-wrap,.biz-banner{padding:60px 20px}
-      .step{grid-template-columns:56px 1fr;gap:16px}
-      .install-box{padding:20px 16px}
-      .biz-top{grid-template-columns:1fr;gap:36px}
-      .biz-cta-box{flex-direction:column}
-      .loop-diagram{gap:8px}
-      .loop-section{padding:56px 20px}
-      .loop-grid{grid-template-columns:1fr;gap:36px}
-      .proof-strip{padding:24px 20px;gap:24px}
-      .flow-step:first-child{border-radius:14px 14px 0 0}
-      .flow-step:last-child{border-radius:0 0 14px 14px}
-      .flow-step::after{display:none}
-      .roi-strip{padding:56px 20px}
-      .cta-section{padding:56px 20px}
-      .hero,.hero-ent{padding:80px 20px 60px}
-    }
-  </style>
-</head>
-<body>
-
-<!-- ══════════════ GLOBAL NAV ══════════════ -->
-<nav>
-  <div style="display:flex;align-items:center">
-    <div class="nav-logo" onclick="goHome()">AI<span>n</span>onymous</div>
-    <span class="nav-badge" id="ent-badge" style="display:none">Enterprise</span>
-  </div>
-  <div class="nav-center">
-    <button class="nav-tab active" id="tab-landing" onclick="setPage('landing')" id="tab-home">
-      <span id="home-label">Accueil</span>
-    </button>
-    <button class="nav-tab" id="tab-enterprise" onclick="setPage('enterprise')">Enterprise</button>
-  </div>
-  <div class="nav-right">
-    <div class="nav-links" id="links-landing">
-      <a id="lnk1" onclick="navScroll('s-comment','s-howitworks')">
-        <span id="lnk1-text">Comment ça marche</span></a>
-      <a id="lnk2" onclick="navScroll('s-pourquoi','s-whyus')">
-        <span id="lnk2-text">Pourquoi nous</span></a>
-      <a id="lnk3" onclick="navScroll('s-installer','s-install')">
-        <span id="lnk3-text">Installer</span></a>
-    </div>
-    <div class="nav-links" id="links-ent" style="display:none">
-      <a onclick="navScroll('s-loop-fr','s-loop-en')">
-        <span id="lnk-loop">Boucle fermée</span></a>
-      <a onclick="navScroll('s-arch-fr','s-arch-en')">Architecture</a>
-      <a onclick="navScroll('s-sec-fr','s-sec-en')">
-        <span id="lnk-sec">Sécurité</span></a>
-      <a onclick="navScroll('s-biz-fr','s-biz-en')">Business case</a>
-    </div>
-    <div class="lang-sw">
-      <button class="active" id="btn-fr" onclick="setLang('fr')">FR</button>
-      <button id="btn-en" onclick="setLang('en')">EN</button>
-    </div>
-    <button class="nav-cta" onclick="window.open('https://github.com/Geoking2104/AInonymous')">
-      <span id="cta-text">Démarrer →</span>
-    </button>
-  </div>
-</nav>
-
-<!-- ══════ LANDING FR ══════ -->
-<div class="page active" id="page-landing-fr">
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AInonymous — L'IA qui vous appartient</title>
-  <style>
     :root {
       --bg: #0a0a0f;
       --bg2: #12121a;
@@ -704,22 +354,375 @@
       .biz-cta-box { flex-direction: column; }
       .loop-diagram { gap: 8px; }
     }
+  
+    :root {
+      --bg: #08080e;
+      --bg2: #10101a;
+      --bg3: #181826;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0eff8;
+      --muted: #8887a0;
+      --accent: #7c6deb;
+      --accent2: #5dd8a8;
+      --accent3: #eb6d7c;
+      --amber: #f5c475;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    code { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: .9em; color: var(--accent2); }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 40px; background: rgba(8,8,14,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-size: 18px; font-weight: 700; }
+    .nav-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px;
+      background: rgba(124,109,235,0.15); color: var(--accent); margin-left: 10px;
+      border: 1px solid rgba(124,109,235,0.3);
+    }
+    .nav-links { display: flex; gap: 24px; font-size: 14px; color: var(--muted); align-items: center; }
+    .nav-back { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .nav-back:hover { color: var(--text); }
+
+    .section { padding: 88px 40px; max-width: 1080px; margin: 0 auto; }
+    .section-narrow { padding: 88px 40px; max-width: 820px; margin: 0 auto; }
+    .full { padding: 72px 40px; }
+    .full-inner { max-width: 1080px; margin: 0 auto; }
+    .eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--accent2); margin-bottom: 14px;
+    }
+    h2 { font-size: clamp(26px, 3.8vw, 42px); font-weight: 800; letter-spacing: -1.5px; line-height: 1.15; margin-bottom: 16px; }
+    h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .section-sub { font-size: 17px; color: var(--muted); max-width: 560px; line-height: 1.6; margin-bottom: 52px; }
+    .divider { border: none; border-top: 1px solid var(--border); }
+
+    .hero {
+      padding: 110px 40px 80px; text-align: center; max-width: 900px; margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 600; color: var(--accent);
+      background: rgba(124,109,235,0.1); border: 1px solid rgba(124,109,235,0.3);
+      padding: 5px 14px; border-radius: 20px; margin-bottom: 28px;
+    }
+    .hero-badge::before { content: '🏢'; font-size: 14px; }
+    h1 { font-size: clamp(36px, 6vw, 64px); font-weight: 800; letter-spacing: -2px; line-height: 1.08; margin-bottom: 22px; }
+    .a1 { color: var(--accent); } .a2 { color: var(--accent2); }
+    .hero-sub { font-size: clamp(16px, 2.2vw, 20px); color: var(--muted); max-width: 620px; margin: 0 auto 40px; line-height: 1.6; }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-p { background: var(--accent); color: #fff; padding: 13px 26px; border-radius: 10px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 7px; transition: opacity .15s, transform .15s; }
+    .btn-p:hover { opacity: .88; transform: translateY(-1px); }
+    .btn-g { border: 1px solid var(--border2); color: var(--muted); padding: 13px 26px; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 7px; transition: border-color .15s, color .15s; }
+    /* PROOF STRIP */
+    .proof-strip {
+      background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      padding: 32px 40px;
+      display: flex; justify-content: center; gap: 48px; flex-wrap: wrap;
+    }
+    .proof-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+    .proof-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
+
+    /* CLOSED LOOP VISUAL */
+    .loop-section { background: var(--bg2); padding: 72px 40px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .loop-inner { max-width: 960px; margin: 0 auto; }
+    .loop-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; margin-top: 48px;
+    }
+    .loop-diagram-v {
+      display: flex; flex-direction: column; gap: 0; align-items: center;
+    }
+    .lnode {
+      background: var(--bg3); border: 1px solid rgba(124,109,235,0.25);
+      border-radius: 12px; padding: 14px 20px; width: 100%; text-align: center;
+      position: relative;
+    }
+    .lnode-icon { font-size: 20px; margin-bottom: 5px; }
+    .lnode-title { font-size: 13px; font-weight: 700; }
+    .lnode-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .lnode.accent { background: rgba(124,109,235,0.1); border-color: rgba(124,109,235,0.5); }
+    .lnode.accent2 { background: rgba(93,216,168,0.08); border-color: rgba(93,216,168,0.4); }
+    .larrow { text-align: center; font-size: 16px; color: rgba(124,109,235,0.4); padding: 6px 0; }
+    .larrow-closed { color: rgba(93,216,168,0.5); }
+    .loop-desc h3 { font-size: 20px; font-weight: 700; margin-bottom: 14px; }
+    .loop-desc p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 14px; }
+    .loop-bullets { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    .loop-bullets li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: var(--muted); line-height: 1.5;
+    }
+    .bullet-ok { color: var(--accent2); font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+
+    /* ARCH DIAGRAM (ASCII-style) */
+    .arch-box {
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 14px; padding: 32px; font-family: 'JetBrains Mono','Fira Code',monospace;
+      font-size: 12px; line-height: 1.8; color: var(--muted); overflow-x: auto;
+    }
+    .arch-box .c-acc { color: var(--accent); }
+    .arch-box .c-teal { color: var(--accent2); }
+    .arch-box .c-amber { color: var(--amber); }
+    .arch-box .c-muted { color: rgba(136,135,160,0.4); }
+
+    /* TECH CARDS */
+    .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .tech-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 24px; transition: border-color .2s;
+    }
+    .tech-card:hover { border-color: rgba(124,109,235,0.3); }
+    .tech-layer {
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 5px; display: inline-block; margin-bottom: 14px;
+    }
+    .layer-infra { background: rgba(124,109,235,0.12); color: var(--accent); }
+    .layer-model { background: rgba(93,216,168,0.12); color: var(--accent2); }
+    .layer-sec   { background: rgba(235,109,124,0.12); color: var(--accent3); }
+    .layer-api   { background: rgba(245,196,117,0.12); color: var(--amber); }
+    .tech-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .tech-card p { font-size: 13px; color: var(--muted); line-height: 1.65; }
+    .tech-tag { font-size: 11px; color: var(--muted); margin-top: 12px; font-family: monospace; }
+
+    /* FUNCTIONAL FLOW */
+    .flow-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 2px; margin-top: 48px; }
+    .flow-step {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 24px 18px; position: relative; text-align: center;
+    }
+    .flow-step:first-child { border-radius: 14px 0 0 14px; }
+    .flow-step:last-child  { border-radius: 0 14px 14px 0; }
+    .flow-step::after {
+      content: '→'; position: absolute; right: -14px; top: 50%;
+      transform: translateY(-50%); z-index: 1;
+      font-size: 18px; color: rgba(124,109,235,0.4);
+    }
+    .flow-step:last-child::after { display: none; }
+    .fs-num {
+      width: 28px; height: 28px; border-radius: 8px; margin: 0 auto 10px;
+      background: rgba(124,109,235,0.15); display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; color: var(--accent);
+    }
+    .flow-step h4 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+    .flow-step p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+    /* SECURITY TABLE */
+    .sec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 40px; }
+    .sec-card {
+      background: var(--bg2); border: 1px solid rgba(235,109,124,0.18);
+      border-radius: 12px; padding: 22px 20px;
+    }
+    .sec-icon { font-size: 20px; margin-bottom: 10px; }
+    .sec-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .sec-card p { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .sec-badge {
+      display: inline-block; margin-top: 10px; font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 5px;
+      background: rgba(93,216,168,0.12); color: var(--accent2);
+    }
+
+    /* BUSINESS CASE TABLE */
+    .bc-table-wrap { overflow-x: auto; margin-top: 44px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+    th { padding: 12px 16px; font-weight: 700; border-bottom: 2px solid var(--border2); text-align: left; color: var(--muted); }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .v-ok { color: var(--accent2); }
+    .v-no { color: var(--accent3); }
+    .col { background: rgba(124,109,235,0.05); }
+    tr.section-row td { background: var(--bg3); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 8px 16px; }
+
+    /* ROI SECTION */
+    .roi-strip {
+      background: var(--bg2); padding: 72px 40px;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .roi-inner { max-width: 1080px; margin: 0 auto; }
+    .roi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 44px; }
+    .roi-card {
+      background: var(--bg); border: 1px solid rgba(93,216,168,0.2);
+      border-radius: 12px; padding: 22px 18px; text-align: center;
+    }
+    .roi-num { font-size: 32px; font-weight: 800; color: var(--accent2); letter-spacing: -1px; }
+    .roi-label { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+    .roi-scenario {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px; margin-top: 28px;
+    }
+    .roi-scenario h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--accent2); }
+    .roi-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .roi-row:last-child { border-bottom: none; font-weight: 700; color: var(--accent2); font-size: 15px; }
+    .roi-row span:first-child { color: var(--muted); }
+    .roi-row span:last-child { font-weight: 600; }
+
+    /* COMPLIANCE */
+    .compliance-grid {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 32px;
+    }
+    .comp-badge {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .comp-check { color: var(--accent2); font-size: 14px; }
+
+    /* DEPLOYMENT MODES */
+    .deploy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 44px; }
+    .deploy-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 24px; position: relative; overflow: hidden;
+    }
+    .deploy-card.featured { border-color: rgba(124,109,235,0.45); }
+    .deploy-card.featured::before {
+      content: 'Recommandé'; position: absolute; top: 14px; right: 14px;
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
+      background: rgba(124,109,235,0.18); color: var(--accent);
+    }
+    .deploy-icon { font-size: 26px; margin-bottom: 14px; }
+    .deploy-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .deploy-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+    .deploy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .dtag { font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 600; }
+    .dtag-p { background: rgba(124,109,235,0.12); color: var(--accent); }
+    .dtag-t { background: rgba(93,216,168,0.12); color: var(--accent2); }
+    .dtag-a { background: rgba(245,196,117,0.12); color: var(--amber); }
+
+    /* FINAL CTA */
+    .cta-section {
+      background: var(--bg2);
+      padding: 80px 40px; text-align: center;
+      border-top: 1px solid var(--border);
+    }
+    .cta-inner { max-width: 680px; margin: 0 auto; }
+    .cta-section h2 { margin-bottom: 16px; }
+    .cta-section p { font-size: 16px; color: var(--muted); margin-bottom: 36px; line-height: 1.6; }
+    .cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    footer {
+      padding: 44px 40px; border-top: 1px solid var(--border);
+      text-align: center; color: var(--muted); font-size: 13px;
+    }
+    .f-logo { font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+    footer a { color: var(--muted); margin: 0 10px; }
+    @media (max-width: 720px) {
+      nav { padding: 12px 20px; }
+      .nav-links { display: none; }
+      .section, .section-narrow { padding: 56px 20px; }
+      .full { padding: 56px 20px; }
+      .proof-strip { padding: 24px 20px; gap: 24px; }
+      .loop-section { padding: 56px 20px; }
+      .loop-grid { grid-template-columns: 1fr; gap: 36px; }
+      .flow-step:first-child { border-radius: 14px 14px 0 0; }
+      .flow-step:last-child  { border-radius: 0 0 14px 14px; }
+      .flow-step::after { display: none; }
+      .roi-strip { padding: 56px 20px; }
+      .cta-section { padding: 56px 20px; }
+    }
+  
+    .deploy-card.featured::before {
+      content: 'Recommended'; position: absolute; top: 14px; right: 14px;
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
+      background: rgba(124,109,235,0.18); color: var(--accent);
+    }
+
+    /* ═══════════════ MOTEUR SPA ═══════════════ */
+    .panel { display: none !important }
+    .panel.active { display: block !important }
+    [onclick] { cursor: pointer }
+    .nav-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px;
+      background: rgba(124,109,235,0.15); color: var(--accent); margin-left: 10px;
+      border: 1px solid rgba(124,109,235,0.3); display: none;
+    }
+    .nav-tab {
+      padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      color: var(--muted); cursor: pointer; border: 1px solid transparent;
+      background: none; font-family: inherit; transition: all .15s;
+    }
+    .nav-tab:hover { color: var(--text) }
+    .nav-tab.active { background: var(--accent); color: #fff }
+    .nav-center { display: flex; align-items: center; gap: 6px }
+    .nav-right  { display: flex; align-items: center; gap: 14px }
+    .nav-land-links {
+      display: flex; gap: 22px; font-size: 13px;
+      color: var(--muted); align-items: center;
+    }
+    .nav-ent-links {
+      display: none; gap: 22px; font-size: 13px;
+      color: var(--muted); align-items: center;
+    }
+    .nav-land-links a,
+    .nav-ent-links  a { cursor: pointer; transition: color .15s }
+    .nav-land-links a:hover,
+    .nav-ent-links  a:hover { color: var(--text) }
+    .lang-sw {
+      display: flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 7px; overflow: hidden;
+    }
+    .lang-sw button {
+      padding: 5px 10px; color: var(--muted); background: none; border: none;
+      cursor: pointer; font-size: 12px; font-weight: 700; font-family: inherit;
+      transition: background .15s, color .15s;
+    }
+    .lang-sw button.active { background: var(--accent); color: #fff }
+    .lang-sw button:hover:not(.active) { color: var(--text) }
+
   </style>
 </head>
 <body>
 
+<!-- ══════════════ NAV ══════════════ -->
+<nav>
+  <div style="display:flex;align-items:center">
+    <div class="nav-logo" onclick="go('landing',state.lang)">AI<span>n</span>onymous</div>
+    <span class="nav-badge" id="ent-badge">Enterprise</span>
+  </div>
+  <div class="nav-center">
+    <button class="nav-tab active" id="tab-land" onclick="go('landing',state.lang)">
+      <span id="lbl-home">Accueil</span>
+    </button>
+    <button class="nav-tab" id="tab-ent" onclick="go('enterprise',state.lang)">Enterprise</button>
+  </div>
+  <div class="nav-right">
+    <div class="nav-land-links" id="nav-land">
+      <a onclick="navlink('l1')"><span id="lbl-l1">Comment ça marche</span></a>
+      <a onclick="navlink('l2')"><span id="lbl-l2">Pourquoi nous</span></a>
+      <a onclick="navlink('l3')"><span id="lbl-l3">Installer</span></a>
+    </div>
+    <div class="nav-ent-links" id="nav-ent">
+      <a onclick="navlink('e1')"><span id="lbl-e1">Boucle fermée</span></a>
+      <a onclick="navlink('e2')">Architecture</a>
+      <a onclick="navlink('e3')"><span id="lbl-e3">Sécurité</span></a>
+      <a onclick="navlink('e4')">Business case</a>
+    </div>
+    <div class="lang-sw">
+      <button id="btn-fr" class="active" onclick="setLang('fr')">FR</button>
+      <button id="btn-en" onclick="setLang('en')">EN</button>
+    </div>
+    <button class="nav-cta" onclick="window.open('https://github.com/Geoking2104/AInonymous','_blank')">
+      <span id="lbl-cta">Démarrer →</span>
+    </button>
+  </div>
+</nav>
 
-
+<!-- ══════ PANEL: LANDING FR ══════ -->
+<div class="panel active" id="p-landing-fr">
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge"><div class="dot"></div>Open source · Apache 2.0 · Bêta publique</div>
-  <h1>L'IA puissante,<br><span class="a1">sans serveur.</span><br><span class="a2">Sans compte.</span></h1>
+  <h1>L'IA indépendante,<br><span class="a1">sans serveur.</span><br><span class="a2">Sans compte.</span></h1>
   <p class="hero-sub">
     AInonymous est un réseau pair-à-pair où vos voisins font tourner l'IA pour vous, et vous pour eux — sans aucune entreprise au milieu.
   </p>
   <div class="hero-actions">
-    <a href="#installer" class="btn-p">⚡ Rejoindre le réseau</a>
-    <a href="#comment" class="btn-g">Voir comment ça marche</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('lf-install')" class="btn-p">⚡ Rejoindre le réseau</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('lf-comment')" class="btn-g">Voir comment ça marche</a>
   </div>
 </div>
 
@@ -761,7 +764,7 @@
 </div>
 
 <!-- HOW IT WORKS -->
-<div class="section" id="comment" style="padding-top: 0">
+<div class="section" id="lf-comment" style="padding-top: 0">
   <div class="eyebrow">La solution</div>
   <h2>Un réseau IA comme BitTorrent,<br>mais pour votre cerveau.</h2>
   <p class="section-sub">Imaginez un village où chacun prête un peu de sa puissance de calcul aux autres. En échange, quand vous avez besoin d'IA, le village travaille pour vous.</p>
@@ -813,7 +816,7 @@
 </div>
 
 <!-- FEATURES -->
-<div class="section" id="pourquoi" style="padding-top: 0">
+<div class="section" id="lf-pourquoi" style="padding-top: 0">
   <div class="eyebrow">Pourquoi AInonymous</div>
   <h2>Tout ce qu'on vous a retiré,<br>on vous le rend.</h2>
   <p class="section-sub">Pas un concurrent de ChatGPT — une alternative fondamentalement différente dans sa philosophie.</p>
@@ -859,32 +862,227 @@
     <table>
       <thead>
         <tr>
-          <th>Critère</th>
+          <th>Criteria</th>
           <th>ChatGPT / Claude</th>
           <th>Ollama (local)</th>
           <th class="hl">AInonymous ✦</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td>Prix</td><td>20€/mois</td><td>Gratuit</td><td class="col ok">Gratuit</td></tr>
-        <tr><td>Confidentialité</td><td><span class="no">✗ Données envoyées</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ Chiffré P2P</td></tr>
-        <tr><td>GPU requis</td><td>Non (cloud)</td><td>Oui (≥8 GB VRAM)</td><td class="col ok">Non (mutualisé)</td></tr>
+        <tr><td>Prix</td><td>~$20/month</td><td>Gratuit</td><td class="col ok">Free</td></tr>
+        <tr><td>Confidentialité</td><td><span class="no">✗ Données envoyées to servers</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ P2P encrypted</td></tr>
+        <tr><td>GPU requis</td><td>Non (cloud)</td><td>Oui (≥8 GB VRAM)</td><td class="col ok">No (pooled)</td></tr>
         <tr><td>Résistance censure</td><td><span class="no">✗ Centralisé</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Décentralisé</td></tr>
-        <tr><td>Qualité modèle</td><td>Très haute</td><td>Haute (selon GPU)
+        <tr><td>Qualité modèle</td><td>Très haute</td><td>Haute (selon GPU)</td><td class="col ok">High (Gemma 4)</td></tr>
+        <tr><td>Account required</td><td><span class="no">✗ Mandatory</span></td><td><span class="ok">✓ None</span></td><td class="col ok">✓ None</td></tr>
+        <tr><td>OpenAI API compatible</td><td>Yes (paid)</td><td>Yes</td><td class="col ok">Yes (localhost)</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<!-- ══════ LANDING EN ══════ -->
-<div class="page" id="page-landing-en">
+<!-- MODELS -->
+<div class="section">
+  <div class="eyebrow">Modèles disponibles</div>
+  <h2>Les meilleurs modèles,<br>entièrement gratuits.</h2>
+  <p class="section-sub">AInonymous privilégie Gemma 4 de Google — performant, compact, Apache 2.0. Chaque modèle est automatiquement distribué selon la puissance disponible dans le réseau.</p>
+  <div class="models-grid">
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · E2B</div>
+      <div class="model-meta">~3 GB · Edge</div>
+      <div class="bar-bg"><div class="bar" style="width:28%"></div></div>
+      <div class="model-use">Light nodes · draft</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · E4B</div>
+      <div class="model-meta">~5 GB · Edge</div>
+      <div class="bar-bg"><div class="bar" style="width:42%"></div></div>
+      <div class="model-use">Speed + quality</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · 26B MoE</div>
+      <div class="model-meta">~18 GB · Multi-node</div>
+      <div class="bar-bg"><div class="bar" style="width:70%"></div></div>
+      <div class="model-use">Complex tasks</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Gemma 4 · 31B</div>
+      <div class="model-meta">~20 GB · Flagship</div>
+      <div class="bar-bg"><div class="bar" style="width:82%"></div></div>
+      <div class="model-use">Best quality</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Qwen3 · 32B</div>
+      <div class="model-meta">~20 GB · Code</div>
+      <div class="bar-bg"><div class="bar bar-p" style="width:80%"></div></div>
+      <div class="model-use">Code · Raisonnement</div>
+    </div>
+    <div class="model-card">
+      <div class="model-name">Llama 3.3 · 70B</div>
+      <div class="model-meta">~43 GB · Multi-node</div>
+      <div class="bar-bg"><div class="bar bar-c" style="width:94%"></div></div>
+      <div class="model-use">Maximum power</div>
+    </div>
+  </div>
+</div>
+
+<!-- BUSINESS CASE -->
+<div class="biz-banner" id="lf-enterprise">
+  <div class="biz-inner">
+    <div class="eyebrow">For enterprises</div>
+    <h2 style="margin-bottom: 14px">Your servers are already running.<br>Make them work for you.</h2>
+    <p style="font-size:17px;color:var(--muted);max-width:600px;margin-bottom:48px;line-height:1.6">
+      AInonymous Enterprise creates a closed, sovereign AI network inside your infrastructure.
+      Your machines share compute power to run state-of-the-art models — without a single byte leaving your network.
+    </p>
+
+    <!-- Closed loop diagram -->
+    <div style="text-align:center;margin-bottom:48px">
+      <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Closed P2P loop — 100% on-premises</p>
+      <div class="loop-diagram">
+        <div class="loop-node">
+          <div class="loop-node-icon">🖥️</div>
+          <div class="loop-node-lbl">Postes de travail</div>
+          <div class="loop-node-sub">GPU / CPU inactifs</div>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-node" style="border-color:rgba(124,109,235,0.6);background:rgba(124,109,235,0.08)">
+          <div class="loop-node-icon">⚡</div>
+          <div class="loop-node-lbl">Réseau privé</div>
+          <div class="loop-node-sub">DHT Holochain interne</div>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-node">
+          <div class="loop-node-icon">🤖</div>
+          <div class="loop-node-lbl">Modèles IA</div>
+          <div class="loop-node-sub">Gemma 4 · Qwen3</div>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-node">
+          <div class="loop-node-icon">👥</div>
+          <div class="loop-node-lbl">Vos équipes</div>
+          <div class="loop-node-sub">OpenAI-compat. API</div>
+        </div>
+        <div class="loop-arrow" style="color:rgba(93,216,168,0.6)">↺</div>
+      </div>
+      <div class="loop-shield">🔒 Data confined to corporate network — zero external traffic</div>
+    </div>
+
+    <!-- KPIs + description -->
+    <div class="biz-top">
+      <div>
+        <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">The compute you're already paying for sleeps at night.</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">
+          A 200-person company has on average several teraflops sitting idle between 7pm and 8am. AInonymous turns them into AI inference infrastructure — without buying a single additional GPU.
+        </p>
+        <p style="font-size:14px;color:var(--muted);line-height:1.7">
+          The bigger your organization, the more powerful your AI. Every new machine is an additional compute unit. The network grows stronger with your headcount — not with a cloud vendor's credit card.
+        </p>
+      </div>
+      <div class="biz-kpi-grid">
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">~70%</div>
+          <div class="biz-kpi-lbl">of enterprise CPU/GPU idle outside business hours</div>
+        </div>
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">$0</div>
+          <div class="biz-kpi-lbl">additional cloud AI cost using existing hardware</div>
+        </div>
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">100%</div>
+          <div class="biz-kpi-lbl">of data stays within your GDPR perimeter</div>
+        </div>
+        <div class="biz-kpi">
+          <div class="biz-kpi-num">×N</div>
+          <div class="biz-kpi-lbl">power scales with every new employee</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Business advantages -->
+    <div class="biz-adv-grid">
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🏛️</div>
+        <h3>Complete data sovereignty</h3>
+        <p>GDPR, HIPAA, SOC 2 compliance guaranteed by architecture. No data leaves your infrastructure — no Data Processing Agreement needed with any third party.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">📈</div>
+        <h3>AI that grows with your fleet</h3>
+        <p>Every machine added increases inference capacity. No pricing tiers, no quota negotiation — power scales linearly with your headcount.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🔐</div>
+        <h3>Enterprise cryptographic identities</h3>
+        <p>Every node is authenticated via ed25519. Holochain Membrane Proofs enable granular access control: who can submit tasks, who can run models.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🧠</div>
+        <h3>Fine-tuning on internal data</h3>
+        <p>Models can be fine-tuned on your documents, processes, and domain vocabulary — without ever leaving the network. Your AI becomes an expert in your industry.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">🔌</div>
+        <h3>Transparent integration</h3>
+        <p>Local OpenAI-compatible API on <code style="font-size:12px;color:var(--accent2)">localhost:9337</code>. Your existing tools (Copilot, n8n, LangChain, Cursor) connect with no changes.</p>
+      </div>
+      <div class="biz-adv">
+        <div class="biz-adv-icon">📋</div>
+        <h3>Immutable audit trail</h3>
+        <p>Every inference task is cryptographically chained in the Holochain source chain. Full traceability for compliance and internal audits.</p>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="biz-cta-box">
+      <div>
+        <h3>Private AI network for your enterprise</h3>
+        <p>Explore the technical architecture, use cases, and detailed business model on our dedicated enterprise deployment page.</p>
+      </div>
+      <a href="javascript:void(0)" onclick="go('enterprise','en')" class="btn-enterprise">Voir la page Entreprise →</a>
+    </div>
+  </div>
+</div>
+
+<!-- INSTALL -->
+<div class="section" id="lf-install" style="padding-top: 0">
+  <div class="eyebrow">Installation</div>
+  <h2>Prêt en 30 secondes.</h2>
+  <p class="section-sub">One command. Your machine joins the network, picks a model suited to its power, and starts contributing — and receiving.</p>
+  <div class="install-box">
+    <pre><span class="comment"># 1. Install AInonymous</span>
+curl -fsSL https://ainonymous.network/install.sh | sh
+
+<span class="comment"># 2. Join the network automatically</span>
+ainonymous --auto
+
+<span class="comment"># 3. Or pick your model</span>
+ainonymous --model gemma4-26b-moe
+
+<span class="comment"># 4. Test in 5 seconds</span>
+curl http://localhost:9337/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gemma4-31b","messages":[{"role":"user","content":"Hello!"}]}'</pre>
+  </div>
+  <div style="margin-top: 24px; display: flex; gap: 14px; flex-wrap: wrap;">
+    <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Voir sur GitHub →</a>
+    <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Documentation technique</a>
+  </div>
+</div>
+</div>
+
+<!-- ══════ PANEL: LANDING EN ══════ -->
+<div class="panel" id="p-landing-en">
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge"><div class="dot"></div>Open source · Apache 2.0 · Public Beta</div>
-  <h1>Powerful AI,<br><span class="a1">no server.</span><br><span class="a2">No account.</span></h1>
+  <h1>Independent AI,<br><span class="a1">no server.</span><br><span class="a2">No account.</span></h1>
   <p class="hero-sub">
     AInonymous is a peer-to-peer network where your neighbors run AI for you, and you for them — with no company in the middle.
   </p>
   <div class="hero-actions">
-    <a href="#install" class="btn-p">⚡ Join the network</a>
-    <a href="#how-it-works" class="btn-g">See how it works</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('le-install')" class="btn-p">⚡ Join the network</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('le-how-it-works')" class="btn-g">See how it works</a>
   </div>
 </div>
 
@@ -926,7 +1124,7 @@
 </div>
 
 <!-- HOW IT WORKS -->
-<div class="section" id="how-it-works" style="padding-top: 0">
+<div class="section" id="le-how-it-works" style="padding-top: 0">
   <div class="eyebrow">The solution</div>
   <h2>An AI network like BitTorrent,<br>but for your brain.</h2>
   <p class="section-sub">Imagine a village where everyone lends a little compute power to their neighbors. In return, when you need AI, the village works for you.</p>
@@ -978,7 +1176,7 @@
 </div>
 
 <!-- FEATURES -->
-<div class="section" id="why-us" style="padding-top: 0">
+<div class="section" id="le-why-us" style="padding-top: 0">
   <div class="eyebrow">Why AInonymous</div>
   <h2>Everything that was taken from you,<br>given back.</h2>
   <p class="section-sub">Not a ChatGPT competitor — a fundamentally different alternative in its philosophy.</p>
@@ -1089,7 +1287,7 @@
 </div>
 
 <!-- BUSINESS CASE -->
-<div class="biz-banner" id="enterprise">
+<div class="biz-banner" id="le-enterprise">
   <div class="biz-inner">
     <div class="eyebrow">For enterprises</div>
     <h2 style="margin-bottom: 14px">Your servers are already running.<br>Make them work for you.</h2>
@@ -1201,13 +1399,13 @@
         <h3>Private AI network for your enterprise</h3>
         <p>Explore the technical architecture, use cases, and detailed business model on our dedicated enterprise deployment page.</p>
       </div>
-      <a href="#" onclick="setPage('enterprise');return false;" class="btn-enterprise">View Enterprise page →</a>
+      <a href="javascript:void(0)" onclick="go('enterprise','en')" class="btn-enterprise">View Enterprise page →</a>
     </div>
   </div>
 </div>
 
 <!-- INSTALL -->
-<div class="section" id="install" style="padding-top: 0">
+<div class="section" id="le-install" style="padding-top: 0">
   <div class="eyebrow">Installation</div>
   <h2>Ready in 30 seconds.</h2>
   <p class="section-sub">One command. Your machine joins the network, picks a model suited to its power, and starts contributing — and receiving.</p>
@@ -1233,11 +1431,8 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 </div>
 
-<!-- ══════ ENTERPRISE FR ══════ -->
-<div class="page" id="page-enterprise-fr">
-<!-- NAV -->
-
-
+<!-- ══════ PANEL: ENTERPRISE FR ══════ -->
+<div class="panel" id="p-enterprise-fr">
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge">Réseau d'IA privé — on-premises</div>
@@ -1246,8 +1441,8 @@ curl http://localhost:9337/v1/chat/completions \
     Un réseau P2P fermé qui transforme la puissance de calcul dormante de vos machines en infrastructure d'IA privée — sans cloud, sans fuite de données, sans coût marginal.
   </p>
   <div class="hero-actions">
-    <a href="#business" class="btn-p">📊 Voir le business case</a>
-    <a href="#architecture" class="btn-g">Architecture technique →</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('ef-business')" class="btn-p">📊 Voir le business case</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('ef-architecture')" class="btn-g">Architecture technique →</a>
   </div>
 </div>
 
@@ -1261,7 +1456,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- CLOSED LOOP -->
-<div class="loop-section" id="closed-loop">
+<div class="loop-section" id="ef-closed-loop">
   <div class="loop-inner">
     <div class="eyebrow">Boucle P2P fermée</div>
     <h2>Un réseau d'IA qui ne sort<br>jamais de chez vous.</h2>
@@ -1318,7 +1513,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- ARCHITECTURE -->
-<div class="section" id="architecture">
+<div class="section" id="ef-architecture">
   <div class="eyebrow">Architecture technique</div>
   <h2>Cinq couches. Zéro dépendance externe.</h2>
   <p class="section-sub">Chaque composant tourne sur votre infrastructure. La cryptographie remplace la confiance envers des tiers.</p>
@@ -1443,7 +1638,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- SECURITY -->
-<div class="section" id="securite">
+<div class="section" id="ef-securite">
   <div class="eyebrow">Sécurité & conformité</div>
   <h2>Conçu pour les environnements<br>les plus exigeants.</h2>
   <p class="section-sub">Chaque couche du système est pensée pour satisfaire les exigences des DSI, DPO et RSSI.</p>
@@ -1503,7 +1698,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- BUSINESS CASE -->
-<div class="roi-strip" id="business">
+<div class="roi-strip" id="ef-business">
   <div class="roi-inner">
     <div class="eyebrow">Business case</div>
     <h2>Le calcul est simple.</h2>
@@ -1667,7 +1862,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- DEPLOYMENT MODES -->
-<div class="section" id="deploiement" style="padding-top: 0">
+<div class="section" id="ef-deploiement" style="padding-top: 0">
   <div class="eyebrow">Modes de déploiement</div>
   <h2>Du pilote à l'échelle groupe.</h2>
   <p class="section-sub">Démarrez petit, scalez sans migration — l'architecture est identique à 5 ou 5 000 nœuds.</p>
@@ -1724,17 +1919,14 @@ curl http://localhost:9337/v1/chat/completions \
     <div class="cta-actions">
       <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Accéder au code source →</a>
       <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Documentation technique</a>
-      <a href="#" onclick="setPage('landing');return false;" class="btn-g">← Retour à l'accueil</a>
+      <a href="javascript:void(0)" onclick="go('landing','fr')" class="btn-g">← Retour à l'accueil</a>
     </div>
   </div>
 </div>
 </div>
 
-<!-- ══════ ENTERPRISE EN ══════ -->
-<div class="page" id="page-enterprise-en">
-<!-- NAV -->
-
-
+<!-- ══════ PANEL: ENTERPRISE EN ══════ -->
+<div class="panel" id="p-enterprise-en">
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge">Private AI network — on-premises</div>
@@ -1743,8 +1935,8 @@ curl http://localhost:9337/v1/chat/completions \
     A closed P2P network that turns the idle compute power of your machines into private AI infrastructure — no cloud, no data leakage, no marginal cost.
   </p>
   <div class="hero-actions">
-    <a href="#business" class="btn-p">📊 View business case</a>
-    <a href="#architecture" class="btn-g">Technical architecture →</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('ee-business')" class="btn-p">📊 View business case</a>
+    <a href="javascript:void(0)" onclick="scrollTo2('ee-architecture')" class="btn-g">Technical architecture →</a>
   </div>
 </div>
 
@@ -1758,7 +1950,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- CLOSED LOOP -->
-<div class="loop-section" id="closed-loop">
+<div class="loop-section" id="ee-closed-loop">
   <div class="loop-inner">
     <div class="eyebrow">Closed P2P loop</div>
     <h2>An AI network that never<br>leaves your premises.</h2>
@@ -1815,7 +2007,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- ARCHITECTURE -->
-<div class="section" id="architecture">
+<div class="section" id="ee-architecture">
   <div class="eyebrow">Technical architecture</div>
   <h2>Five layers. Zero external dependencies.</h2>
   <p class="section-sub">Every component runs on your infrastructure. Cryptography replaces trust in third parties.</p>
@@ -1940,7 +2132,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- SECURITY -->
-<div class="section" id="security">
+<div class="section" id="ee-security">
   <div class="eyebrow">Security & compliance</div>
   <h2>Built for the most demanding<br>environments.</h2>
   <p class="section-sub">Every layer of the system is designed to satisfy the requirements of CISOs, DPOs, and security teams.</p>
@@ -2000,7 +2192,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- BUSINESS CASE -->
-<div class="roi-strip" id="business">
+<div class="roi-strip" id="ee-business">
   <div class="roi-inner">
     <div class="eyebrow">Business case</div>
     <h2>The math is simple.</h2>
@@ -2164,7 +2356,7 @@ curl http://localhost:9337/v1/chat/completions \
 </div>
 
 <!-- DEPLOYMENT MODES -->
-<div class="section" id="deployment" style="padding-top: 0">
+<div class="section" id="ee-deployment" style="padding-top: 0">
   <div class="eyebrow">Deployment modes</div>
   <h2>From pilot to enterprise scale.</h2>
   <p class="section-sub">Start small, scale without migration — the architecture is identical at 5 or 5,000 nodes.</p>
@@ -2221,97 +2413,94 @@ curl http://localhost:9337/v1/chat/completions \
     <div class="cta-actions">
       <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Access source code →</a>
       <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Technical documentation</a>
-      <a href="#" onclick="setPage('landing');return false;" class="btn-g">← Back to home</a>
+      <a href="javascript:void(0)" onclick="go('landing','en')" class="btn-g">← Back to home</a>
     </div>
   </div>
 </div>
 </div>
 
-<!-- ══════ SHARED FOOTER ══════ -->
-<footer>
-  <div class="f-logo" onclick="goHome()">AI<span>n</span>onymous</div>
-  <p id="footer-tagline" style="margin-bottom:16px">L'IA décentralisée, pour tous, pour toujours.</p>
-  <div>
-    <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
-    <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">Docs</a>
-    <a onclick="setPage('enterprise')">Enterprise</a>
-    <a href="https://github.com/Geoking2104/AInonymous/blob/main/LICENSE">Apache 2.0</a>
-  </div>
-  <p style="margin-top:28px;font-size:12px;opacity:.4">Holochain · Gemma 4 · Goose · llama.cpp · Apache 2.0</p>
-</footer>
+
 
 <script>
-  var lang = 'fr';
-  var page = 'landing';
+// ── ÉTAT
+var state = { page: 'landing', lang: 'fr' };
 
-  var i18n = {
-    'home-label':    {fr:'Accueil', en:'Home'},
-    'cta-text':      {fr:'Démarrer →', en:'Get started →'},
-    'footer-tagline':{fr:'L'IA décentralisée, pour tous, pour toujours.', en:'Decentralized AI, for everyone, forever.'},
-    'lnk1-text':     {fr:'Comment ça marche', en:'How it works'},
-    'lnk2-text':     {fr:'Pourquoi nous', en:'Why us'},
-    'lnk3-text':     {fr:'Installer', en:'Install'},
-    'lnk-loop':      {fr:'Boucle fermée', en:'Closed loop'},
-    'lnk-sec':       {fr:'Sécurité', en:'Security'}
-  };
+// ── I18N
+var i18n = {
+  'lbl-home': { fr: 'Accueil',           en: 'Home' },
+  'lbl-cta':  { fr: 'Démarrer →',   en: 'Get started →' },
+  'lbl-l1':   { fr: 'Comment ça marche', en: 'How it works' },
+  'lbl-l2':   { fr: 'Pourquoi nous',     en: 'Why us' },
+  'lbl-l3':   { fr: 'Installer',         en: 'Install' },
+  'lbl-e1':   { fr: 'Boucle fermée', en: 'Closed loop' },
+  'lbl-e3':   { fr: 'Sécurité', en: 'Security' },
+};
 
-  function applyLang() {
-    for (var id in i18n) {
-      var el = document.getElementById(id);
-      if (el) el.textContent = i18n[id][lang];
-    }
-    document.getElementById('btn-fr').className = lang === 'fr' ? 'active' : '';
-    document.getElementById('btn-en').className = lang === 'en' ? 'active' : '';
-    document.documentElement.lang = lang;
+// ── LIENS NAV (fr-id → section dans panneau FR, en-id → panneau EN)
+var navLinks = {
+  l1: { fr: 'lf-comment',     en: 'le-how-it-works' },
+  l2: { fr: 'lf-pourquoi',    en: 'le-why-us' },
+  l3: { fr: 'lf-install',     en: 'le-install' },
+  e1: { fr: 'ef-closed-loop', en: 'ee-closed-loop' },
+  e2: { fr: 'ef-architecture',en: 'ee-architecture' },
+  e3: { fr: 'ef-securite',    en: 'ee-security' },
+  e4: { fr: 'ef-business',    en: 'ee-business' },
+};
+
+// ── RENDER
+function render() {
+  // Panneaux
+  document.querySelectorAll('.panel').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'p-' + state.page + '-' + state.lang);
+  });
+  // Onglets
+  document.getElementById('tab-land').className = 'nav-tab' + (state.page === 'landing'    ? ' active' : '');
+  document.getElementById('tab-ent').className  = 'nav-tab' + (state.page === 'enterprise' ? ' active' : '');
+  // Badge
+  document.getElementById('ent-badge').style.display = (state.page === 'enterprise') ? '' : 'none';
+  // Liens nav
+  document.getElementById('nav-land').style.display = (state.page === 'landing')    ? 'flex' : 'none';
+  document.getElementById('nav-ent').style.display  = (state.page === 'enterprise') ? 'flex' : 'none';
+  // Boutons langue
+  document.getElementById('btn-fr').className = (state.lang === 'fr') ? 'active' : '';
+  document.getElementById('btn-en').className = (state.lang === 'en') ? 'active' : '';
+  document.documentElement.lang = state.lang;
+  // Textes
+  for (var id in i18n) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = i18n[id][state.lang];
   }
+}
 
-  function applyPage() {
-    // hide all pages
-    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
-    // show current
-    var id = 'page-' + page + '-' + lang;
-    var panel = document.getElementById(id);
-    if (panel) panel.classList.add('active');
+// ── NAVIGATION
+function go(page, lang) {
+  if (lang !== undefined) state.lang = lang;
+  state.page = page;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-    // nav tabs
-    document.getElementById('tab-landing').className   = 'nav-tab' + (page === 'landing' ? ' active' : '');
-    document.getElementById('tab-enterprise').className = 'nav-tab' + (page === 'enterprise' ? ' active' : '');
+function setLang(lang) {
+  state.lang = lang;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-    // enterprise badge
-    document.getElementById('ent-badge').style.display = page === 'enterprise' ? '' : 'none';
+// Scroll vers une section (avec délai pour laisser le display:block s'appliquer)
+function scrollTo2(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+}
 
-    // nav link sets
-    document.getElementById('links-landing').style.display = page === 'landing' ? '' : 'none';
-    document.getElementById('links-ent').style.display     = page === 'enterprise' ? '' : 'none';
+// Lien nav contextuel
+function navlink(key) {
+  var map = navLinks[key];
+  if (map) scrollTo2(map[state.lang]);
+}
 
-    window.scrollTo({top: 0, behavior: 'smooth'});
-  }
-
-  function setLang(l) {
-    lang = l;
-    applyLang();
-    applyPage();
-  }
-
-  function setPage(p) {
-    page = p;
-    applyPage();
-  }
-
-  function goHome() {
-    page = 'landing';
-    applyPage();
-  }
-
-  function navScroll(idFr, idEn) {
-    var targetId = lang === 'fr' ? idFr : idEn;
-    var el = document.getElementById(targetId);
-    if (el) el.scrollIntoView({behavior: 'smooth'});
-  }
-
-  // Init
-  applyLang();
-  applyPage();
+// ── INIT
+render();
 </script>
 </body>
 </html>

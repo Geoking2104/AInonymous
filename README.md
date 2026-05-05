@@ -143,10 +143,21 @@ Apache 2.0 — aligné avec Holochain (Apache 2.0), Goose (Apache 2.0), Gemma 4 
 
 ## Site Web / Website
 
+### ✦ Fichier unique tout-en-un
+
+**[→ Voir le site en ligne](https://htmlpreview.github.io/?https://github.com/Geoking2104/AInonymous/blob/main/site/ainonymous.html)**
+
+> `site/ainonymous.html` — fichier HTML autonome contenant les 4 pages (Landing FR/EN + Enterprise FR/EN) avec navigation JS intégrée, sélecteur de langue et tous les liens fonctionnels. Aucune dépendance externe.
+
+---
+
+### Pages individuelles
+
 Les fichiers HTML ci-dessous sont autonomes (aucune dépendance externe) — ouvrez-les directement dans un navigateur ou déployez-les sur n'importe quel hébergeur statique.
 
 | Fichier | Langue | Description |
 |---|---|---|
+| `site/ainonymous.html` | 🇫🇷🇬🇧 FR + EN | **Tout-en-un** — Landing + Enterprise avec switcher FR/EN |
 | `site/landing.html` | 🇫🇷 Français | Page d'accueil grand public |
 | `site/landing-en.html` | 🇬🇧 English | Public landing page |
 | `site/enterprise.html` | 🇫🇷 Français | Page entreprise — architecture & business case |
