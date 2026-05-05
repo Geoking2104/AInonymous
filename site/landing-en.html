@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AInonymous — L'IA qui vous appartient</title>
+  <title>AInonymous — The AI that belongs to you</title>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -40,6 +40,12 @@
     .nav-logo span { color: var(--accent); }
     .nav-links { display: flex; gap: 28px; font-size: 14px; color: var(--muted); align-items: center; }
     .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: #fff;
+      padding: 8px 18px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; transition: opacity .15s;
+    }
+    .nav-cta:hover { opacity: .85; }
     .lang-switch {
       display: flex; align-items: center; gap: 2px;
       font-size: 12px; font-weight: 700;
@@ -53,12 +59,6 @@
       background: var(--accent); color: #fff;
     }
     .lang-switch a:hover:not(.active) { color: var(--text); }
-    .nav-cta {
-      background: var(--accent); color: #fff;
-      padding: 8px 18px; border-radius: 8px;
-      font-size: 14px; font-weight: 600; transition: opacity .15s;
-    }
-    .nav-cta:hover { opacity: .85; }
 
     /* LAYOUT */
     .section { padding: 96px 40px; max-width: 1080px; margin: 0 auto; }
@@ -360,74 +360,74 @@
 <nav>
   <div class="nav-logo">AI<span>n</span>onymous</div>
   <div class="nav-links">
-    <a href="#comment">Comment ça marche</a>
-    <a href="#pourquoi">Pourquoi nous</a>
-    <a href="#installer">Installer</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#why-us">Why us</a>
+    <a href="#install">Install</a>
     <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
-    <a href="enterprise.html" style="color: var(--accent2); font-weight: 600;">Entreprises ✦</a>
+    <a href="enterprise-en.html" style="color: var(--accent2); font-weight: 600;">Enterprise ✦</a>
     <div class="lang-switch">
-      <a href="landing.html" class="active">FR</a>
-      <a href="landing-en.html">EN</a>
+      <a href="landing.html">FR</a>
+      <a href="landing-en.html" class="active">EN</a>
     </div>
   </div>
-  <a href="https://github.com/Geoking2104/AInonymous" class="nav-cta">Démarrer →</a>
+  <a href="https://github.com/Geoking2104/AInonymous" class="nav-cta">Get started →</a>
 </nav>
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-badge"><div class="dot"></div>Open source · Apache 2.0 · Bêta publique</div>
-  <h1>L'IA puissante,<br><span class="a1">sans serveur.</span><br><span class="a2">Sans compte.</span></h1>
+  <div class="hero-badge"><div class="dot"></div>Open source · Apache 2.0 · Public Beta</div>
+  <h1>Powerful AI,<br><span class="a1">no server.</span><br><span class="a2">No account.</span></h1>
   <p class="hero-sub">
-    AInonymous est un réseau pair-à-pair où vos voisins font tourner l'IA pour vous, et vous pour eux — sans aucune entreprise au milieu.
+    AInonymous is a peer-to-peer network where your neighbors run AI for you, and you for them — with no company in the middle.
   </p>
   <div class="hero-actions">
-    <a href="#installer" class="btn-p">⚡ Rejoindre le réseau</a>
-    <a href="#comment" class="btn-g">Voir comment ça marche</a>
+    <a href="#install" class="btn-p">⚡ Join the network</a>
+    <a href="#how-it-works" class="btn-g">See how it works</a>
   </div>
 </div>
 
 <!-- STATS -->
 <div class="stats-bar">
-  <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Serveur central</div></div>
-  <div class="stat"><div class="stat-num">0€</div><div class="stat-lbl">Abonnement</div></div>
-  <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Données collectées</div></div>
+  <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Central server</div></div>
+  <div class="stat"><div class="stat-num">$0</div><div class="stat-lbl">Subscription</div></div>
+  <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">Data collected</div></div>
   <div class="stat"><div class="stat-num">100%</div><div class="stat-lbl">Open source</div></div>
 </div>
 
 <!-- PROBLEM -->
 <div class="section">
-  <div class="eyebrow">Le problème</div>
-  <h2>L'IA actuelle vous surveille.<br>Et vous le payez cher.</h2>
-  <p class="section-sub">ChatGPT, Claude, Gemini — ces services sont excellents, mais ils passent par des serveurs centralisés qui enregistrent vos conversations et vous facturent chaque mois.</p>
+  <div class="eyebrow">The problem</div>
+  <h2>Today's AI is watching you.<br>And charging you for it.</h2>
+  <p class="section-sub">ChatGPT, Claude, Gemini — excellent services, but they run through centralized servers that log your conversations and bill you every month.</p>
   <div class="prob-grid">
     <div class="prob-card">
       <div class="prob-icon">👁️</div>
-      <h3>Vos conversations sont lues</h3>
-      <p>Tout ce que vous tapez est stocké et analysé pour entraîner les prochains modèles.</p>
+      <h3>Your conversations are read</h3>
+      <p>Everything you type is stored and analyzed to train future models.</p>
     </div>
     <div class="prob-card">
       <div class="prob-icon">🏦</div>
-      <h3>Un abonnement à vie</h3>
-      <p>20€/mois en moyenne. Si vous arrêtez de payer, vous perdez l'accès. Pour toujours.</p>
+      <h3>A lifelong subscription</h3>
+      <p>~$20/month on average. Stop paying and you lose access. Forever.</p>
     </div>
     <div class="prob-card">
       <div class="prob-icon">🔒</div>
-      <h3>Un seul point de défaillance</h3>
-      <p>Si OpenAI tombe, vous tombez aussi. Si les conditions changent, vous n'avez rien à dire.</p>
+      <h3>A single point of failure</h3>
+      <p>If OpenAI goes down, you go down too. If terms change, you have no say.</p>
     </div>
     <div class="prob-card">
       <div class="prob-icon">🌍</div>
-      <h3>Hors de portée pour beaucoup</h3>
-      <p>Dans de nombreux pays, 20€/mois représente un salaire hebdomadaire entier.</p>
+      <h3>Out of reach for many</h3>
+      <p>In many countries, $20/month represents an entire week's wages.</p>
     </div>
   </div>
 </div>
 
 <!-- HOW IT WORKS -->
-<div class="section" id="comment" style="padding-top: 0">
-  <div class="eyebrow">La solution</div>
-  <h2>Un réseau IA comme BitTorrent,<br>mais pour votre cerveau.</h2>
-  <p class="section-sub">Imaginez un village où chacun prête un peu de sa puissance de calcul aux autres. En échange, quand vous avez besoin d'IA, le village travaille pour vous.</p>
+<div class="section" id="how-it-works" style="padding-top: 0">
+  <div class="eyebrow">The solution</div>
+  <h2>An AI network like BitTorrent,<br>but for your brain.</h2>
+  <p class="section-sub">Imagine a village where everyone lends a little compute power to their neighbors. In return, when you need AI, the village works for you.</p>
 
   <div class="mesh-wrap">
     <svg class="mesh-svg" viewBox="0 0 700 260" preserveAspectRatio="none">
@@ -438,7 +438,7 @@
       <line x1="350" y1="130" x2="204" y2="238" stroke="rgba(93,216,168,0.22)" stroke-width="1"   stroke-dasharray="6,4"/>
       <line x1="350" y1="130" x2="500" y2="240" stroke="rgba(93,216,168,0.22)" stroke-width="1"   stroke-dasharray="6,4"/>
     </svg>
-    <div class="mesh-node n-you">⚡<br>Vous</div>
+    <div class="mesh-node n-you">⚡<br>You</div>
     <div class="mesh-node n-peer p1">🖥️<br>GPU A</div>
     <div class="mesh-node n-peer p2">💻<br>GPU B</div>
     <div class="mesh-node n-peer p3">🖥️<br>CPU C</div>
@@ -451,24 +451,24 @@
     <div class="step">
       <div class="step-num">1</div>
       <div>
-        <h3>Vous rejoignez le réseau en 30 secondes</h3>
-        <p>Une seule commande installe AInonymous. Votre machine reçoit une identité cryptographique unique — pas de nom, pas d'e-mail, pas de mot de passe. Vous êtes souverain.</p>
-        <span class="tag t-p">Holochain · clé ed25519</span>
+        <h3>Join the network in 30 seconds</h3>
+        <p>A single command installs AInonymous. Your machine receives a unique cryptographic identity — no name, no email, no password. You are sovereign.</p>
+        <span class="tag t-p">Holochain · ed25519 key</span>
       </div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
       <div>
-        <h3>Votre machine contribue, les autres aussi</h3>
-        <p>Quand vous n'utilisez pas votre ordinateur, il prête sa puissance de calcul aux autres membres. En échange, vous accumulez du crédit de calcul. Aucun argent ne s'échange — c'est du troc de GPU.</p>
-        <span class="tag t-t">Mesh P2P · DHT Holochain</span>
+        <h3>Your machine contributes — and so do others</h3>
+        <p>When you're not using your computer, it lends compute power to other members. In return, you accumulate compute credits. No money changes hands — it's GPU bartering.</p>
+        <span class="tag t-t">P2P Mesh · Holochain DHT</span>
       </div>
     </div>
     <div class="step">
       <div class="step-num">3</div>
       <div>
-        <h3>Vous utilisez l'IA comme si c'était local</h3>
-        <p>Envoyez votre question. Le réseau la distribue entre plusieurs machines — chacune traite une partie du modèle IA. Vous recevez la réponse en temps réel. Aucun serveur central n'a vu votre question.</p>
+        <h3>Use AI as if it were running locally</h3>
+        <p>Send your question. The network distributes it across multiple machines — each handling a slice of the AI model. You get the response in real time. No central server ever saw your query.</p>
         <span class="tag t-c">Pipeline-splitting · Gemma 4</span>
       </div>
     </div>
@@ -476,40 +476,40 @@
 </div>
 
 <!-- FEATURES -->
-<div class="section" id="pourquoi" style="padding-top: 0">
-  <div class="eyebrow">Pourquoi AInonymous</div>
-  <h2>Tout ce qu'on vous a retiré,<br>on vous le rend.</h2>
-  <p class="section-sub">Pas un concurrent de ChatGPT — une alternative fondamentalement différente dans sa philosophie.</p>
+<div class="section" id="why-us" style="padding-top: 0">
+  <div class="eyebrow">Why AInonymous</div>
+  <h2>Everything that was taken from you,<br>given back.</h2>
+  <p class="section-sub">Not a ChatGPT competitor — a fundamentally different alternative in its philosophy.</p>
   <div class="feat-grid">
     <div class="feat-card">
       <div class="feat-icon fi-p">🔐</div>
-      <h3>Confidentialité absolue</h3>
-      <p>Vos questions ne quittent jamais le réseau chiffré. Aucune entreprise, aucun gouvernement ne peut lire votre conversation. Pas de logs, pas de cookies, pas de profil.</p>
+      <h3>Absolute privacy</h3>
+      <p>Your questions never leave the encrypted network. No company, no government can read your conversation. No logs, no cookies, no profile.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-t">⚡</div>
-      <h3>Gratuit par construction</h3>
-      <p>Il n'y a personne à payer. Pas d'actionnaires, pas d'infrastructure cloud à financer. Vous échangez de la puissance de calcul, pas de l'argent.</p>
+      <h3>Free by design</h3>
+      <p>There's no one to pay. No shareholders, no cloud infrastructure to fund. You trade compute power, not money.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-c">🌐</div>
-      <h3>Indestructible</h3>
-      <p>Il n'y a pas de bouton «off». Aucune entreprise ne peut fermer le réseau, censurer un utilisateur ou modifier les règles du jeu du jour au lendemain.</p>
+      <h3>Unstoppable</h3>
+      <p>There is no "off switch". No company can shut down the network, censor a user, or change the rules overnight.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-a">🤖</div>
-      <h3>Les meilleurs modèles ouverts</h3>
-      <p>Gemma 4 (Google), Qwen3, Llama 3.3 — les modèles utilisés rivalisent avec GPT-4 sur de nombreuses tâches, et ils sont 100% open source.</p>
+      <h3>The best open models</h3>
+      <p>Gemma 4 (Google), Qwen3, Llama 3.3 — the models we use rival GPT-4 on many tasks, and they're 100% open source.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-p">🔌</div>
-      <h3>Compatible avec vos outils</h3>
-      <p>L'API locale est compatible OpenAI. Branchez n'importe quel outil qui parle à ChatGPT — il parlera automatiquement à AInonymous, sans modification.</p>
+      <h3>Works with your tools</h3>
+      <p>The local API is OpenAI-compatible. Plug in any tool that talks to ChatGPT — it will talk to AInonymous automatically, with no modifications.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-t">🌍</div>
-      <h3>Accessible partout</h3>
-      <p>Pas de carte de crédit, pas de compte, pas de frontières. Si vous avez un ordinateur et Internet, vous accédez à l'IA la plus puissante du moment.</p>
+      <h3>Accessible everywhere</h3>
+      <p>No credit card, no account, no borders. If you have a computer and internet access, you can use the most powerful AI available today.</p>
     </div>
   </div>
 </div>
@@ -517,25 +517,25 @@
 <!-- VS TABLE -->
 <div class="vs-wrap">
   <div class="vs-inner">
-    <div class="eyebrow">Comparaison</div>
-    <h2>AInonymous vs. les alternatives</h2>
+    <div class="eyebrow">Comparison</div>
+    <h2>AInonymous vs. the alternatives</h2>
     <table>
       <thead>
         <tr>
-          <th>Critère</th>
+          <th>Criteria</th>
           <th>ChatGPT / Claude</th>
           <th>Ollama (local)</th>
           <th class="hl">AInonymous ✦</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td>Prix</td><td>20€/mois</td><td>Gratuit</td><td class="col ok">Gratuit</td></tr>
-        <tr><td>Confidentialité</td><td><span class="no">✗ Données envoyées</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ Chiffré P2P</td></tr>
-        <tr><td>GPU requis</td><td>Non (cloud)</td><td>Oui (≥8 GB VRAM)</td><td class="col ok">Non (mutualisé)</td></tr>
-        <tr><td>Résistance censure</td><td><span class="no">✗ Centralisé</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Décentralisé</td></tr>
-        <tr><td>Qualité modèle</td><td>Très haute</td><td>Haute (selon GPU)</td><td class="col ok">Haute (Gemma 4)</td></tr>
-        <tr><td>Création de compte</td><td><span class="no">✗ Obligatoire</span></td><td><span class="ok">✓ Aucun</span></td><td class="col ok">✓ Aucun</td></tr>
-        <tr><td>Compatible OpenAI API</td><td>Oui (payant)</td><td>Oui</td><td class="col ok">Oui (localhost)</td></tr>
+        <tr><td>Price</td><td>~$20/month</td><td>Free</td><td class="col ok">Free</td></tr>
+        <tr><td>Privacy</td><td><span class="no">✗ Data sent to servers</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ P2P encrypted</td></tr>
+        <tr><td>GPU required</td><td>No (cloud)</td><td>Yes (≥8 GB VRAM)</td><td class="col ok">No (pooled)</td></tr>
+        <tr><td>Censorship resistance</td><td><span class="no">✗ Centralized</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Decentralized</td></tr>
+        <tr><td>Model quality</td><td>Very high</td><td>High (GPU dependent)</td><td class="col ok">High (Gemma 4)</td></tr>
+        <tr><td>Account required</td><td><span class="no">✗ Mandatory</span></td><td><span class="ok">✓ None</span></td><td class="col ok">✓ None</td></tr>
+        <tr><td>OpenAI API compatible</td><td>Yes (paid)</td><td>Yes</td><td class="col ok">Yes (localhost)</td></tr>
       </tbody>
     </table>
   </div>
@@ -543,118 +543,118 @@
 
 <!-- MODELS -->
 <div class="section">
-  <div class="eyebrow">Modèles disponibles</div>
-  <h2>Des modèles de pointe,<br>totalement libres.</h2>
-  <p class="section-sub">AInonymous priorise Gemma 4 de Google — performant, compact, Apache 2.0. Chaque modèle est distribué automatiquement selon la puissance disponible dans le réseau.</p>
+  <div class="eyebrow">Available models</div>
+  <h2>State-of-the-art models,<br>completely free.</h2>
+  <p class="section-sub">AInonymous prioritizes Google's Gemma 4 — performant, compact, Apache 2.0. Each model is automatically distributed based on available compute in the network.</p>
   <div class="models-grid">
     <div class="model-card">
       <div class="model-name">Gemma 4 · E2B</div>
       <div class="model-meta">~3 GB · Edge</div>
       <div class="bar-bg"><div class="bar" style="width:28%"></div></div>
-      <div class="model-use">Nœuds légers · draft</div>
+      <div class="model-use">Light nodes · draft</div>
     </div>
     <div class="model-card">
       <div class="model-name">Gemma 4 · E4B</div>
       <div class="model-meta">~5 GB · Edge</div>
       <div class="bar-bg"><div class="bar" style="width:42%"></div></div>
-      <div class="model-use">Rapidité + qualité</div>
+      <div class="model-use">Speed + quality</div>
     </div>
     <div class="model-card">
       <div class="model-name">Gemma 4 · 26B MoE</div>
-      <div class="model-meta">~18 GB · Multi-nœuds</div>
+      <div class="model-meta">~18 GB · Multi-node</div>
       <div class="bar-bg"><div class="bar" style="width:70%"></div></div>
-      <div class="model-use">Tâches complexes</div>
+      <div class="model-use">Complex tasks</div>
     </div>
     <div class="model-card">
       <div class="model-name">Gemma 4 · 31B</div>
       <div class="model-meta">~20 GB · Flagship</div>
       <div class="bar-bg"><div class="bar" style="width:82%"></div></div>
-      <div class="model-use">Meilleure qualité</div>
+      <div class="model-use">Best quality</div>
     </div>
     <div class="model-card">
       <div class="model-name">Qwen3 · 32B</div>
       <div class="model-meta">~20 GB · Code</div>
       <div class="bar-bg"><div class="bar bar-p" style="width:80%"></div></div>
-      <div class="model-use">Code · Raisonnement</div>
+      <div class="model-use">Code · Reasoning</div>
     </div>
     <div class="model-card">
       <div class="model-name">Llama 3.3 · 70B</div>
-      <div class="model-meta">~43 GB · Multi-nœuds</div>
+      <div class="model-meta">~43 GB · Multi-node</div>
       <div class="bar-bg"><div class="bar bar-c" style="width:94%"></div></div>
-      <div class="model-use">Puissance maximale</div>
+      <div class="model-use">Maximum power</div>
     </div>
   </div>
 </div>
 
 <!-- BUSINESS CASE -->
-<div class="biz-banner" id="entreprises">
+<div class="biz-banner" id="enterprise">
   <div class="biz-inner">
-    <div class="eyebrow">Pour les entreprises</div>
-    <h2 style="margin-bottom: 14px">Vos serveurs travaillent déjà.<br>Faites-les travailler pour vous.</h2>
+    <div class="eyebrow">For enterprises</div>
+    <h2 style="margin-bottom: 14px">Your servers are already running.<br>Make them work for you.</h2>
     <p style="font-size:17px;color:var(--muted);max-width:600px;margin-bottom:48px;line-height:1.6">
-      AInonymous Enterprise crée un réseau d'IA fermé et souverain à l'intérieur de votre infrastructure.
-      Vos machines partagent leur puissance de calcul pour faire tourner des modèles de pointe — sans un seul octet qui quitte votre réseau.
+      AInonymous Enterprise creates a closed, sovereign AI network inside your infrastructure.
+      Your machines share compute power to run state-of-the-art models — without a single byte leaving your network.
     </p>
 
     <!-- Closed loop diagram -->
     <div style="text-align:center;margin-bottom:48px">
-      <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Boucle P2P fermée — 100% on-premises</p>
+      <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Closed P2P loop — 100% on-premises</p>
       <div class="loop-diagram">
         <div class="loop-node">
           <div class="loop-node-icon">🖥️</div>
           <div class="loop-node-lbl">Workstations</div>
-          <div class="loop-node-sub">GPU / CPU idle</div>
+          <div class="loop-node-sub">idle GPU / CPU</div>
         </div>
         <div class="loop-arrow">→</div>
         <div class="loop-node" style="border-color:rgba(124,109,235,0.6);background:rgba(124,109,235,0.08)">
           <div class="loop-node-icon">⚡</div>
-          <div class="loop-node-lbl">Mesh privé</div>
-          <div class="loop-node-sub">DHT Holochain interne</div>
+          <div class="loop-node-lbl">Private mesh</div>
+          <div class="loop-node-sub">internal Holochain DHT</div>
         </div>
         <div class="loop-arrow">→</div>
         <div class="loop-node">
           <div class="loop-node-icon">🤖</div>
-          <div class="loop-node-lbl">Modèles IA</div>
+          <div class="loop-node-lbl">AI Models</div>
           <div class="loop-node-sub">Gemma 4 · Qwen3</div>
         </div>
         <div class="loop-arrow">→</div>
         <div class="loop-node">
           <div class="loop-node-icon">👥</div>
-          <div class="loop-node-lbl">Vos équipes</div>
-          <div class="loop-node-sub">API OpenAI-compat.</div>
+          <div class="loop-node-lbl">Your teams</div>
+          <div class="loop-node-sub">OpenAI-compat. API</div>
         </div>
         <div class="loop-arrow" style="color:rgba(93,216,168,0.6)">↺</div>
       </div>
-      <div class="loop-shield">🔒 Données confinées au réseau d'entreprise — aucun trafic externe</div>
+      <div class="loop-shield">🔒 Data confined to corporate network — zero external traffic</div>
     </div>
 
     <!-- KPIs + description -->
     <div class="biz-top">
       <div>
-        <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Le calcul que vous payez déjà dort la nuit.</h3>
+        <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">The compute you're already paying for sleeps at night.</h3>
         <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">
-          Une entreprise de 200 personnes dispose en moyenne de plusieurs téraflops dormants entre 19h et 8h. AInonymous les transforme en infrastructure d'inférence IA — sans acheter un seul GPU supplémentaire.
+          A 200-person company has on average several teraflops sitting idle between 7pm and 8am. AInonymous turns them into AI inference infrastructure — without buying a single additional GPU.
         </p>
         <p style="font-size:14px;color:var(--muted);line-height:1.7">
-          Plus votre organisation grandit, plus votre IA est puissante. Chaque nouvelle machine est une unité de calcul supplémentaire. Le réseau s'améliore avec vous — pas avec la carte bancaire d'un fournisseur cloud.
+          The bigger your organization, the more powerful your AI. Every new machine is an additional compute unit. The network grows stronger with your headcount — not with a cloud vendor's credit card.
         </p>
       </div>
       <div class="biz-kpi-grid">
         <div class="biz-kpi">
           <div class="biz-kpi-num">~70%</div>
-          <div class="biz-kpi-lbl">des CPU/GPU d'entreprise inutilisés en dehors des heures de travail</div>
+          <div class="biz-kpi-lbl">of enterprise CPU/GPU idle outside business hours</div>
         </div>
         <div class="biz-kpi">
-          <div class="biz-kpi-num">0€</div>
-          <div class="biz-kpi-lbl">de coût cloud IA supplémentaire avec les ressources existantes</div>
+          <div class="biz-kpi-num">$0</div>
+          <div class="biz-kpi-lbl">additional cloud AI cost using existing hardware</div>
         </div>
         <div class="biz-kpi">
           <div class="biz-kpi-num">100%</div>
-          <div class="biz-kpi-lbl">des données restent dans votre périmètre RGPD</div>
+          <div class="biz-kpi-lbl">of data stays within your GDPR perimeter</div>
         </div>
         <div class="biz-kpi">
           <div class="biz-kpi-num">×N</div>
-          <div class="biz-kpi-lbl">la puissance augmente avec chaque nouveau collaborateur</div>
+          <div class="biz-kpi-lbl">power scales with every new employee</div>
         </div>
       </div>
     </div>
@@ -663,83 +663,83 @@
     <div class="biz-adv-grid">
       <div class="biz-adv">
         <div class="biz-adv-icon">🏛️</div>
-        <h3>Souveraineté totale des données</h3>
-        <p>Conformité RGPD, HIPAA, SOC 2 garantie par architecture. Aucune donnée ne sort de votre infrastructure — pas besoin de Data Processing Agreement avec un tiers.</p>
+        <h3>Complete data sovereignty</h3>
+        <p>GDPR, HIPAA, SOC 2 compliance guaranteed by architecture. No data leaves your infrastructure — no Data Processing Agreement needed with any third party.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">📈</div>
-        <h3>L'IA grandit avec votre flotte</h3>
-        <p>Chaque machine ajoutée augmente la capacité d'inférence. Pas de paliers tarifaires, pas de négociation de quotas — la puissance scale linéairement avec vos effectifs.</p>
+        <h3>AI that grows with your fleet</h3>
+        <p>Every machine added increases inference capacity. No pricing tiers, no quota negotiation — power scales linearly with your headcount.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">🔐</div>
-        <h3>Identités cryptographiques d'entreprise</h3>
-        <p>Chaque nœud est authentifié via ed25519. Les Membrane Proofs Holochain permettent un contrôle d'accès granulaire : qui peut soumettre des tâches, qui peut exécuter des modèles.</p>
+        <h3>Enterprise cryptographic identities</h3>
+        <p>Every node is authenticated via ed25519. Holochain Membrane Proofs enable granular access control: who can submit tasks, who can run models.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">🧠</div>
-        <h3>Fine-tuning sur vos données internes</h3>
-        <p>Les modèles peuvent être affinés sur vos documents, vos process, votre jargon métier — sans jamais quitter le réseau. Votre IA devient experte de votre secteur.</p>
+        <h3>Fine-tuning on internal data</h3>
+        <p>Models can be fine-tuned on your documents, processes, and domain vocabulary — without ever leaving the network. Your AI becomes an expert in your industry.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">🔌</div>
-        <h3>Intégration transparente</h3>
-        <p>API locale compatible OpenAI sur <code style="font-size:12px;color:var(--accent2)">localhost:9337</code>. Vos outils actuels (Copilot, n8n, LangChain, Cursor) s'y connectent sans modification.</p>
+        <h3>Transparent integration</h3>
+        <p>Local OpenAI-compatible API on <code style="font-size:12px;color:var(--accent2)">localhost:9337</code>. Your existing tools (Copilot, n8n, LangChain, Cursor) connect with no changes.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">📋</div>
-        <h3>Audit trail immuable</h3>
-        <p>Chaque tâche d'inférence est chainée cryptographiquement dans la source chain Holochain. Traçabilité complète pour la conformité et les audits internes.</p>
+        <h3>Immutable audit trail</h3>
+        <p>Every inference task is cryptographically chained in the Holochain source chain. Full traceability for compliance and internal audits.</p>
       </div>
     </div>
 
     <!-- CTA -->
     <div class="biz-cta-box">
       <div>
-        <h3>Réseau d'IA privé pour votre entreprise</h3>
-        <p>Découvrez l'architecture technique, les cas d'usage et le modèle économique détaillé sur notre page dédiée aux déploiements enterprise.</p>
+        <h3>Private AI network for your enterprise</h3>
+        <p>Explore the technical architecture, use cases, and detailed business model on our dedicated enterprise deployment page.</p>
       </div>
-      <a href="enterprise.html" class="btn-enterprise">Voir la page Enterprise →</a>
+      <a href="enterprise-en.html" class="btn-enterprise">View Enterprise page →</a>
     </div>
   </div>
 </div>
 
 <!-- INSTALL -->
-<div class="section" id="installer" style="padding-top: 0">
+<div class="section" id="install" style="padding-top: 0">
   <div class="eyebrow">Installation</div>
-  <h2>Prêt en 30 secondes.</h2>
-  <p class="section-sub">Une ligne de commande. Votre machine rejoint le réseau, choisit un modèle adapté à sa puissance, et commence à contribuer — et à recevoir.</p>
+  <h2>Ready in 30 seconds.</h2>
+  <p class="section-sub">One command. Your machine joins the network, picks a model suited to its power, and starts contributing — and receiving.</p>
   <div class="install-box">
-    <pre><span class="comment"># 1. Installer AInonymous</span>
+    <pre><span class="comment"># 1. Install AInonymous</span>
 curl -fsSL https://ainonymous.network/install.sh | sh
 
-<span class="comment"># 2. Rejoindre le réseau automatiquement</span>
+<span class="comment"># 2. Join the network automatically</span>
 ainonymous --auto
 
-<span class="comment"># 3. Ou choisir votre modèle</span>
+<span class="comment"># 3. Or pick your model</span>
 ainonymous --model gemma4-26b-moe
 
-<span class="comment"># 4. Tester en 5 secondes</span>
+<span class="comment"># 4. Test in 5 seconds</span>
 curl http://localhost:9337/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"gemma4-31b","messages":[{"role":"user","content":"Bonjour !"}]}'</pre>
+  -d '{"model":"gemma4-31b","messages":[{"role":"user","content":"Hello!"}]}'</pre>
   </div>
   <div style="margin-top: 24px; display: flex; gap: 14px; flex-wrap: wrap;">
-    <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Voir sur GitHub →</a>
-    <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Documentation technique</a>
+    <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">View on GitHub →</a>
+    <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Technical documentation</a>
   </div>
 </div>
 
 <footer>
   <div class="f-logo">AI<span>n</span>onymous</div>
-  <p style="margin-bottom: 16px">L'IA décentralisée, pour tous, pour toujours.</p>
+  <p style="margin-bottom: 16px">Decentralized AI, for everyone, forever.</p>
   <div>
     <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
     <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">Docs</a>
-    <a href="enterprise.html">Enterprise</a>
+    <a href="enterprise-en.html">Enterprise</a>
     <a href="https://github.com/Geoking2104/AInonymous/blob/main/LICENSE">Apache 2.0</a>
   </div>
-  <p style="margin-top: 28px; font-size: 12px; opacity: .4">Construit avec Holochain · Gemma 4 · Goose · llama.cpp</p>
+  <p style="margin-top: 28px; font-size: 12px; opacity: .4">Built with Holochain · Gemma 4 · Goose · llama.cpp</p>
 </footer>
 
 </body>

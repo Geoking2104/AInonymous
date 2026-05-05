@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AInonymous Enterprise — IA privée, souveraine, on-premises</title>
+  <title>AInonymous Enterprise — Private, Sovereign, On-Premises AI</title>
   <style>
     :root {
       --bg: #08080e;
@@ -45,6 +45,8 @@
     }
     .nav-links { display: flex; gap: 24px; font-size: 14px; color: var(--muted); align-items: center; }
     .nav-links a:hover { color: var(--text); }
+    .nav-back { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .nav-back:hover { color: var(--text); }
     .lang-switch {
       display: flex; align-items: center; gap: 2px;
       font-size: 12px; font-weight: 700;
@@ -58,8 +60,6 @@
       background: var(--accent); color: #fff;
     }
     .lang-switch a:hover:not(.active) { color: var(--text); }
-    .nav-back { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-    .nav-back:hover { color: var(--text); }
 
     /* LAYOUT */
     .section { padding: 88px 40px; max-width: 1080px; margin: 0 auto; }
@@ -259,7 +259,7 @@
     }
     .deploy-card.featured { border-color: rgba(124,109,235,0.45); }
     .deploy-card.featured::before {
-      content: 'Recommandé'; position: absolute; top: 14px; right: 14px;
+      content: 'Recommended'; position: absolute; top: 14px; right: 14px;
       font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px;
       background: rgba(124,109,235,0.18); color: var(--accent);
     }
@@ -313,96 +313,96 @@
 <!-- NAV -->
 <nav>
   <div style="display:flex;align-items:center">
-    <a href="landing.html" class="nav-logo">AI<span>n</span>onymous</a>
+    <a href="landing-en.html" class="nav-logo">AI<span>n</span>onymous</a>
     <span class="nav-badge">Enterprise</span>
   </div>
   <div class="nav-links">
-    <a href="#closed-loop">Boucle fermée</a>
+    <a href="#closed-loop">Closed loop</a>
     <a href="#architecture">Architecture</a>
-    <a href="#securite">Sécurité</a>
+    <a href="#security">Security</a>
     <a href="#business">Business case</a>
-    <a href="#deploiement">Déploiement</a>
+    <a href="#deployment">Deployment</a>
     <div class="lang-switch">
-      <a href="enterprise.html" class="active">FR</a>
-      <a href="enterprise-en.html">EN</a>
+      <a href="enterprise.html">FR</a>
+      <a href="enterprise-en.html" class="active">EN</a>
     </div>
   </div>
-  <a href="landing.html" class="nav-back">← Retour accueil</a>
+  <a href="landing-en.html" class="nav-back">← Back to home</a>
 </nav>
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-badge">Réseau d'IA privé — on-premises</div>
-  <h1>L'IA de votre entreprise,<br><span class="a1">souveraine</span> et<br><span class="a2">auto-apprenante.</span></h1>
+  <div class="hero-badge">Private AI network — on-premises</div>
+  <h1>Your enterprise AI,<br><span class="a1">sovereign</span> and<br><span class="a2">self-improving.</span></h1>
   <p class="hero-sub">
-    Un réseau P2P fermé qui transforme la puissance de calcul dormante de vos machines en infrastructure d'IA privée — sans cloud, sans fuite de données, sans coût marginal.
+    A closed P2P network that turns the idle compute power of your machines into private AI infrastructure — no cloud, no data leakage, no marginal cost.
   </p>
   <div class="hero-actions">
-    <a href="#business" class="btn-p">📊 Voir le business case</a>
-    <a href="#architecture" class="btn-g">Architecture technique →</a>
+    <a href="#business" class="btn-p">📊 View business case</a>
+    <a href="#architecture" class="btn-g">Technical architecture →</a>
   </div>
 </div>
 
 <!-- PROOF STRIP -->
 <div class="proof-strip">
-  <div class="proof-item"><div class="proof-dot"></div>Zéro donnée hors périmètre</div>
-  <div class="proof-item"><div class="proof-dot"></div>Compatible RGPD · HIPAA · SOC 2</div>
-  <div class="proof-item"><div class="proof-dot"></div>Pas de GPU supplémentaire requis</div>
-  <div class="proof-item"><div class="proof-dot"></div>API OpenAI-compatible en local</div>
-  <div class="proof-item"><div class="proof-dot"></div>Apache 2.0 — aucun vendor lock-in</div>
+  <div class="proof-item"><div class="proof-dot"></div>Zero data outside your perimeter</div>
+  <div class="proof-item"><div class="proof-dot"></div>GDPR · HIPAA · SOC 2 compliant</div>
+  <div class="proof-item"><div class="proof-dot"></div>No additional GPU required</div>
+  <div class="proof-item"><div class="proof-dot"></div>Local OpenAI-compatible API</div>
+  <div class="proof-item"><div class="proof-dot"></div>Apache 2.0 — zero vendor lock-in</div>
 </div>
 
 <!-- CLOSED LOOP -->
 <div class="loop-section" id="closed-loop">
   <div class="loop-inner">
-    <div class="eyebrow">Boucle P2P fermée</div>
-    <h2>Un réseau d'IA qui ne sort<br>jamais de chez vous.</h2>
+    <div class="eyebrow">Closed P2P loop</div>
+    <h2>An AI network that never<br>leaves your premises.</h2>
 
     <div class="loop-grid">
       <!-- Diagram -->
       <div class="loop-diagram-v">
         <div class="lnode">
           <div class="lnode-icon">🖥️</div>
-          <div class="lnode-title">Postes de travail & serveurs</div>
-          <div class="lnode-sub">GPU/CPU idle — toutes plateformes</div>
+          <div class="lnode-title">Workstations & servers</div>
+          <div class="lnode-sub">idle GPU/CPU — all platforms</div>
         </div>
-        <div class="larrow">↓ contribuent au pool</div>
+        <div class="larrow">↓ contribute to the pool</div>
         <div class="lnode accent">
           <div class="lnode-icon">⚡</div>
-          <div class="lnode-title">Mesh privé Holochain</div>
-          <div class="lnode-sub">DHT interne · WebRTC · LAN/VPN</div>
+          <div class="lnode-title">Private Holochain mesh</div>
+          <div class="lnode-sub">internal DHT · WebRTC · LAN/VPN</div>
         </div>
-        <div class="larrow">↓ exécute</div>
+        <div class="larrow">↓ executes</div>
         <div class="lnode">
           <div class="lnode-icon">🧠</div>
-          <div class="lnode-title">Modèles IA distribués</div>
-          <div class="lnode-sub">Pipeline-splitting par couches · GGUF</div>
+          <div class="lnode-title">Distributed AI models</div>
+          <div class="lnode-sub">layer pipeline-splitting · GGUF</div>
         </div>
-        <div class="larrow">↓ répond via</div>
+        <div class="larrow">↓ responds via</div>
         <div class="lnode accent2">
           <div class="lnode-icon">🔌</div>
-          <div class="lnode-title">API locale OpenAI-compat.</div>
-          <div class="lnode-sub">localhost:9337 · vos outils existants</div>
+          <div class="lnode-title">Local OpenAI-compat. API</div>
+          <div class="lnode-sub">localhost:9337 · your existing tools</div>
         </div>
-        <div class="larrow larrow-closed">↑ les interactions améliorent le modèle ↑</div>
+        <div class="larrow larrow-closed">↑ interactions improve the model ↑</div>
         <div style="text-align:center;margin-top:8px">
           <span style="font-size:11px;color:var(--accent2);background:rgba(93,216,168,0.08);border:1px solid rgba(93,216,168,0.25);padding:4px 14px;border-radius:20px;font-weight:600">
-            🔒 Boucle 100% fermée — aucun trafic externe
+            🔒 100% closed loop — zero external traffic
           </span>
         </div>
       </div>
 
       <!-- Description -->
       <div class="loop-desc">
-        <h3>Pourquoi une boucle fermée change tout</h3>
-        <p>Dans un déploiement public, vos données traversent des serveurs tiers — anonymisées ou non. Dans la boucle fermée AInonymous, la question d'un collaborateur ne quitte jamais votre LAN ou VPN d'entreprise.</p>
-        <p>La Distributed Hash Table (DHT) Holochain tourne <strong>à l'intérieur</strong> de votre infrastructure. Les nœuds se découvrent mutuellement par votre réseau interne, et les échanges sont chiffrés de bout en bout par des clés ed25519 propres à chaque machine.</p>
+        <h3>Why a closed loop changes everything</h3>
+        <p>In a public deployment, your data travels through third-party servers — anonymized or not. In the AInonymous closed loop, an employee's query never leaves your corporate LAN or VPN.</p>
+        <p>The Holochain Distributed Hash Table (DHT) runs <strong>inside</strong> your infrastructure. Nodes discover each other through your internal network, and all exchanges are end-to-end encrypted with ed25519 keys unique to each machine.</p>
         <ul class="loop-bullets">
-          <li><span class="bullet-ok">✓</span>Découverte de nœuds : via le réseau d'entreprise (pas de relais externe Nostr ou public)</li>
-          <li><span class="bullet-ok">✓</span>Transport : WebRTC sur LAN ou QUIC sur VPN — pas d'internet requis</li>
-          <li><span class="bullet-ok">✓</span>État partagé : source chain Holochain immutable, auditée, locale</li>
-          <li><span class="bullet-ok">✓</span>Identité : Membrane Proofs pour contrôler qui rejoint le réseau privé</li>
-          <li><span class="bullet-ok">✓</span>Air-gap possible : fonctionne sur réseau isolé sans accès internet</li>
+          <li><span class="bullet-ok">✓</span>Node discovery: via the corporate network (no external Nostr or public relay)</li>
+          <li><span class="bullet-ok">✓</span>Transport: WebRTC over LAN or QUIC over VPN — no internet required</li>
+          <li><span class="bullet-ok">✓</span>Shared state: immutable, audited, local Holochain source chain</li>
+          <li><span class="bullet-ok">✓</span>Identity: Membrane Proofs to control who joins the private network</li>
+          <li><span class="bullet-ok">✓</span>Air-gap capable: works on isolated network with no internet access</li>
         </ul>
       </div>
     </div>
@@ -411,43 +411,43 @@
 
 <!-- ARCHITECTURE -->
 <div class="section" id="architecture">
-  <div class="eyebrow">Architecture technique</div>
-  <h2>Cinq couches. Zéro dépendance externe.</h2>
-  <p class="section-sub">Chaque composant tourne sur votre infrastructure. La cryptographie remplace la confiance envers des tiers.</p>
+  <div class="eyebrow">Technical architecture</div>
+  <h2>Five layers. Zero external dependencies.</h2>
+  <p class="section-sub">Every component runs on your infrastructure. Cryptography replaces trust in third parties.</p>
 
   <!-- ASCII arch -->
   <div class="arch-box">
 <span class="c-muted">┌─────────────────────────────────────────────────────────────────────┐
-│                    PÉRIMÈTRE RÉSEAU ENTREPRISE                       │
+│                    ENTERPRISE NETWORK PERIMETER                      │
 │  ════════════════════════════════════════════════════════════════   │
 │                                                                      │</span>
-<span class="c-amber">│  COUCHE 4 — CLIENTS & OUTILS                                        │
+<span class="c-amber">│  LAYER 4 — CLIENTS & TOOLS                                          │
 │  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  ┌──────────┐  │
 │  │  VS Code   │  │  n8n/Make   │  │  LangChain   │  │  Goose   │  │
 │  │  Cursor    │  │  Automation │  │  LlamaIndex  │  │  Agent   │  │
 │  └─────┬──────┘  └──────┬──────┘  └──────┬───────┘  └────┬─────┘  │
 │        └───────────────────────────────────────────────────┘        │</span>
 <span class="c-muted">│                              │ OpenAI-compatible API                │</span>
-<span class="c-acc">│  COUCHE 3 — API PROXY LOCAL (localhost:9337)                        │
+<span class="c-acc">│  LAYER 3 — LOCAL API PROXY (localhost:9337)                         │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  Route POST /v1/chat/completions → Conducteur Holochain       │  │
-│  │  Champ model → sélection du modèle et routage vers le mesh   │  │
+│  │  Route POST /v1/chat/completions → Holochain conductor        │  │
+│  │  model field → model selection and routing to the mesh        │  │
 │  └───────────────────────────────┬──────────────────────────────┘  │</span>
 <span class="c-muted">│                                   │ WebRTC / QUIC (LAN/VPN)         │</span>
-<span class="c-teal">│  COUCHE 2 — MESH HOLOCHAIN PRIVÉ                                    │
+<span class="c-teal">│  LAYER 2 — PRIVATE HOLOCHAIN MESH                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────────┐ │
-│  │  DNA infer.  │  │  DNA agents  │  │  DNA registry + blackboard│ │
-│  │  mesh (zome) │  │  + goose MCP │  │  (capacités, warrants)    │ │
+│  │  inference   │  │  agents DNA  │  │  registry DNA + blackboard│ │
+│  │  mesh DNA    │  │  + goose MCP │  │  (capabilities, warrants) │ │
 │  └──────┬───────┘  └──────┬───────┘  └───────────────────────────┘ │
 │         └─────────────────┘                                         │
-│                 DHT Holochain — validée, persistante, locale        │</span>
+│                 Holochain DHT — validated, persistent, local        │</span>
 <span class="c-muted">│                                   │                                 │</span>
-<span class="c-acc">│  COUCHE 1 — MOTEUR D'INFÉRENCE (llama.cpp)                         │
+<span class="c-acc">│  LAYER 1 — INFERENCE ENGINE (llama.cpp)                             │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
-│  │  Nœud A    │  │  Nœud B    │  │  Nœud C    │  │  Nœud D    │   │
+│  │  Node A    │  │  Node B    │  │  Node C    │  │  Node D    │   │
 │  │  Gemma4-31B│  │  Gemma4-31B│  │  Gemma4-E4B│  │  Qwen3-32B │   │
-│  │  couches   │  │  couches   │  │  draft spec│  │  code tasks│   │
-│  │  [0 → 15]  │  │  [16 → 31] │  │  spéculatif│  │            │   │
+│  │  layers    │  │  layers    │  │  draft spec│  │  code tasks│   │
+│  │  [0 → 15]  │  │  [16 → 31] │  │  specul.   │  │            │   │
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘   │</span>
 <span class="c-muted">│                                                                      │
 └─────────────────────────────────────────────────────────────────────┘</span>
@@ -455,39 +455,39 @@
 
   <div class="tech-grid" style="margin-top: 32px;">
     <div class="tech-card">
-      <span class="tech-layer layer-infra">Infrastructure P2P</span>
-      <h3>Holochain — DHT agent-centrique</h3>
-      <p>Pas de blockchain, pas de consensus global. Chaque nœud maintient sa propre source chain immuable. La DHT valide l'état partagé sans serveur central.</p>
+      <span class="tech-layer layer-infra">P2P Infrastructure</span>
+      <h3>Holochain — agent-centric DHT</h3>
+      <p>No blockchain, no global consensus. Each node maintains its own immutable source chain. The DHT validates shared state without any central server.</p>
       <div class="tech-tag">Holochain 0.4 · Rust · WebRTC · ed25519</div>
     </div>
     <div class="tech-card">
-      <span class="tech-layer layer-model">Inférence distribuée</span>
-      <h3>Pipeline-splitting par couches</h3>
-      <p>Un modèle 31B trop grand pour une seule machine est découpé par couches et distribué sur plusieurs nœuds. Le décodage spéculatif (draft + verify) accélère l'inférence.</p>
+      <span class="tech-layer layer-model">Distributed inference</span>
+      <h3>Layer pipeline-splitting</h3>
+      <p>A 31B model too large for a single machine is split by layers and distributed across multiple nodes. Speculative decoding (draft + verify) accelerates inference.</p>
       <div class="tech-tag">llama.cpp · GGUF · layer-sharding · spec-decode</div>
     </div>
     <div class="tech-card">
-      <span class="tech-layer layer-sec">Sécurité & identité</span>
+      <span class="tech-layer layer-sec">Security & identity</span>
       <h3>Membrane Proofs + Warrants</h3>
-      <p>Seules les machines détenant une Membrane Proof valide rejoignent le réseau privé. Les warrants cryptographiques attestent la réputation et les capacités de chaque nœud.</p>
-      <div class="tech-tag">ed25519 · zomes de validation · warrants Holochain</div>
+      <p>Only machines holding a valid Membrane Proof can join the private network. Cryptographic warrants attest the reputation and capabilities of each node.</p>
+      <div class="tech-tag">ed25519 · validation zomes · Holochain warrants</div>
     </div>
     <div class="tech-card">
-      <span class="tech-layer layer-api">Compatibilité</span>
-      <h3>API OpenAI-compatible locale</h3>
-      <p>Endpoint <code>localhost:9337/v1</code> reproduit l'API d'OpenAI. Copilot, LangChain, n8n, Cursor, Goose — tous fonctionnent sans modification.</p>
+      <span class="tech-layer layer-api">Compatibility</span>
+      <h3>Local OpenAI-compatible API</h3>
+      <p>The <code>localhost:9337/v1</code> endpoint mirrors the OpenAI API spec. Copilot, LangChain, n8n, Cursor, Goose — all work without modification.</p>
       <div class="tech-tag">REST · SSE streaming · OpenAI v1 spec</div>
     </div>
     <div class="tech-card">
-      <span class="tech-layer layer-model">Orchestration agents</span>
-      <h3>Goose — framework multi-agents</h3>
-      <p>Goose (Block, Apache 2.0) orchestre des agents IA complexes via MCP natif. Ses serveurs MCP se connectent aux zomes Holochain pour accéder au blackboard partagé.</p>
+      <span class="tech-layer layer-model">Agent orchestration</span>
+      <h3>Goose — multi-agent framework</h3>
+      <p>Goose (Block, Apache 2.0) orchestrates complex AI agents via native MCP. Its MCP servers connect to Holochain zomes to access the shared DHT blackboard.</p>
       <div class="tech-tag">Goose · MCP · Rust · multi-LLM</div>
     </div>
     <div class="tech-card">
-      <span class="tech-layer layer-infra">Modèles</span>
+      <span class="tech-layer layer-infra">Models</span>
       <h3>Gemma 4 · Qwen3 · Llama 3.3</h3>
-      <p>Modèles GGUF open source. Gemma 4 (Google, Apache 2.0) en priorité pour sa densité qualité/VRAM. Support complet du pipeline-splitting sur modèles denses et MoE.</p>
+      <p>Open-source GGUF models. Gemma 4 (Google, Apache 2.0) is prioritized for its quality/VRAM density. Full pipeline-splitting support for both dense and MoE architectures.</p>
       <div class="tech-tag">GGUF · quantization Q4-Q8 · MoE · dense</div>
     </div>
   </div>
@@ -496,100 +496,100 @@
 <!-- FUNCTIONAL FLOW -->
 <div class="full" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
   <div class="full-inner">
-    <div class="eyebrow">Modèle fonctionnel</div>
-    <h2>Comment une requête traverse le réseau</h2>
-    <p class="section-sub" style="margin-bottom: 0">Du prompt de votre collaborateur à la réponse — sans jamais toucher l'extérieur.</p>
+    <div class="eyebrow">Functional model</div>
+    <h2>How a request traverses the network</h2>
+    <p class="section-sub" style="margin-bottom: 0">From your employee's prompt to the response — without ever touching the outside world.</p>
     <div class="flow-steps">
       <div class="flow-step">
         <div class="fs-num">1</div>
-        <h4>Prompt utilisateur</h4>
-        <p>L'utilisateur envoie une requête via son outil (VS Code, chat interne, n8n…)</p>
+        <h4>User prompt</h4>
+        <p>The user submits a request via their tool (VS Code, internal chat, n8n…)</p>
       </div>
       <div class="flow-step">
         <div class="fs-num">2</div>
-        <h4>API proxy locale</h4>
-        <p>Le proxy <code style="font-size:10px">:9337</code> reçoit la requête OpenAI-compat. et l'envoie au conducteur Holochain</p>
+        <h4>Local API proxy</h4>
+        <p>The <code style="font-size:10px">:9337</code> proxy receives the OpenAI-compat. request and forwards it to the Holochain conductor</p>
       </div>
       <div class="flow-step">
         <div class="fs-num">3</div>
-        <h4>Routage DHT</h4>
-        <p>Le mesh consulte le registre des nœuds pour trouver les machines disponibles selon le modèle et la charge</p>
+        <h4>DHT routing</h4>
+        <p>The mesh consults the node registry to find available machines by model and current load</p>
       </div>
       <div class="flow-step">
         <div class="fs-num">4</div>
-        <h4>Inférence distribuée</h4>
-        <p>Les couches du modèle sont exécutées en pipeline sur les nœuds sélectionnés (layer-sharding)</p>
+        <h4>Distributed inference</h4>
+        <p>Model layers are executed in pipeline across selected nodes (layer-sharding)</p>
       </div>
       <div class="flow-step">
         <div class="fs-num">5</div>
-        <h4>Streaming tokens</h4>
-        <p>Les tokens générés sont streamés vers l'API en temps réel — latence identique à du local</p>
+        <h4>Token streaming</h4>
+        <p>Generated tokens stream to the API in real time — latency identical to local execution</p>
       </div>
       <div class="flow-step">
         <div class="fs-num">6</div>
         <h4>Audit chain</h4>
-        <p>La tâche est chainée cryptographiquement pour traçabilité. Aucune donnée sensible stockée.</p>
+        <p>The task is cryptographically chained for traceability. No sensitive data stored.</p>
       </div>
     </div>
   </div>
 </div>
 
 <!-- SECURITY -->
-<div class="section" id="securite">
-  <div class="eyebrow">Sécurité & conformité</div>
-  <h2>Conçu pour les environnements<br>les plus exigeants.</h2>
-  <p class="section-sub">Chaque couche du système est pensée pour satisfaire les exigences des DSI, DPO et RSSI.</p>
+<div class="section" id="security">
+  <div class="eyebrow">Security & compliance</div>
+  <h2>Built for the most demanding<br>environments.</h2>
+  <p class="section-sub">Every layer of the system is designed to satisfy the requirements of CISOs, DPOs, and security teams.</p>
 
   <div class="sec-grid">
     <div class="sec-card">
       <div class="sec-icon">🔑</div>
-      <h3>Identités cryptographiques</h3>
-      <p>Chaque nœud est identifié par une paire de clés ed25519. Aucune authentification centralisée, aucun mot de passe — la cryptographie est le seul mécanisme d'identité.</p>
+      <h3>Cryptographic identities</h3>
+      <p>Every node is identified by an ed25519 key pair. No centralized authentication, no password — cryptography is the sole identity mechanism.</p>
       <span class="sec-badge">ed25519 · Holochain keys</span>
     </div>
     <div class="sec-card">
       <div class="sec-icon">🚪</div>
-      <h3>Contrôle d'accès au réseau</h3>
-      <p>Les Membrane Proofs définissent qui peut rejoindre le réseau privé. Un ordinateur sans proof valide est invisible pour le mesh — même sur le même LAN.</p>
+      <h3>Network access control</h3>
+      <p>Membrane Proofs define who can join the private network. A machine without a valid proof is invisible to the mesh — even on the same LAN.</p>
       <span class="sec-badge">Membrane Proofs · RBAC</span>
     </div>
     <div class="sec-card">
       <div class="sec-icon">🔒</div>
-      <h3>Chiffrement de bout en bout</h3>
-      <p>Tous les échanges entre nœuds sont chiffrés. Les données en transit sont protégées même sur un réseau interne compromis.</p>
+      <h3>End-to-end encryption</h3>
+      <p>All inter-node exchanges are encrypted. Data in transit is protected even on a compromised internal network.</p>
       <span class="sec-badge">TLS · WebRTC DTLS · E2E</span>
     </div>
     <div class="sec-card">
       <div class="sec-icon">📋</div>
-      <h3>Audit trail immuable</h3>
-      <p>Chaque tâche d'inférence est ajoutée à une source chain Holochain — une structure append-only cryptographiquement liée. Idéal pour les audits réglementaires.</p>
+      <h3>Immutable audit trail</h3>
+      <p>Every inference task is appended to a Holochain source chain — a cryptographically linked append-only structure. Ideal for regulatory audits.</p>
       <span class="sec-badge">Source chain · append-only</span>
     </div>
     <div class="sec-card">
       <div class="sec-icon">🌐</div>
-      <h3>Isolation réseau totale</h3>
-      <p>Le réseau peut tourner sans aucun accès internet. Modes supportés : LAN interne, VPN d'entreprise, réseau air-gappé. Aucune dépendance à des relais ou DNS externes.</p>
+      <h3>Full network isolation</h3>
+      <p>The network can run without any internet access. Supported modes: internal LAN, corporate VPN, air-gapped network. Zero dependency on external relays or DNS.</p>
       <span class="sec-badge">Air-gap ready · VPN · LAN</span>
     </div>
     <div class="sec-card">
       <div class="sec-icon">🔍</div>
-      <h3>Validation des pairs</h3>
-      <p>Les zomes de validation Holochain permettent à chaque nœud de vérifier la conformité des données des autres avant de les accepter. Pas de nœud malveillant non détecté.</p>
+      <h3>Peer validation</h3>
+      <p>Holochain validation zomes allow each node to verify the conformity of other nodes' data before accepting it. No undetected malicious node.</p>
       <span class="sec-badge">Zome validation · warrants</span>
     </div>
   </div>
 
   <div style="margin-top: 40px;">
-    <h3 style="margin-bottom: 20px; font-size: 16px; color: var(--muted); font-weight: 600;">Certifications et frameworks supportés</h3>
+    <h3 style="margin-bottom: 20px; font-size: 16px; color: var(--muted); font-weight: 600;">Supported certifications & frameworks</h3>
     <div class="compliance-grid">
-      <div class="comp-badge"><span class="comp-check">✓</span> RGPD / GDPR</div>
+      <div class="comp-badge"><span class="comp-check">✓</span> GDPR</div>
       <div class="comp-badge"><span class="comp-check">✓</span> HIPAA</div>
       <div class="comp-badge"><span class="comp-check">✓</span> SOC 2 Type II</div>
       <div class="comp-badge"><span class="comp-check">✓</span> ISO 27001</div>
       <div class="comp-badge"><span class="comp-check">✓</span> NIS2</div>
       <div class="comp-badge"><span class="comp-check">✓</span> DORA (Finance)</div>
-      <div class="comp-badge"><span class="comp-check">✓</span> HDS (Santé)</div>
-      <div class="comp-badge"><span class="comp-check">✓</span> Réseau air-gappé</div>
+      <div class="comp-badge"><span class="comp-check">✓</span> HIPAA (Healthcare)</div>
+      <div class="comp-badge"><span class="comp-check">✓</span> Air-gapped network</div>
     </div>
   </div>
 </div>
@@ -598,50 +598,50 @@
 <div class="roi-strip" id="business">
   <div class="roi-inner">
     <div class="eyebrow">Business case</div>
-    <h2>Le calcul est simple.</h2>
-    <p class="section-sub" style="margin-bottom: 0">Vous payez déjà pour les machines. AInonymous transforme leurs heures creuses en infrastructure IA.</p>
+    <h2>The math is simple.</h2>
+    <p class="section-sub" style="margin-bottom: 0">You're already paying for the machines. AInonymous turns their off-hours into AI infrastructure.</p>
 
     <div class="roi-grid">
       <div class="roi-card">
         <div class="roi-num">~70%</div>
-        <div class="roi-label">des ressources de calcul dormantes en dehors des heures ouvrées</div>
+        <div class="roi-label">of compute resources idle outside business hours</div>
       </div>
       <div class="roi-card">
-        <div class="roi-num">0€</div>
-        <div class="roi-label">de GPU supplémentaire requis pour un mesh de 50+ machines</div>
+        <div class="roi-num">$0</div>
+        <div class="roi-label">additional GPU required for a mesh of 50+ machines</div>
       </div>
       <div class="roi-card">
         <div class="roi-num">×N</div>
-        <div class="roi-label">la puissance d'inférence scale avec chaque nouveau poste</div>
+        <div class="roi-label">inference power scales with every new workstation</div>
       </div>
       <div class="roi-card">
-        <div class="roi-num">&lt;1 an</div>
-        <div class="roi-label">ROI vs. abonnements cloud IA pour une équipe de 100 personnes</div>
+        <div class="roi-num">&lt;1 yr</div>
+        <div class="roi-label">ROI vs. cloud AI subscriptions for a 100-person team</div>
       </div>
     </div>
 
     <!-- Scenario ROI -->
     <div class="roi-scenario">
-      <h3>Scénario : 200 collaborateurs, 50 postes GPU modestes (8 GB VRAM)</h3>
+      <h3>Scenario: 200 employees, 50 modest GPU workstations (8 GB VRAM)</h3>
       <div class="roi-row">
-        <span>Coût actuel — abonnements cloud IA (200 × 20€/mois)</span>
-        <span>4 000 € / mois</span>
+        <span>Current cost — cloud AI subscriptions (200 × $20/month)</span>
+        <span>$4,000 / month</span>
       </div>
       <div class="roi-row">
-        <span>Coût AInonymous Enterprise (déploiement + support)</span>
-        <span>~500–800 € / mois</span>
+        <span>AInonymous Enterprise cost (deployment + support)</span>
+        <span>~$500–800 / month</span>
       </div>
       <div class="roi-row">
-        <span>Économie annuelle estimée</span>
-        <span>~38 000 – 42 000 €</span>
+        <span>Estimated annual saving</span>
+        <span>~$38,000 – $42,000</span>
       </div>
       <div class="roi-row">
-        <span>Données exposées à des tiers après migration</span>
+        <span>Data exposed to third parties after migration</span>
         <span style="color: var(--accent2)">0</span>
       </div>
       <div class="roi-row">
-        <span>Économie sur 3 ans (sans compter la croissance d'équipe)</span>
-        <span>+120 000 €</span>
+        <span>3-year saving (excluding headcount growth)</span>
+        <span>+$120,000</span>
       </div>
     </div>
   </div>
@@ -649,109 +649,109 @@
 
 <!-- COMPARATIVE TABLE -->
 <div class="section">
-  <div class="eyebrow">Comparaison détaillée</div>
+  <div class="eyebrow">Detailed comparison</div>
   <h2>Enterprise vs. cloud vs. local</h2>
   <div class="bc-table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Critère</th>
-          <th>Cloud IA (OpenAI, Azure)</th>
-          <th>Ollama local (par poste)</th>
+          <th>Criteria</th>
+          <th>Cloud AI (OpenAI, Azure)</th>
+          <th>Ollama local (per device)</th>
           <th class="hl">AInonymous Enterprise ✦</th>
         </tr>
       </thead>
       <tbody>
-        <tr class="section-row"><td colspan="4">Souveraineté & sécurité</td></tr>
+        <tr class="section-row"><td colspan="4">Sovereignty & security</td></tr>
         <tr>
-          <td>Données hors périmètre</td>
-          <td class="v-no">✗ Oui — serveurs tiers</td>
-          <td class="v-ok">✓ Non — machine locale</td>
-          <td class="col v-ok">✓ Non — réseau interne</td>
+          <td>Data outside your perimeter</td>
+          <td class="v-no">✗ Yes — third-party servers</td>
+          <td class="v-ok">✓ No — local machine</td>
+          <td class="col v-ok">✓ No — internal network</td>
         </tr>
         <tr>
-          <td>Conformité RGPD by-design</td>
-          <td>Partielle (DPA requis)</td>
-          <td class="v-ok">✓ Totale</td>
-          <td class="col v-ok">✓ Totale + auditée</td>
+          <td>GDPR compliance by design</td>
+          <td>Partial (DPA required)</td>
+          <td class="v-ok">✓ Full</td>
+          <td class="col v-ok">✓ Full + audited</td>
         </tr>
         <tr>
-          <td>Contrôle d'accès granulaire</td>
-          <td>IAM externe</td>
-          <td class="v-no">✗ Aucun</td>
+          <td>Granular access control</td>
+          <td>External IAM</td>
+          <td class="v-no">✗ None</td>
           <td class="col v-ok">✓ Membrane Proofs</td>
         </tr>
         <tr>
-          <td>Audit trail cryptographique</td>
-          <td class="v-no">✗ Non</td>
-          <td class="v-no">✗ Non</td>
-          <td class="col v-ok">✓ Source chain Holochain</td>
+          <td>Cryptographic audit trail</td>
+          <td class="v-no">✗ No</td>
+          <td class="v-no">✗ No</td>
+          <td class="col v-ok">✓ Holochain source chain</td>
         </tr>
         <tr>
-          <td>Mode air-gap</td>
+          <td>Air-gap mode</td>
           <td class="v-no">✗ Impossible</td>
-          <td class="v-ok">✓ Oui (1 machine)</td>
-          <td class="col v-ok">✓ Oui (réseau entier)</td>
+          <td class="v-ok">✓ Yes (single machine)</td>
+          <td class="col v-ok">✓ Yes (entire network)</td>
         </tr>
 
-        <tr class="section-row"><td colspan="4">Coûts & scalabilité</td></tr>
+        <tr class="section-row"><td colspan="4">Cost & scalability</td></tr>
         <tr>
-          <td>Coût par utilisateur/mois</td>
-          <td>~20–30 €</td>
-          <td>0 € (GPU requis)</td>
-          <td class="col">~2–4 € (support)</td>
+          <td>Cost per user/month</td>
+          <td>~$20–30</td>
+          <td>$0 (GPU required)</td>
+          <td class="col">~$2–4 (support)</td>
         </tr>
         <tr>
-          <td>Scalabilité puissance IA</td>
-          <td>$ (achat de quotas)</td>
-          <td class="v-no">✗ Limitée au GPU local</td>
-          <td class="col v-ok">✓ Scale avec la flotte</td>
+          <td>AI power scalability</td>
+          <td>$ (quota purchase)</td>
+          <td class="v-no">✗ Limited to local GPU</td>
+          <td class="col v-ok">✓ Scales with the fleet</td>
         </tr>
         <tr>
-          <td>GPU dédié requis</td>
-          <td class="v-ok">✓ Non (cloud)</td>
-          <td class="v-no">✗ Oui (par poste)</td>
-          <td class="col v-ok">✓ Non (mutualisé)</td>
+          <td>Dedicated GPU required</td>
+          <td class="v-ok">✓ No (cloud)</td>
+          <td class="v-no">✗ Yes (per device)</td>
+          <td class="col v-ok">✓ No (pooled)</td>
         </tr>
 
-        <tr class="section-row"><td colspan="4">Capacités IA</td></tr>
+        <tr class="section-row"><td colspan="4">AI capabilities</td></tr>
         <tr>
-          <td>Fine-tuning sur données internes</td>
-          <td>Possible (données cloud)</td>
-          <td class="v-no">✗ Complexe</td>
-          <td class="col v-ok">✓ On-prem, natif</td>
+          <td>Fine-tuning on internal data</td>
+          <td>Possible (cloud data)</td>
+          <td class="v-no">✗ Complex</td>
+          <td class="col v-ok">✓ On-prem, native</td>
         </tr>
         <tr>
-          <td>Modèles &gt;30B params</td>
-          <td class="v-ok">✓ Oui</td>
-          <td class="v-no">✗ Nécessite 20+ GB VRAM</td>
+          <td>Models &gt;30B params</td>
+          <td class="v-ok">✓ Yes</td>
+          <td class="v-no">✗ Requires 20+ GB VRAM</td>
           <td class="col v-ok">✓ Via pipeline-splitting</td>
         </tr>
         <tr>
-          <td>Multi-agents / orchestration</td>
-          <td>API uniquement</td>
-          <td class="v-no">✗ Manuel</td>
-          <td class="col v-ok">✓ Goose + blackboard DHT</td>
+          <td>Multi-agent / orchestration</td>
+          <td>API only</td>
+          <td class="v-no">✗ Manual</td>
+          <td class="col v-ok">✓ Goose + DHT blackboard</td>
         </tr>
         <tr>
-          <td>API OpenAI-compatible</td>
+          <td>OpenAI-compatible API</td>
           <td class="v-ok">✓ Native</td>
-          <td class="v-ok">✓ Oui</td>
+          <td class="v-ok">✓ Yes</td>
           <td class="col v-ok">✓ localhost:9337</td>
         </tr>
 
-        <tr class="section-row"><td colspan="4">Gouvernance</td></tr>
+        <tr class="section-row"><td colspan="4">Governance</td></tr>
         <tr>
           <td>Vendor lock-in</td>
-          <td class="v-no">✗ Fort</td>
-          <td class="v-ok">✓ Aucun</td>
-          <td class="col v-ok">✓ Aucun (Apache 2.0)</td>
+          <td class="v-no">✗ Strong</td>
+          <td class="v-ok">✓ None</td>
+          <td class="col v-ok">✓ None (Apache 2.0)</td>
         </tr>
         <tr>
-          <td>Indépendance fournisseur</td>
-          <td class="v-no">✗ Dépendance totale</td>
-          <td class="v-ok">✓ Totale</td>
-          <td class="col v-ok">✓ Totale + résilient</td>
+          <td>Vendor independence</td>
+          <td class="v-no">✗ Total dependency</td>
+          <td class="v-ok">✓ Full</td>
+          <td class="col v-ok">✓ Full + resilient</td>
         </tr>
       </tbody>
     </table>
@@ -759,49 +759,49 @@
 </div>
 
 <!-- DEPLOYMENT MODES -->
-<div class="section" id="deploiement" style="padding-top: 0">
-  <div class="eyebrow">Modes de déploiement</div>
-  <h2>Du pilote à l'échelle groupe.</h2>
-  <p class="section-sub">Démarrez petit, scalez sans migration — l'architecture est identique à 5 ou 5 000 nœuds.</p>
+<div class="section" id="deployment" style="padding-top: 0">
+  <div class="eyebrow">Deployment modes</div>
+  <h2>From pilot to enterprise scale.</h2>
+  <p class="section-sub">Start small, scale without migration — the architecture is identical at 5 or 5,000 nodes.</p>
   <div class="deploy-grid">
     <div class="deploy-card">
       <div class="deploy-icon">🌱</div>
-      <h3>Pilote équipe</h3>
-      <p>10–30 machines, réseau LAN. Idéal pour valider le cas d'usage sur une équipe tech ou R&D. Déploiement en moins d'une journée.</p>
+      <h3>Team pilot</h3>
+      <p>10–30 machines, LAN network. Ideal for validating the use case with a tech or R&D team. Deployment in under a day.</p>
       <div class="deploy-tags">
         <span class="dtag dtag-t">Gemma4-E4B</span>
         <span class="dtag dtag-t">LAN</span>
-        <span class="dtag dtag-a">1 jour</span>
+        <span class="dtag dtag-a">1 day</span>
       </div>
     </div>
     <div class="deploy-card featured">
       <div class="deploy-icon">🏢</div>
-      <h3>Déploiement site</h3>
-      <p>50–500 machines, VPN d'entreprise. Modèles 26B–31B distribués, multi-services, API centralisée par site. Configuration recommandée pour la majorité des entreprises.</p>
+      <h3>Site deployment</h3>
+      <p>50–500 machines, corporate VPN. 26B–31B models distributed, multi-service, centralized API per site. Recommended configuration for most enterprises.</p>
       <div class="deploy-tags">
         <span class="dtag dtag-p">Gemma4-31B</span>
         <span class="dtag dtag-t">VPN · LAN</span>
-        <span class="dtag dtag-a">1–2 semaines</span>
+        <span class="dtag dtag-a">1–2 weeks</span>
       </div>
     </div>
     <div class="deploy-card">
       <div class="deploy-icon">🏛️</div>
-      <h3>Groupe multi-sites</h3>
-      <p>500+ machines, multi-sites, réseau maillé entre filiales. Chaque site dispose d'un sous-réseau autonome avec fédération possible. Support Llama 3.3 70B.</p>
+      <h3>Multi-site group</h3>
+      <p>500+ machines, multi-site, mesh network across subsidiaries. Each site has an autonomous sub-network with optional federation. Llama 3.3 70B support.</p>
       <div class="deploy-tags">
         <span class="dtag dtag-p">Llama3.3-70B</span>
         <span class="dtag dtag-t">Multi-VPN</span>
-        <span class="dtag dtag-a">1 mois</span>
+        <span class="dtag dtag-a">1 month</span>
       </div>
     </div>
     <div class="deploy-card">
       <div class="deploy-icon">🔒</div>
-      <h3>Air-gap / haute sécurité</h3>
-      <p>Réseau totalement isolé, sans accès internet. Pour environnements défense, santé, finance réglementée. Modèles pré-chargés, zéro dépendance externe.</p>
+      <h3>Air-gap / high security</h3>
+      <p>Completely isolated network, no internet access. For defense, healthcare, regulated finance environments. Pre-loaded models, zero external dependency.</p>
       <div class="deploy-tags">
-        <span class="dtag dtag-p">Tous modèles</span>
+        <span class="dtag dtag-p">All models</span>
         <span class="dtag dtag-t">Air-gap</span>
-        <span class="dtag dtag-a">Sur mesure</span>
+        <span class="dtag dtag-a">Custom</span>
       </div>
     </div>
   </div>
@@ -810,22 +810,22 @@
 <!-- FINAL CTA -->
 <div class="cta-section">
   <div class="cta-inner">
-    <div class="eyebrow" style="text-align:center">Passez à l'action</div>
-    <h2>Votre infrastructure IA privée<br>commence ici.</h2>
-    <p>AInonymous Enterprise est open source, Apache 2.0. Déployez, adaptez, auditez — sans demander la permission à personne.</p>
+    <div class="eyebrow" style="text-align:center">Take action</div>
+    <h2>Your private AI infrastructure<br>starts here.</h2>
+    <p>AInonymous Enterprise is open source, Apache 2.0. Deploy, adapt, audit — without asking anyone's permission.</p>
     <div class="cta-actions">
-      <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Accéder au code source →</a>
-      <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Documentation technique</a>
-      <a href="landing.html" class="btn-g">← Retour à l'accueil</a>
+      <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Access source code →</a>
+      <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md" class="btn-g">Technical documentation</a>
+      <a href="landing-en.html" class="btn-g">← Back to home</a>
     </div>
   </div>
 </div>
 
 <footer>
   <div class="f-logo">AI<span>n</span>onymous <span style="color:var(--muted);font-size:14px;font-weight:400">Enterprise</span></div>
-  <p style="margin-bottom: 14px">L'IA souveraine pour les organisations qui ne font pas de compromis.</p>
+  <p style="margin-bottom: 14px">Sovereign AI for organizations that don't compromise.</p>
   <div>
-    <a href="landing.html">Accueil</a>
+    <a href="landing-en.html">Home</a>
     <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
     <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">Docs</a>
     <a href="https://github.com/Geoking2104/AInonymous/blob/main/LICENSE">Apache 2.0</a>
