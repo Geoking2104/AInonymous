@@ -1,0 +1,13 @@
+[package]
+name = "hybridnode_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hybridnode_coordinator"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { version = "0.6.1", features = ["tracing"] }
+hybridnode_integrity = { path = "../integrity" }
+serde = { version = "1", features = ["derive"] }

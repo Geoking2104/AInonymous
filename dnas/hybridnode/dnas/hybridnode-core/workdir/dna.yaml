@@ -1,0 +1,16 @@
+---
+manifest_version: "1"
+name: hybridnode-core
+integrity:
+  network_seed: "ainonymous-hybridnode-v1"
+  properties:
+    private_network: false
+  zomes:
+    - name: hybridnode_integrity
+      bundled: "../../../zomes/integrity/target/wasm32-unknown-unknown/release/hybridnode_integrity.wasm"
+coordinator:
+  zomes:
+    - name: hybridnode_coordinator
+      bundled: "../../../zomes/coordinator/target/wasm32-unknown-unknown/release/hybridnode_coordinator.wasm"
+      dependencies:
+        - name: hybridnode_integrity

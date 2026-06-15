@@ -1,0 +1,80 @@
+# HybridNode — Configuration de référence pour AInonymous
+version: "1.0"
+mode: hybridnode
+
+identity:
+  backend: holochain
+  keystore: lair
+
+holochain:
+  conductor_url: "ws://localhost:8888"
+  app_port: 8889
+  version: "0.6.1"
+  bootstrap_mode: private
+  bootstrap_url: "https://bootstrap.internal.sdwan:8888"
+
+sdwan:
+  provider: rest
+  api_url: "https://vmanage.internal:8443"
+  api_token_env: SDWAN_API_TOKEN
+  site_id_env: SDWAN_SITE_ID
+  tls_verify: true
+  poll_interval_seconds: 30
+  sla_thresholds:
+    max_latency_ms:
+      intra_site: 5
+      inter_site_local: 20
+      inter_site_remote: 80
+    min_bandwidth_mbps:
+      intra_site: 10000
+      inter_site_local: 1000
+      inter_site_remote: 100
+
+quic:
+  mtls_strict: true
+  bind_addr: "0.0.0.0:0"
+  relay_fallback: true
+  dscp_marking: 46
+  compression:
+    mode: auto
+    threshold_gbps: 1.0
+  limits:
+    max_activation_size_mb: 512
+    max_concurrent_sessions: 4
+
+scheduler:
+  default_strategy: local_first
+  max_inter_site_activation_mb: 50
+  max_nodes_per_plan: 3
+
+models:
+  placement_strategy: locality_aware
+  gguf_paths:
+    - "~/.ainonymous/models"
+    - "/opt/ainonymous/models"
+
+inference:
+  llama_server_port: 9337
+  llama_server_host: "127.0.0.1"
+  api_port: 9337
+  metrics_port: 9338
+
+observability:
+  prometheus: true
+  prometheus_addr: "0.0.0.0:9338"
+  otel_endpoint: ""
+  otel_service_name: "ainonymous"
+  sdwan_metrics: true
+  log_level: info
+
+audit:
+  enabled: true
+  interval_hours: 6
+  auto_warrant: true
+  model_hash_check: true
+  reputation_threshold: 0.5
+
+security:
+  private_network: true
+  pow_difficulty: 0
+  warrant_expiry_days: 30

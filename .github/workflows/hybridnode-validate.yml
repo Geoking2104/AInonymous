@@ -1,0 +1,118 @@
+name: HybridNode Validate
+
+on:
+  push:
+    paths:
+      - 'hybridnode/**'
+      - 'crates/hybridnode-core/**'
+      - 'crates/hybridnode-daemon/**'
+      - 'dnas/hybridnode/**'
+      - 'scripts/hybridnode/**'
+      - '.github/workflows/hybridnode-validate.yml'
+  pull_request:
+    paths:
+      - 'hybridnode/**'
+      - 'crates/hybridnode-core/**'
+      - 'crates/hybridnode-daemon/**'
+      - 'dnas/hybridnode/**'
+
+jobs:
+  # ── 1. Validate YAML configs against JSON Schema ──────────────────────────
+  validate-configs:
+    name: Validate YAML configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml jsonschema
+      - name: Validate all hybridnode configs
+        run: |
+          python scripts/hybridnode/validate_config.py \
+            hybridnode/configs/ainonymous.hybridnode.yaml \
+            hybridnode/configs/generic-project.hybridnode.yaml
+
+  # ── 2. Rust lint + test for hybridnode-core ───────────────────────────────
+  rust-check:
+    name: Rust check (hybridnode-core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/hybridnode-core/Cargo.toml -- --check
+      - name: Clippy
+        run: |
+          cargo clippy \
+            --manifest-path crates/hybridnode-core/Cargo.toml \
+            --features mock-sdwan \
+            -- -D warnings
+      - name: Tests
+        run: |
+          cargo test \
+            --manifest-path crates/hybridnode-core/Cargo.toml \
+            --features mock-sdwan
+
+  # ── 3. Check YAML policy files are well-formed ────────────────────────────
+  lint-policies:
+    name: Lint policy YAML files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml
+      - name: Parse all policy files
+        run: |
+          python -c "
+          import yaml, sys, pathlib
+          errors = []
+          for f in pathlib.Path('hybridnode/policies').glob('*.yaml'):
+              try:
+                  yaml.safe_load(f.read_text())
+                  print(f'✓ {f}')
+              except yaml.YAMLError as e:
+                  errors.append(f'{f}: {e}')
+                  print(f'✗ {f}: {e}')
+          if errors:
+              sys.exit(1)
+          "
+
+  # ── 4. Security baseline checks ───────────────────────────────────────────
+  security-checks:
+    name: Security baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml
+      - name: Verify mtls_strict is not disabled in any config
+        run: |
+          python -c "
+          import yaml, sys, pathlib
+          for f in pathlib.Path('hybridnode/configs').glob('*.yaml'):
+              cfg = yaml.safe_load(f.read_text())
+              quic = cfg.get('quic', {})
+              if quic.get('mtls_strict') is False:
+                  print(f'FAIL: {f} has quic.mtls_strict=false')
+                  sys.exit(1)
+          print('All configs: mtls_strict OK')
+          "
+      - name: Verify no allow_unverified in model validation
+        run: |
+          python -c "
+          import yaml, sys, pathlib
+          policy = pathlib.Path('hybridnode/policies/model-validation.yaml')
+          cfg = yaml.safe_load(policy.read_text())
+          if cfg.get('cross_peer_verification', {}).get('on_mismatch') == 'allow':
+              print(f'FAIL: model-validation policy allows unverified models')
+              sys.exit(1)
+          print('Model validation policy OK')
+          "

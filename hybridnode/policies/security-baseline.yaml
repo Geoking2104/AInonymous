@@ -1,0 +1,39 @@
+# HybridNode — Baseline de sécurité
+name: hybridnode-security-baseline
+version: "1.0"
+
+network:
+  quic_mtls_strict: true             # mTLS ed25519 obligatoire, pas de certificat auto-signé
+  min_tls_version: "1.3"
+  allowed_ciphers:
+    - TLS_AES_256_GCM_SHA384
+    - TLS_CHACHA20_POLY1305_SHA256
+  session_token_length_bytes: 32
+  session_token_expiry_seconds: 30
+
+identity:
+  key_algorithm: ed25519
+  keystore: lair                     # lair-keystore Holochain uniquement
+  key_rotation_days: 0               # 0 = jamais (clé persistante = identité DHT)
+
+holochain:
+  validate_all_entries: true
+  warrant_auto_publish: true
+  warrant_expiry_days: 30
+  reputation_exclusion_threshold: 0.5
+
+sdwan:
+  api_tls_verify: true
+  api_token_rotation_days: 90
+  site_authentication: certificate   # "certificate" | "psk"
+
+models:
+  hash_verification: required        # SHA256 vérifié localement avant tout service
+  cross_peer_verification: true      # >= 2 pairs doivent confirmer le hash
+  allow_unverified: false            # refuser de servir un modèle non attesté
+
+audit:
+  enabled: true
+  log_all_requests: false            # ne logger que les métadonnées, jamais les prompts
+  log_metrics_only: true
+  warrant_notification: true

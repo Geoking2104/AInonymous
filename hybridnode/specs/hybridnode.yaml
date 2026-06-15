@@ -1,0 +1,118 @@
+# HybridNode Specification — Format de configuration complet
+# Ce fichier documente TOUS les champs disponibles avec leurs valeurs par défaut.
+# Pour une configuration minimale, voir configs/generic-project.hybridnode.yaml
+
+version: "1.0"
+mode: hybridnode                  # "hybridnode" | "holochain-only" | "sdwan-only"
+
+# ── Identité ────────────────────────────────────────────────────────────────
+identity:
+  backend: holochain              # "holochain" — clé ed25519 gérée par lair-keystore
+  keystore: lair                  # keystore Holochain (ne jamais utiliser autre chose)
+  # node_id_override: ""         # optionnel : forcer un AgentPubKey spécifique (dev only)
+
+# ── Holochain ───────────────────────────────────────────────────────────────
+holochain:
+  conductor_url: "ws://localhost:8888"
+  app_port: 8889
+  version: "0.6.1"               # version minimale requise
+  bootstrap_mode: private         # "public" | "private"
+  bootstrap_url: "https://bootstrap.internal.sdwan:8888"
+  # Pour réseau public, utiliser :
+  # bootstrap_mode: public
+  # bootstrap_url: "https://bootstrap.holo.host"
+  dna_hashes:
+    inference_mesh: ""            # rempli automatiquement au démarrage
+    agent_registry: ""
+    blackboard: ""
+    hybridnode: ""
+    attestation: ""
+
+# ── SD-WAN ──────────────────────────────────────────────────────────────────
+sdwan:
+  provider: rest                  # "rest" | "vmanage" | "velocloud" | "fortinet" | "mock"
+  api_url: "https://vmanage.internal:8443"
+  api_token_env: SDWAN_API_TOKEN  # variable d'environnement contenant le token API
+  site_id_env: SDWAN_SITE_ID      # variable d'environnement contenant l'ID de site
+  tls_verify: true                # toujours true en production
+  poll_interval_seconds: 30       # fréquence de rafraîchissement topologie
+
+  # Seuils SLA pour le scheduler
+  sla_thresholds:
+    max_latency_ms:
+      intra_site: 10
+      inter_site_local: 30
+      inter_site_remote: 100
+    min_bandwidth_mbps:
+      intra_site: 1000
+      inter_site_local: 100
+      inter_site_remote: 10
+    max_jitter_ms: 5
+    max_packet_loss_percent: 0.1
+
+# ── QUIC / mTLS ─────────────────────────────────────────────────────────────
+quic:
+  mtls_strict: true               # TOUJOURS true — ne jamais désactiver
+  bind_addr: "0.0.0.0:0"         # port éphémère automatique
+  relay_fallback: true            # relay iroh si NAT symétrique
+  session_timeout_seconds: 120
+  dscp_marking: 46                # EF (Expedited Forwarding) pour QoS SD-WAN
+  compression:
+    mode: auto                    # "auto" | "zstd" | "none"
+    threshold_gbps: 1.0
+  limits:
+    max_activation_size_mb: 512
+    max_concurrent_sessions: 4
+
+# ── Scheduler ───────────────────────────────────────────────────────────────
+scheduler:
+  default_strategy: local_first   # "local_first" | "balanced_qos" | "max_throughput" | "latency_budget"
+  latency_budget_ms: 50           # utilisé si strategy = latency_budget
+  # Limite de taille d'activation pour autoriser un pipeline-split inter-sites
+  # Si les activations estimées > seuil ET lien inter-site < 1Gbps → refus
+  max_inter_site_activation_mb: 100
+  # Nombre de nœuds max dans un plan d'exécution
+  max_nodes_per_plan: 4
+
+# ── Modèles ─────────────────────────────────────────────────────────────────
+models:
+  placement_strategy: locality_aware  # "locality_aware" | "capacity_first" | "manual"
+  gguf_paths:
+    - "~/.ainonymous/models"
+    - "/opt/ainonymous/models"
+  # Politique de réplication inter-sites (à configurer manuellement)
+  # replication:
+  #   - model: "gemma4-e4b"
+  #     sites: all
+  #   - model: "gemma4-31b"
+  #     sites: [hq]
+
+# ── Inférence ───────────────────────────────────────────────────────────────
+inference:
+  llama_server_port: 9337
+  llama_server_host: "127.0.0.1"
+  api_port: 9337                  # endpoint OpenAI-compat exposé aux clients
+  metrics_port: 9338              # endpoint Prometheus
+
+# ── Observabilité ───────────────────────────────────────────────────────────
+observability:
+  prometheus: true
+  prometheus_addr: "0.0.0.0:9338"
+  otel_endpoint: ""               # ex: "http://otel-collector:4317" — vide = désactivé
+  otel_service_name: "ainonymous-hybridnode"
+  sdwan_metrics: true             # inclure métriques SD-WAN dans snapshots DHT
+  log_level: info                 # "trace" | "debug" | "info" | "warn" | "error"
+
+# ── Audit ───────────────────────────────────────────────────────────────────
+audit:
+  enabled: true
+  interval_hours: 6
+  auto_warrant: true
+  model_hash_check: true
+  reputation_threshold: 0.5
+
+# ── Sécurité ────────────────────────────────────────────────────────────────
+security:
+  private_network: true           # activer membrane proofs (feature "private-network")
+  pow_difficulty: 0               # 0 = désactivé, >0 = bits de PoW requis à l'admission
+  warrant_expiry_days: 30

@@ -1,0 +1,40 @@
+# HybridNode — Configuration observabilité
+name: hybridnode-observability
+version: "1.0"
+
+prometheus:
+  enabled: true
+  addr: "0.0.0.0:9338"
+  path: /metrics
+  metrics:
+    - ainonymous_requests_total
+    - ainonymous_latency_seconds
+    - ainonymous_tokens_per_second
+    - ainonymous_vram_used_bytes
+    - hybridnode_sdwan_link_latency_ms
+    - hybridnode_sdwan_link_bandwidth_mbps
+    - hybridnode_scheduler_decisions_total
+    - hybridnode_inter_site_activations_total
+
+opentelemetry:
+  enabled: false                     # activer si un collecteur OTEL est disponible
+  endpoint: ""                       # ex: "http://otel-collector.internal:4317"
+  service_name: ainonymous-hybridnode
+  trace_sampling_rate: 0.1           # 10% des requêtes tracées
+  propagation: w3c                   # W3C TraceContext
+
+logging:
+  level: info
+  format: json                       # "json" | "text"
+  output: stdout
+  include_request_id: true
+  include_site_id: true
+  exclude_fields:
+    - prompt_content
+    - activation_data
+    - session_token
+
+sdwan_metrics:
+  collect: true
+  include_in_dht_snapshot: true
+  snapshot_interval_minutes: 5
