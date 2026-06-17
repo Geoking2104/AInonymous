@@ -11,7 +11,7 @@ AInonymous sépare strictement les deux plans réseau :
 ```
 PLAN DE CONTRÔLE                    PLAN DE DONNÉES
 ────────────────                    ────────────────
-Holochain / kitsune2                QUIC direct (iroh-net)
+Holochain / iroh (DHT)              QUIC mTLS direct (iroh-net)
 
 • Découverte de pairs               • Activations tensorielles
 • Négociation de sessions           • Tokens générés (stream)
@@ -28,18 +28,196 @@ Volume : < 10 KB par message        Volume : 10 MB — 500 MB par requête
 
 ## Stack QUIC
 
-**Librairie** : `iroh-net` (Rust) — la même que Holochain utilise pour kitsune2, mais exposée directement pour les connexions de données.
+**Librairie** : `iroh-net` (Rust) — le même transport qu'utilise Holochain 0.6.1 pour le DHT, exposé directement pour les connexions de données.
 
 **iroh-net** fournit :
-- QUIC sur UDP avec NAT traversal automatique (hole punching)
-- Chiffrement TLS 1.3 de bout en bout (clés ed25519 Holochain réutilisées)
-- Multiplexage de streams sur une même connexion
+- QUIC sur UDP avec NAT traversal automatique (hole punching STUN/TURN)
+- **TLS 1.3 obligatoire** avec authentification mutuelle (mTLS) basée sur les clés ed25519 Holochain
+- Multiplexage de streams sur une même connexion QUIC
 - 0-RTT reconnexion entre pairs déjà connus
 
 **Pourquoi QUIC et pas TCP ou WebRTC :**
 - TCP : pas de multiplexing natif, head-of-line blocking sur les gros tenseurs
-- WebRTC : overhead de signaling, conçu pour media temps-réel pas pour blobs tensoriels
+- WebRTC : overhead de signaling, conçu pour media temps-réel
 - QUIC : streams indépendants, contrôle de congestion, 0-RTT, idéal pour gros transferts binaires
+
+---
+
+## mTLS QUIC — Authentification Mutuelle
+
+> **Problème résolu** : l'ancienne implémentation (`ainonymous-quic`) utilisait des certificats auto-signés avec vérification TLS désactivée (`dangerous_accept_any_server_cert`). C'est corrigé.
+
+### Principe
+
+Chaque nœud présente son **AgentPubKey Holochain (ed25519)** comme certificat TLS lors de l'établissement QUIC. Les deux extrémités vérifient mutuellement l'identité de leur pair avant d'échanger des activations :
+
+```
+Nœud A                              Nœud B
+  │                                    │
+  │──── ClientHello (TLS 1.3) ────────►│
+  │     + certificat ed25519(A)         │
+  │                                    │
+  │◄─── ServerHello + cert ed25519(B) ─│
+  │                                    │
+  │ Vérifications mutuelles :           │
+  │ A vérifie : cert(B) == AgentPubKey(B) connu dans le DHT
+  │ B vérifie : cert(A) == AgentPubKey(A) connu dans le DHT
+  │ + B vérifie le session_token reçu via Holochain
+  │                                    │
+  │◄══ QUIC chiffré mTLS établi ══════►│
+```
+
+### Implémentation
+
+```rust
+use iroh_net::tls::Keypair;
+
+// Côté Nœud A (initiateur)
+pub async fn connect_quic_mtls(
+    local_key: &ed25519_dalek::SigningKey,
+    remote_pubkey: &AgentPubKey,
+    remote_addr: SocketAddr,
+    session_token: &[u8; 32],
+) -> anyhow::Result<quinn::Connection> {
+    // Construire le certificat TLS depuis la clé ed25519 Holochain
+    let keypair = Keypair::from_ed25519_bytes(local_key.to_bytes())?;
+
+    let endpoint = iroh_net::Endpoint::builder()
+        .secret_key(keypair)
+        // Vérification stricte du pair distant
+        .tls_client_config(build_mtls_client_config(remote_pubkey)?)
+        .bind()
+        .await?;
+
+    let connection = endpoint
+        .connect(remote_addr, &remote_pubkey.into_node_id())
+        .await?;
+
+    // Envoyer le session_token pour authentifier cette session spécifique
+    let mut auth_stream = connection.open_uni().await?;
+    auth_stream.write_all(session_token).await?;
+    auth_stream.finish().await?;
+
+    Ok(connection)
+}
+
+fn build_mtls_client_config(
+    expected_peer: &AgentPubKey,
+) -> anyhow::Result<rustls::ClientConfig> {
+    let verifier = PeerKeyVerifier::new(expected_peer.clone());
+    Ok(rustls::ClientConfig::builder()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth()) // l'auth client est faite via le keypair iroh
+}
+
+// Vérificateur de clé pair (remplace le danger accept-any)
+struct PeerKeyVerifier {
+    expected_pubkey: AgentPubKey,
+}
+
+impl rustls::client::ServerCertVerifier for PeerKeyVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &rustls::Certificate,
+        _intermediates: &[rustls::Certificate],
+        _server_name: &rustls::ServerName,
+        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _ocsp_response: &[u8],
+        _now: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+        // Extraire la clé publique ed25519 du certificat iroh
+        let peer_pubkey = extract_ed25519_from_cert(end_entity)?;
+        // Comparer avec l'AgentPubKey attendue (obtenue via Holochain DHT)
+        if peer_pubkey != self.expected_pubkey.get_raw_32() {
+            return Err(rustls::Error::General(
+                "Clé publique pair ne correspond pas à l'AgentPubKey DHT".into()
+            ));
+        }
+        Ok(rustls::client::ServerCertVerified::assertion())
+    }
+}
+
+// Côté Nœud B (listener)
+pub async fn accept_quic_mtls(
+    local_key: &ed25519_dalek::SigningKey,
+    expected_session_token: &[u8; 32],
+    expected_caller: &AgentPubKey,
+) -> anyhow::Result<quinn::Connection> {
+    let keypair = Keypair::from_ed25519_bytes(local_key.to_bytes())?;
+
+    let endpoint = iroh_net::Endpoint::builder()
+        .secret_key(keypair)
+        .tls_server_config(build_mtls_server_config()?)
+        .bind()
+        .await?;
+
+    let incoming = endpoint.accept().await
+        .ok_or(anyhow::anyhow!("Pas de connexion entrante"))?;
+    let connection = incoming.await?;
+
+    // Vérifier l'identité du pair appelant
+    let peer_pubkey = extract_peer_pubkey(&connection)?;
+    if peer_pubkey != expected_caller.get_raw_32() {
+        connection.close(1u32.into(), b"unauthorized peer");
+        anyhow::bail!("Pair non autorisé");
+    }
+
+    // Vérifier le session_token
+    let mut auth_stream = connection.accept_uni().await?;
+    let mut token = [0u8; 32];
+    auth_stream.read_exact(&mut token).await?;
+    if &token != expected_session_token {
+        connection.close(2u32.into(), b"invalid session token");
+        anyhow::bail!("Session token invalide");
+    }
+
+    Ok(connection)
+}
+```
+
+---
+
+## Attestation des Nœuds côté Transport
+
+Avant toute connexion QUIC, le coordinateur vérifie l'attestation du nœud worker dans le DHT Holochain :
+
+```rust
+pub async fn verify_node_before_connect(
+    node: &AgentPubKey,
+    required_model: &str,
+) -> anyhow::Result<()> {
+    // 1. Vérifier NodeAttestation récente (< 24h) dans le DHT
+    let attestation = get_node_attestation(node).await?
+        .ok_or(anyhow::anyhow!("Pas d'attestation pour ce nœud"))?;
+
+    if attestation.age_hours() > 24 {
+        anyhow::bail!("Attestation expirée ({} h)", attestation.age_hours());
+    }
+
+    // 2. Vérifier la signature de l'attestation
+    verify_ed25519_signature(
+        node,
+        &attestation.attestation_signature,
+        &attestation.content_bytes(),
+    )?;
+
+    // 3. Vérifier que le nœud a un ModelClaim valide pour ce modèle
+    let claim = get_model_claim(node, required_model).await?
+        .ok_or(anyhow::anyhow!("Nœud n'a pas ce modèle attesté"))?;
+
+    if !claim.verified_locally {
+        anyhow::bail!("Modèle non vérifié localement par le nœud");
+    }
+
+    // 4. Vérifier absence de warrant actif
+    let warrants = get_active_warrants(node).await?;
+    if !warrants.is_empty() {
+        anyhow::bail!("{} warrant(s) actif(s) sur ce nœud", warrants.len());
+    }
+
+    Ok(())
+}
+```
 
 ---
 
@@ -53,7 +231,7 @@ Nœud A (coordinateur)                    Nœud B (worker)
        │── call_remote() Holochain ───────────►│
        │   "inference-mesh::negotiate_quic"    │
        │   {request_id, layer_range: 24-47}    │
-       │                                       │── ouvre QUIC listener
+       │                                       │── ouvre QUIC mTLS listener
        │                                       │   sur port éphémère UDP
        │◄── QuicSessionOffer ─────────────────│
        │   {endpoint: "203.0.113.42:54xxx",   │
@@ -61,121 +239,69 @@ Nœud A (coordinateur)                    Nœud B (worker)
        │    expires_in: 30s}                   │
 ```
 
-### 2. Établissement QUIC (direct, sans Holochain)
+### 2. Vérifications pré-connexion
 
-```rust
-// Côté Nœud A (initiateur)
-let endpoint = iroh_net::Endpoint::builder()
-    .secret_key(holochain_agent_secret_key())  // clé ed25519 de l'agent Holochain
-    .bind()
-    .await?;
-
-let connection = endpoint
-    .connect(node_b_addr, node_b_public_key)
-    .await?;
-
-// Authentifier la session avec le token négocié via Holochain
-let auth_stream = connection.open_uni().await?;
-auth_stream.write_all(&session_token).await?;
+```
+A vérifie (via DHT Holochain) :
+  ✅ NodeAttestation de B valide et récente (< 24h)
+  ✅ ModelClaim de B pour le modèle demandé
+  ✅ Aucun warrant actif sur B
+  ✅ Heartbeat récent de B (< 60s)
+→ Si une vérification échoue : sélection d'un autre nœud
 ```
 
-```rust
-// Côté Nœud B (listener)
-let incoming = endpoint.accept().await?;
-let connection = incoming.await?;
+### 3. Établissement QUIC mTLS
 
-// Vérifier token de session
-let auth_stream = connection.accept_uni().await?;
-let token = read_exact(auth_stream, 32).await?;
-if token != expected_session_token {
-    connection.close(1u32.into(), b"invalid session token");
-    return Err(anyhow!("Session token invalide"));
-}
+```rust
+// A se connecte à B avec authentification mutuelle ed25519
+let connection = connect_quic_mtls(&agent_key, &node_b_pubkey, offer.endpoint, &offer.session_token).await?;
 ```
 
-### 3. Transfer des Activations
+### 4. Transfer des Activations
 
 ```rust
-// Format du stream d'activations
-// Header (fixe, 64 bytes)
+// Format du stream d'activations (header 64 bytes + body tenseur)
 struct ActivationHeader {
-    request_id: [u8; 36],          // UUID
+    request_id: [u8; 36],
     layer_start: u32,
     layer_end: u32,
-    seq_len: u32,                  // longueur de séquence
-    hidden_size: u32,              // taille cachée (ex: 5120 pour gemma4-31b)
-    dtype: u8,                     // 0=f32, 1=f16, 2=bf16
-    compression: u8,               // 0=none, 1=zstd
+    seq_len: u32,
+    hidden_size: u32,
+    dtype: u8,          // 0=f32, 1=f16, 2=bf16
+    compression: u8,    // 0=none, 1=zstd
     _reserved: [u8; 14],
 }
-
 // Body : tenseur [seq_len × hidden_size] en dtype spécifié
 // Taille typique : 2048 × 5120 × 2 bytes (bf16) = 20 MB
-
-// Côté Nœud A : envoyer activations
-let mut send_stream = connection.open_uni().await?;
-send_stream.write_all(&header.to_bytes()).await?;
-if header.compression == 1 {
-    let compressed = zstd::encode_all(&activations_bytes, 1)?;  // niveau 1 : vitesse
-    send_stream.write_all(&compressed).await?;
-} else {
-    send_stream.write_all(&activations_bytes).await?;
-}
-send_stream.finish().await?;
-
-// Côté Nœud B : recevoir et traiter
-let mut recv_stream = connection.accept_uni().await?;
-let header = ActivationHeader::from_bytes(&read_exact(&mut recv_stream, 64).await?);
-let body = recv_stream.read_to_end(MAX_ACTIVATION_SIZE).await?;
-let activations = if header.compression == 1 {
-    zstd::decode_all(&body[..])?
-} else { body };
-// → passer à llama-server via shared memory ou stdin
 ```
 
-### 4. Stream de Tokens (génération)
+### 5. Stream de Tokens
 
 ```rust
 // Stream séparé sur la même connexion QUIC (multiplexing)
-// Nœud final → Nœud coordinateur → Client SSE
-
-// Format : NDJSON compatible OpenAI streaming
+// Format NDJSON compatible OpenAI streaming
 // {"id":"chatcmpl-X","choices":[{"delta":{"content":"Le "}}]}
-// {"id":"chatcmpl-X","choices":[{"delta":{"content":"sharding"}}]}
-// {"id":"chatcmpl-X","choices":[{"finish_reason":"stop"}]}
-
-let mut token_stream = connection.open_uni().await?;
-for token in generated_tokens {
-    let chunk = serde_json::to_vec(&ChatCompletionChunk::from(token))?;
-    token_stream.write_all(&(chunk.len() as u32).to_le_bytes()).await?;
-    token_stream.write_all(&chunk).await?;
-}
-token_stream.finish().await?;
 ```
 
-### 5. Fermeture
+### 6. Fermeture et Métriques
 
 ```rust
-// Nœud A ferme la connexion proprement après réception complète
 connection.close(0u32.into(), b"done");
 
-// Métriques publiées sur Holochain (plan de contrôle)
+// Métriques publiées sur Holochain
 call_zome("inference-mesh", "publish_metrics", InferenceMetrics {
     request_id,
-    total_latency_ms: elapsed.as_millis() as u32,
-    tokens_per_second: tokens_count as f32 / elapsed.as_secs_f32(),
+    total_latency_ms,
+    tokens_per_second,
     nodes_used: 2,
-    model_id: "gemma4-31b".into(),
     success: true,
-    error_reason: None,
+    ..
 }).await?;
 ```
 
 ---
 
 ## Compression des Activations
-
-Les activations tensorielles peuvent être significativement compressées car elles contiennent des patterns répétitifs :
 
 | Modèle | Séq. | Taille brute (bf16) | Zstd-1 | Gain | Latence compression |
 |---|---|---|---|---|---|
@@ -184,122 +310,105 @@ Les activations tensorielles peuvent être significativement compressées car el
 | Gemma4-26B-MoE | 2048 | 16 MB | 6.2 MB | 61% | ~9ms |
 | Gemma4-E4B | 512 | 1.4 MB | 0.6 MB | 57% | ~1ms |
 
-**Décision automatique** : compression activée si bande passante estimée < 1 Gbps entre les nœuds.
-
-```rust
-fn should_compress(node_a: &NodeInfo, node_b: &NodeInfo) -> bool {
-    let bandwidth_estimate = estimate_bandwidth(node_a, node_b);
-    bandwidth_estimate < 1_000_000_000  // < 1 Gbps
-}
-```
+**Décision automatique** : compression activée si bande passante estimée < 1 Gbps.
 
 ---
 
 ## NAT Traversal
 
-iroh-net gère le NAT traversal automatiquement via **hole punching** (STUN/TURN). La séquence :
+iroh-net gère le NAT traversal via **hole punching** :
 
 ```
-1. Les deux nœuds connaissent leurs IP publiques
-   (obtenues via le DHT Holochain au moment de l'annonce de capabilities)
-
-2. iroh-net tente la connexion directe UDP (hole punching)
-   → succès dans ~85% des cas (NAT symétrique → échec)
-
-3. Si échec direct : iroh-net utilise un relay QUIC
-   → relay public iroh (open source, opérés par la communauté)
+1. Les deux nœuds annoncent leurs IP publiques dans le DHT Holochain
+2. iroh-net tente connexion UDP directe (hole punching)
+   → succès dans ~85% des cas
+3. Si échec : relay QUIC iroh (open source, opérés par la communauté)
    → performance dégradée mais fonctionnel
-
-4. Résultats enregistrés localement pour optimiser les futures connexions
 ```
 
-**Ports utilisés :**
-- Port éphémère UDP pour chaque session QUIC de données
-- Le port est communiqué via Holochain (`QuicSessionOffer.endpoint`)
-- Pas de port fixe à ouvrir en firewall (sauf si relay forcé)
+**Ports** : éphémères UDP par session — pas de port fixe en firewall (sauf relay forcé).
 
 ---
 
 ## Gestion des Échecs
 
-### Timeout et retry
+### Scénarios
+
+| Scénario | Détection | Action |
+|---|---|---|
+| B inaccessible (QUIC timeout) | 5s timeout connexion | Holochain → nœud alternatif |
+| Attestation B expirée | Vérif DHT pré-connexion | Exclusion de ce nœud, sélection alternative |
+| mTLS : clé pair incorrecte | Erreur TLS au handshake | Connexion refusée + warrant potentiel |
+| Stream coupé (transfert partiel) | EOF inattendu | Abandon requête + métriques failure |
+| Session token expiré (> 30s) | Rejet côté B | Re-négocier via Holochain |
+| B OOM pendant calcul | Signal Holochain NodeError | B publie heartbeat load=1.0 → exclu futures |
+| Réseau lent (> 10s) | Stream timeout | Abandon + log métriques |
 
 ```rust
 const QUIC_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const QUIC_STREAM_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_ACTIVATION_SIZE: usize = 512 * 1024 * 1024;  // 512 MB max
 
-// Si connexion QUIC échoue → signaler via Holochain et prendre un autre nœud
-match timeout(QUIC_CONNECT_TIMEOUT, connect_quic(&offer)).await {
+match timeout(QUIC_CONNECT_TIMEOUT, connect_quic_mtls(...)).await {
     Ok(Ok(conn)) => conn,
-    Ok(Err(e)) | Err(_) => {
-        // Publier échec sur Holochain
+    _ => {
         report_node_failure(offer.node_id, "quic_connect_failed").await?;
-        // Re-router vers un autre nœud disponible
         let new_node = call_zome("agent-registry", "get_fallback_node", model_id).await?;
-        connect_quic_to(new_node).await?
+        connect_quic_mtls(...new_node...).await?
     }
 }
 ```
-
-### Scénarios d'échec
-
-| Scénario | Détection | Action |
-|---|---|---|
-| Nœud B inaccessible (QUIC timeout) | 5s timeout connexion | Holochain → nœud alternatif |
-| Stream coupé en cours (transfert partiel) | EOF inattendu | Abandon requête + métriques failure |
-| Session token expiré (> 30s) | Rejet côté B | Re-négocier via Holochain |
-| Nœud B OOM pendant calcul | Signal Holochain NodeError | Nœud B publie heartbeat load=1.0, exclu des futures requêtes |
-| Réseau lent (latence > 10s) | Stream timeout | Abandon + log dans métriques |
 
 ---
 
 ## Sécurité du Canal QUIC
 
-Même en réseau public, le canal QUIC est sécurisé :
-
-- **Chiffrement** : TLS 1.3 obligatoire (intégré dans QUIC) — les activations sont chiffrées en transit
-- **Authentification mutuelle** : les deux nœuds s'authentifient avec leur clé ed25519 Holochain (la même clé que leur AgentPubKey)
-- **Token de session** : 32 bytes aléatoires négociés via Holochain — empêche les connexions non sollicitées même si l'endpoint QUIC est connu
-- **Pas de stockage** : les activations ne sont jamais écrites sur disque, uniquement en mémoire → pas de fuite post-inférence
-
 ```
+Chiffrement      : TLS 1.3 obligatoire — activations chiffrées en transit
+Auth mutuelle    : ed25519 Holochain des deux côtés — plus de certificats auto-signés
+Token session    : 32 bytes aléatoires via Holochain — empêche connexions non sollicitées
+Pas de stockage  : activations jamais écrites sur disque — pas de fuite post-inférence
+```
+
 Ce que voit un observateur réseau :
-  • Connexion QUIC chiffrée entre deux IP
-  • Pas de contenu lisible (TLS 1.3)
-  • Pas d'identification du modèle ou du prompt
-  • Taille du transfert visible (mais pas le contenu)
-```
+- Connexion QUIC chiffrée entre deux IP
+- Pas de contenu lisible (TLS 1.3)
+- Pas d'identification du modèle ou du prompt
+- Taille du transfert visible uniquement
 
 ---
 
 ## Configuration Daemon Local
 
-Le daemon `ainonymous` gère le canal QUIC en parallèle du conducteur Holochain :
-
 ```toml
 # ~/.config/ainonymous/config.toml
 
 [network]
-# Holochain conductor
 holochain_port = 8888
 holochain_app_port = 8889
 
-# QUIC data plane
-quic_bind_addr = "0.0.0.0:0"      # port éphémère automatique
-quic_relay_fallback = true         # utiliser relay si NAT symétrique
+[quic]
+bind_addr = "0.0.0.0:0"           # port éphémère automatique
+relay_fallback = true              # relay si NAT symétrique
 max_session_duration_seconds = 120
+mtls_strict = true                 # TOUJOURS true — ne jamais désactiver
 
-# Compression des activations
-activation_compression = "auto"   # "auto" | "zstd" | "none"
-compression_threshold_gbps = 1.0  # activer si bande passante estimée < 1 Gbps
+[quic.compression]
+mode = "auto"                      # "auto" | "zstd" | "none"
+threshold_gbps = 1.0               # compresser si bande < 1 Gbps
 
-# Limites
+[quic.limits]
 max_activation_size_mb = 512
-max_concurrent_quic_sessions = 4
+max_concurrent_sessions = 4
 
 [inference]
 llama_server_port = 9337
 llama_server_host = "127.0.0.1"
-api_port = 9337                    # endpoint OpenAI-compat exposé au client
+api_port = 9337
+metrics_port = 9338                # endpoint Prometheus
+
+[audit]
+enabled = true
+interval_hours = 6
+auto_warrant = true
 ```

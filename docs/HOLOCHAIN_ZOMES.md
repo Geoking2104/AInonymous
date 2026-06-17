@@ -639,6 +639,502 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
 
 ---
 
+## DNA 4 : `attestation` (nouveau)
+
+### Rôle
+
+DNA dédiée à l'attestation des nœuds et à la validation des modèles. Sépare ces responsabilités de sécurité de la logique d'inférence.
+
+### Types de Données (Integrity Zome)
+
+```rust
+use hdi::prelude::*;
+
+// ── Attestation nœud ─────────────────────────────────────────────
+
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct NodeAttestation {
+    pub agent: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub hardware_fingerprint: HardwareFingerprint,
+    pub benchmark_results: BenchmarkResults,
+    pub holochain_version: String,         // ex: "0.6.1"
+    pub daemon_version: String,            // version ainonymous-daemon
+    pub attestation_signature: Vec<u8>,    // ed25519 sign(agent_key, content_hash)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HardwareFingerprint {
+    pub gpu_uuid: Option<String>,           // UUID GPU NVIDIA/AMD si disponible
+    pub metal_device_id: Option<u64>,       // Apple Silicon device ID
+    pub vram_total_bytes: u64,
+    pub ram_total_bytes: u64,
+    pub cpu_cores: u32,
+    pub cpu_model: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BenchmarkResults {
+    pub model_id: String,
+    pub tokens_per_second: f32,
+    pub ttft_ms: u32,                        // time-to-first-token
+    pub benchmark_prompt_hash: Vec<u8>,      // SHA256 du prompt standardisé
+    pub measured_at: Timestamp,
+}
+
+// ── Manifeste de modèle ──────────────────────────────────────────
+
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct ModelManifest {
+    pub model_id: String,
+    pub model_hash: Vec<u8>,                // SHA256 du fichier GGUF (32 bytes)
+    pub huggingface_repo: Option<String>,   // ex: "google/gemma-4-31b-GGUF"
+    pub expected_size_bytes: u64,
+    pub quantization: String,               // "Q4_K_M", "Q8_0", "F16", etc.
+    pub architecture: String,               // "llama", "gemma", "qwen3"
+    pub context_length: u32,
+    pub layer_count: u32,
+    pub hidden_size: u32,
+    pub published_by: AgentPubKey,
+    pub verified_by: Vec<AgentPubKey>,      // pairs ayant co-signé ce hash
+}
+
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct ModelClaim {
+    pub manifest_hash: ActionHash,          // référence au ModelManifest
+    pub node: AgentPubKey,
+    pub verified_locally: bool,             // le nœud a vérifié SHA256 localement
+    pub layer_range: Option<(u32, u32)>,    // si pipeline-split
+    pub expert_ids: Option<Vec<u32>>,       // si MoE sharding
+    pub timestamp: Timestamp,
+}
+
+// ── Warrants ─────────────────────────────────────────────────────
+
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct Warrant {
+    pub accused: AgentPubKey,
+    pub accuser: AgentPubKey,
+    pub evidence: ActionHash,               // hash de l'entrée invalide détectée
+    pub rule_violated: String,              // ex: "ModelManifest hash mismatch"
+    pub timestamp: Timestamp,
+    pub expires_at: Timestamp,              // 30 jours par défaut
+    pub accuser_signature: Vec<u8>,         // ed25519 sign(accuser_key, warrant_hash)
+}
+
+#[hdk_entry_helper]
+#[derive(Clone)]
+pub struct WarrantRefutation {
+    pub warrant_hash: ActionHash,           // référence au Warrant contesté
+    pub refuted_by: AgentPubKey,            // l'accusé
+    pub counter_evidence: ActionHash,       // preuve contradictoire
+    pub explanation: String,                // max 2048 chars
+    pub signature: Vec<u8>,
+}
+
+#[hdk_entry_types]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    NodeAttestation(NodeAttestation),
+    ModelManifest(ModelManifest),
+    ModelClaim(ModelClaim),
+    Warrant(Warrant),
+    WarrantRefutation(WarrantRefutation),
+}
+
+#[hdk_link_types]
+pub enum LinkTypes {
+    AgentToAttestation,        // AgentPubKey → NodeAttestation
+    ManifestToClaim,           // ModelManifest → ModelClaim[]
+    AgentToWarrants,           // AgentPubKey → Warrant[] (warrants reçus)
+    WarrantToRefutation,       // Warrant → WarrantRefutation
+    ModelToManifest,           // model_id anchor → ModelManifest
+}
+```
+
+### Validation (Integrity Zome)
+
+```rust
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action }) => {
+            match app_entry {
+                EntryTypes::NodeAttestation(att) => validate_node_attestation(&att, &action),
+                EntryTypes::ModelManifest(m) => validate_model_manifest(&m),
+                EntryTypes::ModelClaim(c) => validate_model_claim(&c),
+                EntryTypes::Warrant(w) => validate_warrant(&w, &action),
+                EntryTypes::WarrantRefutation(r) => validate_warrant_refutation(&r),
+            }
+        },
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+fn validate_node_attestation(
+    att: &NodeAttestation,
+    action: &SignedActionHashed,
+) -> ExternResult<ValidateCallbackResult> {
+    // L'attestation doit être signée par l'agent qu'elle décrit
+    if att.agent != action.action().author().clone() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "L'attestation doit être publiée par l'agent qu'elle décrit".into()
+        ));
+    }
+    // Vérifier la signature ed25519 interne (en plus de la signature Holochain)
+    let content_hash = sha256(&att.content_bytes());
+    if !verify_ed25519(&att.agent, &att.attestation_signature, &content_hash)? {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Signature d'attestation invalide".into()
+        ));
+    }
+    // VRAM déclarée cohérente
+    if att.hardware_fingerprint.vram_total_bytes == 0 {
+        return Ok(ValidateCallbackResult::Invalid("VRAM doit être > 0".into()));
+    }
+    // Benchmark récent (timestamp dans les 48h de l'action)
+    let age = att.timestamp.checked_sub(att.benchmark_results.measured_at)
+        .unwrap_or(Duration::MAX);
+    if age > Duration::from_secs(172800) {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Benchmark trop ancien (> 48h)".into()
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_model_manifest(m: &ModelManifest) -> ExternResult<ValidateCallbackResult> {
+    if m.model_hash.len() != 32 {
+        return Ok(ValidateCallbackResult::Invalid("model_hash doit être SHA256 (32 bytes)".into()));
+    }
+    if m.layer_count == 0 || m.hidden_size == 0 {
+        return Ok(ValidateCallbackResult::Invalid("layer_count et hidden_size doivent être > 0".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_model_claim(c: &ModelClaim) -> ExternResult<ValidateCallbackResult> {
+    // Vérifier que le manifeste référencé existe dans le DHT
+    let manifest = get(c.manifest_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Manifeste introuvable".into())))?;
+    let manifest_entry: ModelManifest = manifest.entry().to_app_option()?.unwrap();
+
+    // Vérifier cohérence layer_range
+    if let Some((start, end)) = c.layer_range {
+        if end >= manifest_entry.layer_count {
+            return Ok(ValidateCallbackResult::Invalid(
+                "layer_range dépasse le nombre de couches du modèle".into()
+            ));
+        }
+        if start > end {
+            return Ok(ValidateCallbackResult::Invalid("layer_range invalide (start > end)".into()));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_warrant(
+    w: &Warrant,
+    action: &SignedActionHashed,
+) -> ExternResult<ValidateCallbackResult> {
+    // L'accuser doit être l'auteur de l'entrée warrant
+    if &w.accuser != action.action().author() {
+        return Ok(ValidateCallbackResult::Invalid("Accuser != auteur du warrant".into()));
+    }
+    // Vérifier signature interne
+    let content_hash = sha256(&w.content_bytes());
+    if !verify_ed25519(&w.accuser, &w.accuser_signature, &content_hash)? {
+        return Ok(ValidateCallbackResult::Invalid("Signature warrant invalide".into()));
+    }
+    // Explication non vide
+    if w.rule_violated.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("rule_violated ne peut pas être vide".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_warrant_refutation(r: &WarrantRefutation) -> ExternResult<ValidateCallbackResult> {
+    if r.explanation.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid("Explication > 2048 chars".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+```
+
+### Coordinator Zome — API Attestation
+
+```rust
+/// Publier l'attestation de ce nœud (appelé au démarrage + toutes les 24h)
+#[hdk_extern]
+pub fn publish_attestation(input: AttestationInput) -> ExternResult<ActionHash> {
+    // Construire et signer l'attestation
+    let agent = agent_info()?.agent_latest_pubkey;
+    let att = NodeAttestation {
+        agent: agent.clone(),
+        timestamp: sys_time()?,
+        hardware_fingerprint: input.hardware,
+        benchmark_results: input.benchmark,
+        holochain_version: input.holochain_version,
+        daemon_version: env!("CARGO_PKG_VERSION").into(),
+        attestation_signature: sign(agent, &input.content_bytes())?,
+    };
+    let hash = create_entry(EntryTypes::NodeAttestation(att))?;
+    create_link(agent_info()?.agent_latest_pubkey, hash.clone(), LinkTypes::AgentToAttestation, ())?;
+    Ok(hash)
+}
+
+/// Publier un manifeste de modèle
+#[hdk_extern]
+pub fn publish_model_manifest(manifest: ModelManifest) -> ExternResult<ActionHash> {
+    let hash = create_entry(EntryTypes::ModelManifest(manifest.clone()))?;
+    // Lier à l'anchor du model_id pour découverte
+    let model_anchor = anchor("models", &manifest.model_id)?;
+    create_link(model_anchor, hash.clone(), LinkTypes::ModelToManifest, ())?;
+    Ok(hash)
+}
+
+/// Déclarer posséder un modèle (ModelClaim)
+#[hdk_extern]
+pub fn claim_model(input: ModelClaimInput) -> ExternResult<ActionHash> {
+    let claim = ModelClaim {
+        manifest_hash: input.manifest_hash.clone(),
+        node: agent_info()?.agent_latest_pubkey,
+        verified_locally: input.verified_locally,
+        layer_range: input.layer_range,
+        expert_ids: input.expert_ids,
+        timestamp: sys_time()?,
+    };
+    let hash = create_entry(EntryTypes::ModelClaim(claim))?;
+    create_link(input.manifest_hash, hash.clone(), LinkTypes::ManifestToClaim, ())?;
+    Ok(hash)
+}
+
+/// Publier un warrant contre un pair (comportement invalide détecté)
+#[hdk_extern]
+pub fn publish_warrant(input: WarrantInput) -> ExternResult<ActionHash> {
+    let agent = agent_info()?.agent_latest_pubkey;
+    let expires_at = sys_time()?.checked_add(Duration::from_secs(30 * 24 * 3600))
+        .ok_or(wasm_error!(WasmErrorInner::Guest("overflow".into())))?;
+    let warrant = Warrant {
+        accused: input.accused.clone(),
+        accuser: agent.clone(),
+        evidence: input.evidence_hash,
+        rule_violated: input.rule_violated,
+        timestamp: sys_time()?,
+        expires_at,
+        accuser_signature: sign(agent, &input.content_bytes())?,
+    };
+    let hash = create_entry(EntryTypes::Warrant(warrant))?;
+    // Lier à l'accusé pour faciliter la recherche
+    create_link(input.accused, hash.clone(), LinkTypes::AgentToWarrants, ())?;
+    Ok(hash)
+}
+
+/// Contester un warrant (par l'accusé)
+#[hdk_extern]
+pub fn refute_warrant(input: RefutationInput) -> ExternResult<ActionHash> {
+    let agent = agent_info()?.agent_latest_pubkey;
+    let refutation = WarrantRefutation {
+        warrant_hash: input.warrant_hash.clone(),
+        refuted_by: agent.clone(),
+        counter_evidence: input.counter_evidence,
+        explanation: input.explanation,
+        signature: sign(agent, &input.content_bytes())?,
+    };
+    let hash = create_entry(EntryTypes::WarrantRefutation(refutation))?;
+    create_link(input.warrant_hash, hash.clone(), LinkTypes::WarrantToRefutation, ())?;
+    Ok(hash)
+}
+
+/// Récupérer les warrants actifs d'un nœud
+#[hdk_extern]
+pub fn get_active_warrants(node: AgentPubKey) -> ExternResult<Vec<WarrantWithStatus>> {
+    let links = get_links(
+        GetLinksInputBuilder::try_new(node, LinkTypes::AgentToWarrants)?.build()
+    )?;
+    let now = sys_time()?;
+    let mut result = Vec::new();
+
+    for link in links {
+        if let Some(record) = get(link.target.into_action_hash().unwrap(), GetOptions::default())? {
+            if let Ok(Some(warrant)) = record.entry().to_app_option::<Warrant>() {
+                // Filtrer les warrants expirés
+                if warrant.expires_at > now {
+                    // Vérifier s'il y a une réfutation valide
+                    let refutations = get_warrant_refutations(&record.action_address())?;
+                    result.push(WarrantWithStatus {
+                        warrant,
+                        refuted: !refutations.is_empty(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
+/// Vérifier l'attestation d'un nœud avant connexion
+#[hdk_extern]
+pub fn verify_node_attestation(input: VerifyAttestationInput) -> ExternResult<AttestationStatus> {
+    let links = get_links(
+        GetLinksInputBuilder::try_new(input.node.clone(), LinkTypes::AgentToAttestation)?.build()
+    )?;
+
+    // Prendre l'attestation la plus récente
+    let latest = links.last()
+        .and_then(|l| get(l.target.into_action_hash()?, GetOptions::default()).ok()?)
+        .and_then(|r| r.entry().to_app_option::<NodeAttestation>().ok()?);
+
+    match latest {
+        None => Ok(AttestationStatus::Missing),
+        Some(att) => {
+            let age = sys_time()?.checked_sub(att.timestamp).unwrap_or(Duration::MAX);
+            if age > Duration::from_secs(86400) {
+                return Ok(AttestationStatus::Expired { age_hours: age.as_secs() / 3600 });
+            }
+            // Vérifier les warrants actifs
+            let warrants = get_active_warrants(input.node)?;
+            let active_unrefuted: Vec<_> = warrants.iter().filter(|w| !w.refuted).collect();
+            if !active_unrefuted.is_empty() {
+                return Ok(AttestationStatus::Warranted { count: active_unrefuted.len() });
+            }
+            Ok(AttestationStatus::Valid { attestation: att })
+        }
+    }
+}
+```
+
+---
+
+## Membrane Proofs — Réseau Public et Privé
+
+### Réseau public (défaut)
+
+AInonymous est par défaut un **réseau public ouvert** : aucune membrane proof requise.
+
+```rust
+#[hdk_extern]
+pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
+    Ok(ValidateCallbackResult::Valid)
+}
+```
+
+La protection repose sur :
+- Validation déterministe dans les integrity zomes
+- Warrants : preuves cryptographiques d'invalidité → éjection automatique
+- Scoring de réputation basé sur les métriques DHT
+
+### Réseau privé (feature flag `private-network`)
+
+Voir section **2.2 Bootstrap privé** dans `ARCHITECTURE.md` pour l'implémentation complète de `PrivateNetworkProof` et `genesis_self_check` avec vérification de membrane proof.
+
+```rust
+// Dans la DNA inference-mesh, mode privé
+#[hdk_extern]
+pub fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
+    #[cfg(feature = "private-network")]
+    {
+        let proof: PrivateNetworkProof = data.membrane_proof
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Membrane proof requise".into())))?
+            .try_into()?;
+        // Vérification admin + signature + expiration → voir ARCHITECTURE.md §2.2
+        verify_private_network_proof(&proof, &data.agent_key)?;
+        Ok(ValidateCallbackResult::Valid)
+    }
+    #[cfg(not(feature = "private-network"))]
+    Ok(ValidateCallbackResult::Valid)
+}
+```
+
+---
+
+## Processus d'Audit Holochain
+
+### Cycle de vie d'un warrant
+
+```
+1. DÉTECTION
+   └── Pair A observe comportement invalide de Nœud B
+       (hash modèle incorrect, entrée invalide, benchmark falsifié, etc.)
+
+2. GÉNÉRATION
+   └── A crée Warrant{accused: B, evidence: hash_entrée_invalide, rule: "..."}
+   └── A signe le warrant avec sa clé ed25519
+   └── Validation Holochain : signature vérifiée par les pairs avant acceptation DHT
+
+3. PUBLICATION
+   └── Warrant créé dans la source chain de A → propagé dans le DHT
+   └── Lien AgentToWarrants(B) → Warrant publié (découvrable par tous)
+
+4. PROPAGATION & VÉRIFICATION
+   └── Pairs voisins reçoivent le warrant via gossip DHT
+   └── Chaque pair vérifie indépendamment (integrity zome : validate_warrant)
+   └── Si invalid → rejeté localement (pas de propagation)
+
+5. EFFET
+   └── Nœuds qui voient le warrant excluent B de leurs plans d'exécution
+   └── verify_node_attestation(B) retourne AttestationStatus::Warranted
+   └── Score de réputation de B dégradé proportionnellement
+
+6. CONTESTATION (optionnel — par B)
+   └── B publie WarrantRefutation{warrant_hash, counter_evidence, explanation}
+   └── Les pairs évaluent les deux preuves indépendamment
+   └── Si réfutation valide : get_active_warrants filtre ce warrant comme "refuted"
+   └── Score de réputation restauré progressivement
+
+7. EXPIRATION
+   └── Warrant ignoré après expires_at (30 jours par défaut)
+   └── B peut regagner sa réputation via nouvelles métriques positives
+```
+
+### Audit automatique (daemon)
+
+```rust
+// Lancé toutes les 6h par ainonymous-daemon
+pub async fn run_periodic_audit(config: &AuditConfig) -> anyhow::Result<()> {
+    let peers = get_all_known_nodes().await?;
+
+    for peer in &peers {
+        // 1. Vérifier attestation
+        match verify_node_attestation(peer).await? {
+            AttestationStatus::Missing => {
+                log::warn!("Nœud {} sans attestation — ignoré du routage", peer);
+            },
+            AttestationStatus::Expired { age_hours } => {
+                log::warn!("Attestation expirée ({} h) pour {}", age_hours, peer);
+            },
+            AttestationStatus::Warranted { count } => {
+                log::warn!("{} warrant(s) actifs pour {}", count, peer);
+            },
+            AttestationStatus::Valid { .. } => {}
+        }
+
+        // 2. Vérifier cohérence des ModelClaims
+        if config.model_hash_check {
+            check_model_claims_consistency(peer).await?;
+        }
+
+        // 3. Publier warrant si incohérence détectée
+        if config.auto_warrant {
+            if let Some(violation) = detect_violations(peer).await? {
+                publish_warrant(WarrantInput {
+                    accused: peer.clone(),
+                    evidence_hash: violation.evidence,
+                    rule_violated: violation.rule,
+                    content_bytes: violation.to_bytes(),
+                }).await?;
+            }
+        }
+    }
+    Ok(())
+}
+```
+
+---
+
 ## Résumé des DNAs et Zomes
 
 | DNA | Integrity Zome | Coordinator Zome | Rôle |
@@ -646,3 +1142,4 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
 | `inference-mesh` | Types: Request, Chunk, Metrics | submit, route, execute, publish_metrics | Cœur inférence distribuée |
 | `agent-registry` | Types: Capabilities, Heartbeat, LoadedModel | announce, heartbeat, get_available_nodes | Annuaire des nœuds |
 | `blackboard` | Types: BlackboardPost | post, search, get_recent_posts | Collaboration agents |
+| `attestation` | Types: NodeAttestation, ModelManifest, ModelClaim, Warrant, WarrantRefutation | publish_attestation, claim_model, publish_warrant, refute_warrant, verify_node_attestation | Sécurité et audit |
