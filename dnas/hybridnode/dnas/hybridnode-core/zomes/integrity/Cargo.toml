@@ -1,0 +1,12 @@
+[package]
+name = "hybridnode_integrity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hybridnode_integrity"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { version = "0.7.1", features = ["tracing"] }
+serde = { version = "1", features = ["derive"] }

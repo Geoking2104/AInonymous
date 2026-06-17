@@ -1,0 +1,49 @@
+# HybridNode — Template minimal pour un nouveau projet
+# Remplacez les valeurs entre <> par vos paramètres réels.
+version: "1.0"
+mode: hybridnode
+
+identity:
+  backend: holochain
+  keystore: lair
+
+holochain:
+  conductor_url: "ws://localhost:8888"
+  app_port: 8889
+  version: "0.6.1"
+  bootstrap_mode: private                   # ou "public" pour internet ouvert
+  bootstrap_url: "<https://votre-bootstrap-interne:8888>"
+
+sdwan:
+  provider: mock                            # remplacer par "rest", "vmanage", etc.
+  api_url: "<https://votre-sdwan-controller>"
+  api_token_env: SDWAN_API_TOKEN
+  site_id_env: SDWAN_SITE_ID
+  tls_verify: true
+  poll_interval_seconds: 60
+
+quic:
+  mtls_strict: true
+  bind_addr: "0.0.0.0:0"
+  relay_fallback: true
+  dscp_marking: 46
+
+scheduler:
+  default_strategy: local_first
+
+inference:
+  llama_server_port: 9337
+  api_port: 9337
+  metrics_port: 9338
+
+observability:
+  prometheus: true
+  log_level: info
+
+audit:
+  enabled: true
+  interval_hours: 6
+  auto_warrant: true
+
+security:
+  private_network: false                    # mettre à true pour réseau privé

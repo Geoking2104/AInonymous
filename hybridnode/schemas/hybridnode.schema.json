@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ainonymous.dev/schemas/hybridnode.schema.json",
+  "title": "HybridNode Configuration",
+  "description": "Schema for hybridnode YAML configuration files",
+  "type": "object",
+  "required": ["version", "mode", "identity", "holochain", "sdwan", "quic"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version",
+      "enum": ["1.0"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["hybridnode", "holochain-only", "sdwan-only"],
+      "description": "Operating mode for this node"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["backend", "keystore"],
+      "properties": {
+        "backend": { "type": "string", "enum": ["holochain"] },
+        "keystore": { "type": "string", "enum": ["lair"] }
+      }
+    },
+    "holochain": {
+      "type": "object",
+      "required": ["conductor_url", "app_port", "version"],
+      "properties": {
+        "conductor_url": { "type": "string", "format": "uri" },
+        "app_port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "version": { "type": "string" },
+        "bootstrap_mode": { "type": "string", "enum": ["private", "public"] },
+        "bootstrap_url": { "type": "string", "format": "uri" }
+      }
+    },
+    "sdwan": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": { "type": "string", "enum": ["rest", "vmanage", "velocloud", "mock"] },
+        "api_url": { "type": "string", "format": "uri" },
+        "api_token_env": { "type": "string" },
+        "site_id_env": { "type": "string" },
+        "tls_verify": { "type": "boolean", "default": true },
+        "poll_interval_seconds": { "type": "integer", "minimum": 10 },
+        "sla_thresholds": {
+          "type": "object",
+          "properties": {
+            "max_latency_ms": {
+              "type": "object",
+              "properties": {
+                "intra_site": { "type": "number" },
+                "inter_site_local": { "type": "number" },
+                "inter_site_remote": { "type": "number" }
+              }
+            },
+            "min_bandwidth_mbps": {
+              "type": "object",
+              "properties": {
+                "intra_site": { "type": "number" },
+                "inter_site_local": { "type": "number" },
+                "inter_site_remote": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "quic": {
+      "type": "object",
+      "required": ["mtls_strict"],
+      "properties": {
+        "mtls_strict": { "type": "boolean", "default": true },
+        "bind_addr": { "type": "string" },
+        "relay_fallback": { "type": "boolean" },
+        "dscp_marking": { "type": "integer", "minimum": 0, "maximum": 63 },
+        "compression": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["auto", "always", "never"] },
+            "threshold_gbps": { "type": "number" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "max_activation_size_mb": { "type": "integer" },
+            "max_concurrent_sessions": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "scheduler": {
+      "type": "object",
+      "properties": {
+        "default_strategy": {
+          "type": "string",
+          "enum": ["local_first", "round_robin", "lowest_latency", "highest_bandwidth"]
+        },
+        "max_inter_site_activation_mb": { "type": "integer" },
+        "max_nodes_per_plan": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "models": {
+      "type": "object",
+      "properties": {
+        "placement_strategy": {
+          "type": "string",
+          "enum": ["locality_aware", "replicated", "single"]
+        },
+        "gguf_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "properties": {
+        "llama_server_port": { "type": "integer" },
+        "llama_server_host": { "type": "string" },
+        "api_port": { "type": "integer" },
+        "metrics_port": { "type": "integer" }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "properties": {
+        "prometheus": { "type": "boolean" },
+        "prometheus_addr": { "type": "string" },
+        "otel_endpoint": { "type": "string" },
+        "otel_service_name": { "type": "string" },
+        "sdwan_metrics": { "type": "boolean" },
+        "log_level": { "type": "string", "enum": ["trace", "debug", "info", "warn", "error"] }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "interval_hours": { "type": "integer", "minimum": 1 },
+        "auto_warrant": { "type": "boolean" },
+        "model_hash_check": { "type": "boolean" },
+        "reputation_threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "private_network": { "type": "boolean" },
+        "pow_difficulty": { "type": "integer", "minimum": 0 },
+        "warrant_expiry_days": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "additionalProperties": false
+}

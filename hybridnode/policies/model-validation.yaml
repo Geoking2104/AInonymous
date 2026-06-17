@@ -1,0 +1,40 @@
+# HybridNode — Politique de validation des modèles
+name: hybridnode-model-validation
+version: "1.0"
+
+manifest:
+  require_manifest: true              # ModelManifest dans le DHT obligatoire
+  hash_algorithm: sha256
+  fields_required:
+    - model_name
+    - version
+    - sha256
+    - size_bytes
+    - architecture
+    - quant_format
+    - num_layers
+
+local_verification:
+  enabled: true
+  on_startup: true                    # vérifier au démarrage du daemon
+  on_request: false                   # trop lent à la volée (fichier GB)
+  cache_valid_hours: 24
+
+cross_peer_verification:
+  enabled: true
+  min_peers: 2                        # au moins 2 pairs doivent confirmer le SHA256
+  timeout_ms: 5000
+  on_mismatch: reject                 # "reject" | "warn" | "quarantine"
+
+model_claim:
+  require_claim: true                 # ModelClaim dans le DHT obligatoire avant de servir
+  layer_range_check: true             # vérifier que layer_range ⊆ manifest.num_layers
+  max_claim_age_hours: 48             # reclaim si plus ancien
+
+automated_audit:
+  enabled: true
+  interval_hours: 6
+  actions_on_failure:
+    - log_warning
+    - publish_warrant
+    - suspend_model_service
