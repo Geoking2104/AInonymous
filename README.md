@@ -1,87 +1,131 @@
 # AInonymous
 
-> Inference LLM décentralisée et anonyme sur infrastructure Holochain — principe mesh-llm, souveraineté agent-centrique.
+> Inference LLM décentralisée et anonyme — architecture **HybridNode** : Holochain 0.6.1 (overlay DHT) + QUIC/mTLS ed25519 (data plane) + SD-WAN (underlay). Souveraineté agent-centrique, zéro serveur central.
+
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Holochain](https://img.shields.io/badge/Holochain-0.6.1-purple)](https://holochain.org)
+[![Rust](https://img.shields.io/badge/rust-stable-orange)](https://rustup.rs)
 
 ---
 
 ## Concept
 
-AInonymous est un réseau d'inférence distribué où chaque participant contribue et consomme de la puissance de calcul sans serveur central, sans compte, sans traçabilité. Il adapte le principe **mesh-llm** (pooling P2P de ressources GPU/CPU pour exécuter des LLMs ouverts) en remplaçant l'infrastructure réseau QUIC/Nostr par **Holochain** — un runtime P2P agent-centrique, cryptographiquement souverain.
+AInonymous est un réseau d'inférence distribué où chaque participant contribue et consomme de la puissance de calcul sans serveur central, sans compte, sans traçabilité. Il adapte le principe **mesh-llm** (pooling P2P de ressources GPU/CPU pour exécuter des LLMs ouverts) via une architecture **HybridNode** en trois couches :
 
-Les agents IA tournant dans le réseau sont orchestrés par **Goose** (Block/Open Source) et propulsés en priorité par **Gemma 4** (Google, Apache 2.0) avec support complet des formats GGUF.
+| Couche | Technologie | Rôle |
+|--------|------------|------|
+| **Overlay** | Holochain 0.6.1 + iroh | DHT, identité ed25519, coordination, warrants |
+| **Data plane** | QUIC/mTLS ed25519 | Transfert d'activations tensorielles, token streams |
+| **Underlay** | SD-WAN | Topology-aware routing, QoS DSCP 46, SLA enforcement |
+
+Les agents IA sont orchestrés par **Goose** (Block/Open Source) et propulsés en priorité par **Gemma 4** (Google, Apache 2.0) avec support complet GGUF.
 
 ---
 
-## Pourquoi Holochain et pas Nostr/QUIC ?
+## Pourquoi Holochain et pas Nostr/QUIC pur ?
 
-| Besoin | mesh-llm (anarchai.org) | AInonymous (Holochain) |
+| Besoin | mesh-llm (anarchai.org) | AInonymous (HybridNode) |
 |---|---|---|
-| Découverte de pairs | Relais Nostr publics | DHT Holochain (aucun relais tiers) |
-| Transport | QUIC + RPC | WebRTC + conducteur Holochain |
+| Découverte de pairs | Relais Nostr publics | DHT Holochain iroh (aucun relais tiers) |
+| Transport activations | QUIC | QUIC/mTLS ed25519 — `PeerKeyVerifier` strict |
 | État distribué | Gossip éphémère | Source chain immuable + DHT validé |
-| Identité | Anonyme non-vérifiée | Clé cryptographique ed25519 souveraine |
+| Identité | Anonyme non-vérifiée | AgentPubKey ed25519 = DHT + TLS cert + signer |
 | Blackboard agents | Gossip 48h | DHT persistant + entrées chainées |
-| Validation pairs | Aucune | Zomes de validation déterministes |
-| Réputation nœuds | Score VRAM ad-hoc | Warrants cryptographiques + membrane proofs |
+| Réputation nœuds | Score VRAM ad-hoc | Warrants cryptographiques Holochain |
+| Réseau privé | Non | `PrivateNetworkProof` membrane proof |
+| Topologie réseau | Non | SD-WAN SLA-aware scheduler |
 
 ---
 
 ## Architecture en un clin d'œil
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   CLIENT / AGENT                        │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │    Goose    │  │  CLI ainon.  │  │  Web UI / API │  │
-│  │  (agent IA) │  │  (terminal)  │  │  (OpenAI compat)│ │
-│  └──────┬──────┘  └──────┬───────┘  └───────┬───────┘  │
-│         └────────────────┴──────────────────┘          │
-│                          │                              │
-│               ┌──────────▼──────────┐                  │
-│               │  Conducteur Holochain│                  │
-│               │  (runtime local)     │                  │
-│               └──────────┬──────────┘                  │
-└──────────────────────────┼──────────────────────────────┘
-                           │ WebRTC / QUIC
-        ┌──────────────────┼──────────────────┐
-        ▼                  ▼                  ▼
- ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
- │  Nœud GPU A  │   │  Nœud GPU B  │   │  Nœud CPU C  │
- │  Gemma4-31B  │   │  Gemma4-26B  │   │  Gemma4-E4B  │
- │  (couches 0-24)│  │ (couches 24-48)│  │ (spéculatif) │
- │  [zome:infer]│   │  [zome:infer]│   │  [zome:draft]│
- └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-        └──────────────────┴──────────────────┘
-                     DHT Holochain
-              (routing table + état partagé)
+┌─────────────────────────────────────────────────────────────┐
+│                   CLIENT / AGENT                            │
+│  ┌──────────┐  ┌─────────────┐  ┌──────────────────────┐  │
+│  │  Goose   │  │ CLI ainon.  │  │  API OpenAI-compat   │  │
+│  │ (agent)  │  │ (terminal)  │  │  localhost:9337/v1   │  │
+│  └────┬─────┘  └──────┬──────┘  └──────────┬───────────┘  │
+│       └───────────────┴──────────────────────┘             │
+│                        │                                    │
+│          ┌─────────────▼──────────────┐                    │
+│          │     HybridNode Scheduler   │                    │
+│          │  (SD-WAN topo + DHT caps)  │                    │
+│          └──────┬──────────┬──────────┘                    │
+│                 │          │                                │
+│    ┌────────────▼──┐  ┌────▼──────────────┐               │
+│    │Holochain 0.6.1│  │  QUIC/mTLS plane  │               │
+│    │  (iroh DHT)   │  │  ed25519 PeerKey  │               │
+│    └───────────────┘  └───────────────────┘               │
+└─────────────────────────────┼───────────────────────────────┘
+                              │ SD-WAN fabric (DSCP 46)
+           ┌──────────────────┼──────────────────┐
+           ▼                  ▼                  ▼
+  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │  Nœud GPU A  │  │  Nœud GPU B  │  │  Nœud CPU C  │
+  │  Gemma4-31B  │  │  Gemma4-26B  │  │  Gemma4-E4B  │
+  │  couches 0-24│  │ couches 24-48│  │  spéculatif  │
+  │ [attestation]│  │ [ModelClaim] │  │  [warrant ✓] │
+  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+         └─────────────────┴─────────────────┘
+                   DHT Holochain + SD-WAN underlay
 ```
+
+---
+
+## Stack technique
+
+| Composant | Version | Notes |
+|-----------|---------|-------|
+| Holochain | **0.6.1** | iroh transport, HDK 0.6.1, warrants API stable |
+| QUIC | quinn 0.11 | mTLS strict — `PeerKeyVerifier` ed25519 |
+| Identité | ed25519-dalek 2 | AgentPubKey = DHT + TLS cert + signer |
+| Prometheus | :9338/metrics | `ainonymous_*` + `hybridnode_*` métriques |
+| OpenTelemetry | 0.22 | Traces OTLP optionnelles |
+| llama.cpp | latest | Format GGUF, pipeline-splitting par couches |
+| SD-WAN | vManage / mock | API REST, DSCP 46 EF pour inférence |
 
 ---
 
 ## Composants Principaux
 
-### 1. hApp `ainonymous-core`
-La hApp Holochain centrale. Contient :
-- **DNA `inference-mesh`** : coordination de l'inférence distribuée
-- **DNA `agent-registry`** : registre des nœuds, capacités, disponibilité
-- **DNA `blackboard`** : collaboration d'agents décentralisée
+### 1. HybridNode (`crates/hybridnode-core`)
+Couche d'architecture réutilisable combinant les trois plans :
+- **`scheduler`** — routage locality-aware : local-first → inter-site si SLA OK
+- **`sdwan`** — abstraction provider (vManage, VeloCloud, mock)
+- **`topology`** — modèle `NodeTopology` : `LinkSla` + `PeerCapabilities`
+- **`identity`** — chargement AgentPubKey depuis lair-keystore
+- **`observability`** — endpoint Prometheus :9338
 
-### 2. Moteur d'inférence
+### 2. hApp `ainonymous-core`
+La hApp Holochain centrale. DNAs :
+- **`inference-mesh`** : coordination de l'inférence distribuée
+- **`attestation`** : NodeAttestation, ModelManifest, ModelClaim, Warrant, WarrantRefutation
+- **`agent-registry`** : capacités nœuds, disponibilité
+- **`blackboard`** : collaboration d'agents décentralisée
+
+### 3. Sécurité — mTLS + Warrants
+- **mTLS QUIC strict** : `PeerKeyVerifier` — ed25519 AgentPubKey réutilisée comme certificat TLS, vérification mutuelle obligatoire
+- **Attestation nœuds** : `NodeAttestation` signé ed25519, vérifié par les pairs avant connexion
+- **Validation modèles** : SHA-256 GGUF + confirmation ≥ 2 pairs (`ModelManifest` + `ModelClaim`)
+- **Warrants** : preuve cryptographique DHT de comportement invalide, exclusion automatique du scheduling
+- **Bootstrap privé** : `PrivateNetworkProof` membrane proof pour consortiums fermés
+
+### 4. Moteur d'inférence
 - Binaire **llama.cpp** pour l'exécution locale GGUF
 - Modèles prioritaires : **Gemma 4** (E2B, E4B, 26B-A4B MoE, 31B)
 - Pipeline-splitting par couches entre nœuds (layer sharding)
-- Décodage spéculatif : nœud draft (Gemma4-E4B) + nœud verify
+- Redondance : PrimaryShadow, HotStandby, NofM Quorum (2/3), SpeculativeVerify
 
-### 3. Agent d'orchestration : Goose
+### 5. Agent d'orchestration : Goose
 - Framework agent open-source (Block, Apache 2.0)
-- Intégration MCP native → accès aux zomes Holochain via serveur MCP
+- Intégration MCP native → accès aux zomes Holochain
 - Multi-LLM configurable (Gemma 4 local en priorité, fallback cloud)
-- Commande : `ainonymous goose` démarre Goose pointant sur le mesh local
 
-### 4. API OpenAI-compatible
+### 6. API OpenAI-compatible
 - Endpoint local `localhost:9337/v1`
-- Routage des requêtes vers le mesh via le conducteur Holochain
-- Champ `model` utilisé pour le routage (ex: `gemma4-31b`, `gemma4-moe`)
+- Routage via HybridNode Scheduler → mesh Holochain
+- Champ `model` pour le routage (ex : `gemma4-31b`, `gemma4-moe`)
 
 ---
 
@@ -94,11 +138,12 @@ curl -fsSL https://ainonymous.network/install.sh | sh
 # Rejoindre le mesh public
 ainonymous --auto
 
-# Rejoindre avec un modèle spécifique
-ainonymous --model gemma4-26b-moe
+# Ou démarrer le daemon HybridNode directement
+cargo install --path crates/hybridnode-daemon --features mock-sdwan
+hybridnode --config hybridnode/configs/ainonymous.hybridnode.yaml
 
-# Lancer Goose en mode mesh
-ainonymous goose
+# Initialiser un nouveau projet avec HybridNode
+bash scripts/hybridnode/init_project.sh mon-projet
 
 # Tester l'API locale
 curl http://localhost:9337/v1/chat/completions \
@@ -110,25 +155,43 @@ curl http://localhost:9337/v1/chat/completions \
 
 ## Modèles Supportés (Gemma 4 prioritaire)
 
-| Modèle | VRAM | Architecture | Usage |
+| Modèle | VRAM | Architecture | Usage HybridNode |
 |---|---|---|---|
 | `gemma4-e2b` | ~3 GB | Dense edge | Nœuds légers, draft spéculatif |
 | `gemma4-e4b` | ~5 GB | Dense edge | Nœuds légers, inférence solo |
-| `gemma4-26b-moe` | ~18 GB | MoE (4B actifs) | Sharding par experts |
-| `gemma4-31b` | ~20 GB | Dense | Pipeline-splitting couches |
+| `gemma4-26b-moe` | ~18 GB | MoE (4B actifs) | Sharding par experts inter-sites |
+| `gemma4-31b` | ~20 GB | Dense | Pipeline-splitting couches, NofM quorum |
 | `qwen3-32b` | ~20 GB | Dense | Alternatif haute qualité |
-| `llama-3.3-70b` | ~43 GB | Dense | Multi-nœuds requis |
+| `llama-3.3-70b` | ~43 GB | Dense | Multi-nœuds requis, SpeculativeVerify |
+
+---
+
+## Documentation
+
+| Document | Contenu |
+|----------|---------|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Architecture complète : identité, mTLS, attestation, observabilité, anti-Sybil, redondance, migration |
+| [`docs/NETWORK.md`](docs/NETWORK.md) | QUIC/mTLS — `PeerKeyVerifier`, `connect_quic_mtls()`, `verify_node_before_connect()` |
+| [`docs/HOLOCHAIN_ZOMES.md`](docs/HOLOCHAIN_ZOMES.md) | Zomes Holochain — DNA `attestation` complet : entrées, validations, API coordinator |
+| [`docs/HYBRIDNODE.md`](docs/HYBRIDNODE.md) | HybridNode — concepts, cas d'usage, politique SD-WAN |
+| [`docs/HYBRIDNODE_ARCHITECTURE.md`](docs/HYBRIDNODE_ARCHITECTURE.md) | Composants Rust, flux de requête, sécurité double-chiffrement |
+| [`docs/HYBRIDNODE_CARGO_PATCH.md`](docs/HYBRIDNODE_CARGO_PATCH.md) | Intégration workspace Cargo |
+| [`HYBRIDNODE_APPLY.md`](HYBRIDNODE_APPLY.md) | Guide d'intégration pas-à-pas dans un nouveau projet |
+| [`hybridnode/`](hybridnode/) | Configs, policies, schémas, specs YAML |
 
 ---
 
 ## Statut du Projet
 
-- [ ] Spécification technique (ce document)
-- [ ] Zomes Holochain — MVP inference-mesh
+- [x] Spécification technique (architecture complète)
+- [x] Architecture sécurité — mTLS QUIC, attestation nœuds, warrants, anti-Sybil
+- [x] HybridNode — crate Rust `hybridnode-core` + daemon + DNA Holochain
+- [x] DNA `attestation` — zomes integrity + coordinator (Holochain 0.6.1)
+- [x] Politique SD-WAN + configs + schéma JSON + CI GitHub Actions
+- [ ] Zomes Holochain — MVP `inference-mesh` (compilation WASM)
 - [ ] Intégration llama.cpp + pipeline-splitting
 - [ ] MCP server pour Goose
 - [ ] API proxy OpenAI-compatible
-- [ ] Blackboard Holochain (agents collaboration)
 - [ ] Testnet public
 - [ ] UI dashboard
 

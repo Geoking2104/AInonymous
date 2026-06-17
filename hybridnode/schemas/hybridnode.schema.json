@@ -2,158 +2,357 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ainonymous.dev/schemas/hybridnode.schema.json",
   "title": "HybridNode Configuration",
-  "description": "Schema for hybridnode YAML configuration files",
+  "description": "Schema for hybridnode YAML configuration files. Stack: Holochain 0.6.1 (iroh, HDK 0.6.1) + QUIC/mTLS ed25519 (quinn 0.11) + SD-WAN.",
   "type": "object",
   "required": ["version", "mode", "identity", "holochain", "sdwan", "quic"],
   "properties": {
+
     "version": {
       "type": "string",
       "description": "Schema version",
       "enum": ["1.0"]
     },
+
     "mode": {
       "type": "string",
       "enum": ["hybridnode", "holochain-only", "sdwan-only"],
-      "description": "Operating mode for this node"
+      "description": "Operating mode. 'hybridnode' = all three layers active."
     },
+
     "identity": {
       "type": "object",
+      "description": "Identity configuration. The ed25519 AgentPubKey serves as DHT identity, QUIC/mTLS certificate, and source-chain signer.",
       "required": ["backend", "keystore"],
       "properties": {
-        "backend": { "type": "string", "enum": ["holochain"] },
-        "keystore": { "type": "string", "enum": ["lair"] }
-      }
+        "backend": {
+          "type": "string",
+          "enum": ["holochain"],
+          "description": "Only 'holochain' is supported — keys live in lair-keystore."
+        },
+        "keystore": {
+          "type": "string",
+          "enum": ["lair"],
+          "description": "Holochain lair-keystore. Never extract private keys."
+        }
+      },
+      "additionalProperties": false
     },
+
     "holochain": {
       "type": "object",
+      "description": "Holochain 0.6.1 conductor settings. Uses iroh as default P2P transport.",
       "required": ["conductor_url", "app_port", "version"],
       "properties": {
-        "conductor_url": { "type": "string", "format": "uri" },
-        "app_port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
-        "version": { "type": "string" },
-        "bootstrap_mode": { "type": "string", "enum": ["private", "public"] },
-        "bootstrap_url": { "type": "string", "format": "uri" }
-      }
+        "conductor_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "WebSocket URL of the Holochain conductor (e.g. ws://localhost:8888)."
+        },
+        "app_port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "Holochain app port for zome calls (default: 8889)."
+        },
+        "version": {
+          "type": "string",
+          "description": "Holochain version string, e.g. '0.6.1'."
+        },
+        "bootstrap_mode": {
+          "type": "string",
+          "enum": ["private", "public"],
+          "default": "public",
+          "description": "Private: requires PrivateNetworkProof membrane proof at genesis."
+        },
+        "bootstrap_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Bootstrap server URL. For private networks: internal SD-WAN server."
+        },
+        "network_seed": {
+          "type": "string",
+          "description": "DNA network seed — must match across all nodes in the same mesh."
+        }
+      },
+      "additionalProperties": false
     },
+
     "sdwan": {
       "type": "object",
+      "description": "SD-WAN underlay configuration. Provides topology, SLA metrics and QoS policies.",
       "required": ["provider"],
       "properties": {
-        "provider": { "type": "string", "enum": ["rest", "vmanage", "velocloud", "mock"] },
-        "api_url": { "type": "string", "format": "uri" },
-        "api_token_env": { "type": "string" },
-        "site_id_env": { "type": "string" },
-        "tls_verify": { "type": "boolean", "default": true },
-        "poll_interval_seconds": { "type": "integer", "minimum": 10 },
+        "provider": {
+          "type": "string",
+          "enum": ["rest", "vmanage", "velocloud", "mock"],
+          "description": "SD-WAN controller type. Use 'mock' for development/CI."
+        },
+        "api_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "SD-WAN controller REST API URL."
+        },
+        "api_token_env": {
+          "type": "string",
+          "description": "Environment variable holding the SD-WAN API token."
+        },
+        "site_id_env": {
+          "type": "string",
+          "description": "Environment variable holding this node's site ID."
+        },
+        "tls_verify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify TLS certificate of SD-WAN controller. Never set to false in production."
+        },
+        "poll_interval_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "How often to poll SD-WAN for topology updates."
+        },
         "sla_thresholds": {
           "type": "object",
+          "description": "SLA thresholds for scheduling decisions.",
           "properties": {
             "max_latency_ms": {
               "type": "object",
+              "description": "Maximum acceptable RTT for each link class.",
               "properties": {
-                "intra_site": { "type": "number" },
-                "inter_site_local": { "type": "number" },
-                "inter_site_remote": { "type": "number" }
+                "intra_site":       { "type": "number", "description": "< 5ms recommended" },
+                "inter_site_local": { "type": "number", "description": "< 20ms recommended" },
+                "inter_site_remote":{ "type": "number", "description": "< 80ms recommended" }
               }
             },
             "min_bandwidth_mbps": {
               "type": "object",
+              "description": "Minimum bandwidth for each link class.",
               "properties": {
-                "intra_site": { "type": "number" },
-                "inter_site_local": { "type": "number" },
-                "inter_site_remote": { "type": "number" }
+                "intra_site":       { "type": "number", "description": "> 10000 Mbps recommended" },
+                "inter_site_local": { "type": "number", "description": "> 1000 Mbps recommended" },
+                "inter_site_remote":{ "type": "number", "description": "> 100 Mbps recommended" }
               }
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
+
     "quic": {
       "type": "object",
+      "description": "QUIC/mTLS data plane. ed25519 AgentPubKey is reused as TLS certificate. PeerKeyVerifier enforces mutual authentication.",
       "required": ["mtls_strict"],
       "properties": {
-        "mtls_strict": { "type": "boolean", "default": true },
-        "bind_addr": { "type": "string" },
-        "relay_fallback": { "type": "boolean" },
-        "dscp_marking": { "type": "integer", "minimum": 0, "maximum": 63 },
+        "mtls_strict": {
+          "type": "boolean",
+          "default": true,
+          "description": "ALWAYS true — activates PeerKeyVerifier. Setting false disables peer verification and is forbidden in production."
+        },
+        "bind_addr": {
+          "type": "string",
+          "default": "0.0.0.0:0",
+          "description": "Local address to bind for QUIC connections."
+        },
+        "relay_fallback": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fall back to iroh relay if direct QUIC fails."
+        },
+        "dscp_marking": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 63,
+          "default": 46,
+          "description": "DSCP value for inference traffic. 46 = EF (Expedited Forwarding)."
+        },
         "compression": {
           "type": "object",
           "properties": {
-            "mode": { "type": "string", "enum": ["auto", "always", "never"] },
-            "threshold_gbps": { "type": "number" }
+            "mode": {
+              "type": "string",
+              "enum": ["auto", "always", "never"],
+              "default": "auto"
+            },
+            "threshold_gbps": {
+              "type": "number",
+              "description": "Above this bandwidth, skip compression (already fast enough)."
+            }
           }
         },
         "limits": {
           "type": "object",
           "properties": {
-            "max_activation_size_mb": { "type": "integer" },
-            "max_concurrent_sessions": { "type": "integer" }
+            "max_activation_size_mb": {
+              "type": "integer",
+              "description": "Maximum activation blob size in MB per transfer."
+            },
+            "max_concurrent_sessions": {
+              "type": "integer",
+              "description": "Maximum concurrent QUIC sessions."
+            }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
+
     "scheduler": {
       "type": "object",
+      "description": "HybridNode locality-aware scheduler configuration.",
       "properties": {
         "default_strategy": {
           "type": "string",
-          "enum": ["local_first", "round_robin", "lowest_latency", "highest_bandwidth"]
+          "enum": ["local_first", "round_robin", "lowest_latency", "highest_bandwidth"],
+          "default": "local_first",
+          "description": "local_first: prefer same SD-WAN site; fall back to remote only if SLA allows."
         },
-        "max_inter_site_activation_mb": { "type": "integer" },
-        "max_nodes_per_plan": { "type": "integer", "minimum": 1 }
-      }
+        "max_inter_site_activation_mb": {
+          "type": "integer",
+          "description": "Refuse to route activations larger than this over inter-site links."
+        },
+        "max_nodes_per_plan": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum nodes in a single inference plan."
+        }
+      },
+      "additionalProperties": false
     },
+
+    "redundancy": {
+      "type": "object",
+      "description": "Inference redundancy configuration (mirrors RedundancyLevel enum).",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "primary_shadow", "hot_standby", "n_of_m_quorum", "speculative_verify"],
+          "default": "none",
+          "description": "none=single node; primary_shadow=shadow copy; hot_standby=failover; n_of_m_quorum=consensus; speculative_verify=draft+verify."
+        },
+        "quorum_n": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "For n_of_m_quorum: minimum agreements required."
+        },
+        "quorum_m": {
+          "type": "integer",
+          "minimum": 2,
+          "description": "For n_of_m_quorum: total nodes to query."
+        }
+      },
+      "additionalProperties": false
+    },
+
     "models": {
       "type": "object",
       "properties": {
         "placement_strategy": {
           "type": "string",
-          "enum": ["locality_aware", "replicated", "single"]
+          "enum": ["locality_aware", "replicated", "single"],
+          "default": "locality_aware"
         },
         "gguf_paths": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "description": "Directories to scan for GGUF model files."
         }
-      }
+      },
+      "additionalProperties": false
     },
+
     "inference": {
       "type": "object",
       "properties": {
-        "llama_server_port": { "type": "integer" },
-        "llama_server_host": { "type": "string" },
-        "api_port": { "type": "integer" },
-        "metrics_port": { "type": "integer" }
-      }
+        "llama_server_port": { "type": "integer", "default": 9337 },
+        "llama_server_host": { "type": "string", "default": "127.0.0.1" },
+        "api_port":          { "type": "integer", "default": 9337 },
+        "metrics_port":      { "type": "integer", "default": 9338,
+          "description": "Prometheus scrape port. Also exposed at /metrics." }
+      },
+      "additionalProperties": false
     },
+
     "observability": {
       "type": "object",
+      "description": "Prometheus + OpenTelemetry configuration.",
       "properties": {
-        "prometheus": { "type": "boolean" },
-        "prometheus_addr": { "type": "string" },
-        "otel_endpoint": { "type": "string" },
-        "otel_service_name": { "type": "string" },
-        "sdwan_metrics": { "type": "boolean" },
-        "log_level": { "type": "string", "enum": ["trace", "debug", "info", "warn", "error"] }
-      }
+        "prometheus": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Prometheus scrape endpoint at metrics_port/metrics."
+        },
+        "prometheus_addr": {
+          "type": "string",
+          "default": "0.0.0.0:9338"
+        },
+        "otel_endpoint": {
+          "type": "string",
+          "description": "OpenTelemetry OTLP endpoint (e.g. http://otel-collector:4317). Empty = disabled."
+        },
+        "otel_service_name": {
+          "type": "string",
+          "default": "hybridnode"
+        },
+        "sdwan_metrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include SD-WAN link metrics in NodeObservabilitySnapshot DHT entries."
+        },
+        "log_level": {
+          "type": "string",
+          "enum": ["trace", "debug", "info", "warn", "error"],
+          "default": "info"
+        }
+      },
+      "additionalProperties": false
     },
+
     "audit": {
       "type": "object",
+      "description": "Automated audit configuration (mirrors ainonymous audit node/model CLI).",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "interval_hours": { "type": "integer", "minimum": 1 },
-        "auto_warrant": { "type": "boolean" },
-        "model_hash_check": { "type": "boolean" },
-        "reputation_threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
-      }
+        "enabled":            { "type": "boolean", "default": true },
+        "interval_hours":     { "type": "integer", "minimum": 1, "default": 6 },
+        "auto_warrant":       {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically publish a Warrant when a peer fails audit checks."
+        },
+        "model_hash_check":   { "type": "boolean", "default": true },
+        "reputation_threshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Peers below this score are excluded from scheduling. Formula: (success_rate×0.4)+(speed×0.3)+(age×0.2)-(warrant_penalty×0.1)."
+        }
+      },
+      "additionalProperties": false
     },
+
     "security": {
       "type": "object",
+      "description": "Security settings.",
       "properties": {
-        "private_network": { "type": "boolean" },
-        "pow_difficulty": { "type": "integer", "minimum": 0 },
-        "warrant_expiry_days": { "type": "integer", "minimum": 1 }
-      }
+        "private_network": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require PrivateNetworkProof membrane proof at genesis. Enables genesis_self_check with feature private-network."
+        },
+        "pow_difficulty": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Anti-Sybil PoW difficulty at admission. 0 = disabled (only suitable for private networks)."
+        },
+        "warrant_expiry_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Warrants expire after this many days (Holochain DHT link TTL)."
+        }
+      },
+      "additionalProperties": false
     }
+
   },
   "additionalProperties": false
 }
