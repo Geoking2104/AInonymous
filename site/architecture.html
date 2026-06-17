@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AInonymous — Inférence IA Distribuée & Souveraine</title>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --bg2: #111520;
+    --bg3: #161b28;
+    --border: #1e2a3a;
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --accent3: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --code: #1e293b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,12,16,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem; height: 60px;
+  }
+  .nav-logo { font-weight: 700; font-size: 1.1rem; color: var(--accent); letter-spacing: -0.5px; }
+  .nav-logo span { color: var(--text); }
+  .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    background: var(--accent); color: #fff; border: none; padding: 0.45rem 1.1rem;
+    border-radius: 6px; font-size: 0.9rem; cursor: pointer; text-decoration: none;
+    transition: background 0.2s;
+  }
+  .nav-cta:hover { background: #2563eb; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 6rem 2rem 4rem;
+    background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59,130,246,0.15) 0%, transparent 70%);
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);
+    color: var(--accent); padding: 0.3rem 0.9rem; border-radius: 100px;
+    font-size: 0.8rem; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .badge-dot { width: 6px; height: 6px; background: var(--accent3); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  h1 { font-size: clamp(2.4rem, 5vw, 4.2rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.2rem; letter-spacing: -1.5px; }
+  h1 .grad { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero-sub { font-size: 1.15rem; color: var(--muted); max-width: 600px; margin: 0 auto 2.5rem; }
+  .hero-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--accent); color: #fff; padding: 0.75rem 1.8rem;
+    border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1rem;
+    transition: all 0.2s; border: none; cursor: pointer;
+  }
+  .btn-primary:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 8px 25px rgba(59,130,246,0.4); }
+  .btn-ghost {
+    background: transparent; color: var(--text); padding: 0.75rem 1.8rem;
+    border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1rem;
+    border: 1px solid var(--border); transition: all 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* STATS BAR */
+  .stats-bar {
+    background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 3rem;
+  }
+  .stat { text-align: center; }
+  .stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* SECTIONS */
+  section { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
+  .section-tag { color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.6rem; font-weight: 600; }
+  h2 { font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 700; margin-bottom: 1rem; letter-spacing: -0.5px; }
+  .section-intro { color: var(--muted); font-size: 1.05rem; max-width: 600px; margin-bottom: 3rem; }
+  hr.section-sep { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+  /* ARCHITECTURE DIAGRAM */
+  .arch-diagram {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+    padding: 2.5rem; margin: 2.5rem 0; overflow-x: auto;
+  }
+  .arch-layers { display: flex; flex-direction: column; gap: 0.5rem; }
+  .arch-layer {
+    border-radius: 10px; padding: 1rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .layer-sd { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); }
+  .layer-hc { background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.25); }
+  .layer-quic { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); }
+  .arch-layer-name { font-weight: 700; font-size: 0.95rem; }
+  .arch-layer-desc { font-size: 0.85rem; color: var(--muted); }
+  .arch-layer-badge {
+    font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 100px;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  }
+  .arch-arrow { text-align: center; color: var(--muted); font-size: 1.2rem; }
+
+  /* CARDS GRID */
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.8rem; transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-icon { font-size: 2rem; margin-bottom: 1rem; }
+  .card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .card p { font-size: 0.9rem; color: var(--muted); }
+
+  /* SECURITY SECTION */
+  .security-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; }
+  .sec-item {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.3rem 1.5rem; display: flex; gap: 1rem; align-items: flex-start;
+  }
+  .sec-icon {
+    width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 1.2rem; flex-shrink: 0;
+    background: rgba(59,130,246,0.1);
+  }
+  .sec-text h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .sec-text p { font-size: 0.82rem; color: var(--muted); }
+
+  /* COMPARISON TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th { text-align: left; padding: 0.8rem 1rem; background: var(--bg2); color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 0.9rem 1rem; border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .check { color: var(--accent3); font-weight: 700; }
+  .cross { color: var(--red); }
+  .partial { color: var(--yellow); }
+  .highlight-col { background: rgba(59,130,246,0.05); font-weight: 600; }
+
+  /* PYTORCH SECTION */
+  .code-block {
+    background: var(--code); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.3rem 1.5rem; overflow-x: auto; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.85rem; line-height: 1.7; margin: 1.5rem 0;
+  }
+  .code-block .kw { color: #7dd3fc; }
+  .code-block .fn { color: #a5f3fc; }
+  .code-block .str { color: #86efac; }
+  .code-block .cmt { color: #475569; }
+  .code-block .num { color: #fda4af; }
+
+  /* FLOW DIAGRAM */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0; margin: 2rem 0; }
+  .flow-step {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.8rem 1.2rem; text-align: center; min-width: 130px; flex: 1;
+  }
+  .flow-step .step-num { font-size: 0.7rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .flow-step .step-label { font-size: 0.85rem; font-weight: 600; margin-top: 0.2rem; }
+  .flow-arrow { color: var(--muted); font-size: 1.2rem; padding: 0 0.5rem; }
+  .flow-step.highlight { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+
+  /* USE CASES */
+  .usecase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .usecase {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; cursor: default;
+  }
+  .usecase:hover { border-color: var(--accent2); }
+  .usecase h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .usecase p { font-size: 0.83rem; color: var(--muted); }
+  .uc-badge {
+    display: inline-block; padding: 0.15rem 0.5rem; border-radius: 100px;
+    font-size: 0.7rem; font-weight: 700; margin-bottom: 0.6rem;
+  }
+  .uc-enterprise { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .uc-research { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .uc-edge { background: rgba(16,185,129,0.15); color: var(--accent3); }
+
+  /* CTA */
+  .cta-section {
+    background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.12));
+    border: 1px solid rgba(59,130,246,0.2); border-radius: 20px;
+    padding: 4rem 2rem; text-align: center; margin: 3rem 0;
+  }
+  .cta-section h2 { margin-bottom: 0.8rem; }
+  .cta-section p { color: var(--muted); margin-bottom: 2rem; }
+
+  /* FOOTER */
+  footer {
+    background: var(--bg2); border-top: 1px solid var(--border);
+    padding: 2rem; text-align: center; color: var(--muted); font-size: 0.85rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* WARRANT BADGE */
+  .warrant-safe {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3);
+    color: var(--accent3); padding: 0.25rem 0.7rem; border-radius: 100px; font-size: 0.8rem;
+  }
+  .sla-bar {
+    display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.8rem;
+  }
+  .sla-tag {
+    background: var(--bg3); border: 1px solid var(--border);
+    padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.78rem; color: var(--muted);
+  }
+  .sla-tag strong { color: var(--text); }
+
+  @media (max-width: 640px) {
+    nav .nav-links { display: none; }
+    .flow-arrow { display: none; }
+    .flow-step { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">AI<span>nonymous</span></div>
+  <ul class="nav-links">
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#securite">Sécurité</a></li>
+    <li><a href="#pytorch">PyTorch</a></li>
+    <li><a href="#comparaison">Comparaison</a></li>
+    <li><a href="#usecases">Use Cases</a></li>
+  </ul>
+  <a href="https://github.com/Geoking2104/AInonymous" class="nav-cta" target="_blank">GitHub →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div style="position:relative;z-index:1">
+    <div class="badge"><span class="badge-dot"></span> Open Source · Holochain 0.6.1 · QUIC/mTLS</div>
+    <h1>Inférence IA Distribuée<br>& <span class="grad">Souveraine</span></h1>
+    <p class="hero-sub">
+      AInonymous connecte vos GPUs en un réseau P2P sécurisé. Chaque nœud est attesté,
+      chaque modèle vérifié, chaque transfert chiffré — sans serveur central.
+    </p>
+    <div class="hero-btns">
+      <a href="https://github.com/Geoking2104/AInonymous" class="btn-primary" target="_blank">Voir le code source</a>
+      <a href="#architecture" class="btn-ghost">Explorer l'architecture</a>
+    </div>
+  </div>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat"><div class="stat-value">3</div><div class="stat-label">Couches de protocole</div></div>
+  <div class="stat"><div class="stat-value">ed25519</div><div class="stat-label">Signature cryptographique</div></div>
+  <div class="stat"><div class="stat-value">&lt;5ms</div><div class="stat-label">Latence intra-site</div></div>
+  <div class="stat"><div class="stat-value">0</div><div class="stat-label">Serveur central</div></div>
+  <div class="stat"><div class="stat-value">SHA-256</div><div class="stat-label">Intégrité des modèles</div></div>
+</div>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="section-tag">Architecture</div>
+  <h2>Trois couches, une seule identité</h2>
+  <p class="section-intro">
+    HybridNode empile SD-WAN, Holochain DHT et QUIC/mTLS en une pile cohérente
+    où l'identité ed25519 d'un nœud traverse les trois niveaux.
+  </p>
+
+  <div class="arch-diagram">
+    <div class="arch-layers">
+      <div class="arch-layer layer-sd">
+        <div>
+          <div class="arch-layer-name" style="color:#7dd3fc">① SD-WAN — Underlay</div>
+          <div class="arch-layer-desc">Transport physique · QoS · DSCP 46 (Expedited Forwarding) · SLA enforcement</div>
+          <div class="sla-bar">
+            <div class="sla-tag">Intra-site <strong>&lt;5ms / 10 Gbps</strong></div>
+            <div class="sla-tag">Inter-site <strong>&lt;20ms / 1 Gbps</strong></div>
+            <div class="sla-tag">Inter-région <strong>&lt;80ms / 100 Mbps</strong></div>
+          </div>
+        </div>
+        <div class="arch-layer-badge">vManage · VeloCloud · Mock</div>
+      </div>
+      <div class="arch-arrow">↕ mTLS ed25519 AgentPubKey</div>
+      <div class="arch-layer layer-hc">
+        <div>
+          <div class="arch-layer-name" style="color:#c4b5fd">② Holochain 0.6.1 — Plan de contrôle (DHT)</div>
+          <div class="arch-layer-desc">Découverte de pairs · Attestation de nœud · Validation de modèles · Warrants (preuves de mauvaise conduite)</div>
+        </div>
+        <div class="arch-layer-badge">iroh transport · HDK 0.6.1 · HDI 0.7.x</div>
+      </div>
+      <div class="arch-arrow">↕ Activation tensors (binary wire format)</div>
+      <div class="arch-layer layer-quic">
+        <div>
+          <div class="arch-layer-name" style="color:#6ee7b7">③ QUIC/mTLS — Plan de données</div>
+          <div class="arch-layer-desc">Transfert d'activations · Pipeline splitting · Chiffrement de bout en bout · PeerKeyVerifier strict</div>
+        </div>
+        <div class="arch-layer-badge">quinn 0.11 · ALPN ainonymous/1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-icon">🔀</div>
+      <h3>Pipeline Splitting</h3>
+      <p>Un modèle est découpé entre N nœuds. Les couches s'exécutent en séquence, les activations transitent via QUIC chiffré. Aucune copie complète du modèle n'est nécessaire sur un seul nœud.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🗺️</div>
+      <h3>Scheduler Topology-Aware</h3>
+      <p>Le scheduler lit la topologie SD-WAN pour sélectionner le pair optimal : latence minimale, bande passante maximale, réputation Holochain, sans warrant actif.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">♾️</div>
+      <h3>Redondance N-of-M</h3>
+      <p>PrimaryShadow, HotStandby, NofMQuorum (2/3 consensus), SpeculativeVerify — choisissez le niveau de redondance selon votre SLA métier.</p>
+    </div>
+  </div>
+</section>
+<hr class="section-sep">
+
+<!-- SECURITE -->
+<section id="securite">
+  <div class="section-tag">Sécurité</div>
+  <h2>Sécurité cryptographique à chaque niveau</h2>
+  <p class="section-intro">
+    Pas de confiance implicite. Chaque pair est authentifié, chaque modèle haché,
+    chaque comportement déviant punissable par Warrant DHT.
+  </p>
+
+  <div class="security-grid">
+    <div class="sec-item">
+      <div class="sec-icon">🔑</div>
+      <div class="sec-text">
+        <h4>mTLS ed25519 strict</h4>
+        <p>L'<code>AgentPubKey</code> Holochain est réutilisé comme certificat TLS. Le <code>PeerKeyVerifier</code> refuse toute connexion non vérifiée — fini le <code>dangerous_accept_any_server_cert</code>.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">📋</div>
+      <div class="sec-text">
+        <h4>NodeAttestation</h4>
+        <p>Chaque nœud publie dans le DHT : empreinte matérielle, benchmarks GPU, signature ed25519. Les clients refusent les pairs non attestés via <code>require_attestation=True</code>.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">🔒</div>
+      <div class="sec-text">
+        <h4>SHA-256 ModelManifest</h4>
+        <p>Chaque modèle est hashé avant service. ≥ 2 pairs doivent confirmer le hash via <code>ModelClaim</code>. Un modèle non vérifié ne peut pas être servi.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">⚖️</div>
+      <div class="sec-text">
+        <h4>Warrants DHT</h4>
+        <p>Preuve cryptographique de mauvaise conduite (hash incorrect, SLA violé, double-spend). Exclusion automatique du scheduling, valide 30 jours, réfutable avec preuve.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">🛡️</div>
+      <div class="sec-text">
+        <h4>Anti-Sybil</h4>
+        <p>Score de réputation : <code>(success×0.4) + (speed×0.3) + (age×0.2) - (warrant_penalty×0.1)</code>. PoW optionnel pour les réseaux ouverts.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">🔐</div>
+      <div class="sec-text">
+        <h4>Réseau privé (membrane)</h4>
+        <p><code>PrivateNetworkProof</code> dans le genesis — seuls les membres du consortium peuvent rejoindre le DHT. Audit log immuable via la source-chain Holochain.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">🚫</div>
+      <div class="sec-text">
+        <h4>Zéro pickle</h4>
+        <p>Le format binaire d'activation (magic <code>0xA1A0C1C0</code> + dtype + shape + raw bytes) n'utilise jamais pickle. Pas d'exécution de code arbitraire via la désérialisation de tenseurs.</p>
+      </div>
+    </div>
+    <div class="sec-item">
+      <div class="sec-icon">📡</div>
+      <div class="sec-text">
+        <h4>DSCP 46 — Expedited Forwarding</h4>
+        <p>Le trafic d'inférence est marqué DSCP 46 (EF) — traitement prioritaire sur les équipements réseau, garantie de latence sur le plan de données.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:2rem; padding:1.5rem; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); border-radius:12px;">
+    <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem;">
+      <span class="warrant-safe">✓ Warrant-safe</span>
+      <span style="font-weight:700">Audit trail complet sans serveur central</span>
+    </div>
+    <p style="font-size:0.9rem;color:var(--muted)">La source-chain Holochain de chaque nœud enregistre chaque attestation, chaque claim de modèle, chaque warrant publié. Immuable, non falsifiable, accessible à tout validateur du réseau.</p>
+  </div>
+</section>
+<hr class="section-sep">
+
+<!-- PYTORCH -->
+<section id="pytorch">
+  <div class="section-tag">Intégration PyTorch</div>
+  <h2>PyTorch native — zéro friction</h2>
+  <p class="section-intro">
+    AInonymous s'intègre dans n'importe quel pipeline PyTorch existant via
+    des <code>nn.Module</code> standards et une API REST OpenAI-compatible.
+  </p>
+
+  <!-- Flow -->
+  <div class="flow">
+    <div class="flow-step">
+      <div class="step-num">Step 1</div>
+      <div class="step-label">HF Model</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step highlight">
+      <div class="step-num">Step 2</div>
+      <div class="step-label">PipelineSplit</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="step-num">QUIC mTLS</div>
+      <div class="step-label">Activation Transfer</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="step-num">Step 3</div>
+      <div class="step-label">Remote Layers</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="step-num">Step 4</div>
+      <div class="step-label">Output</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h3 style="margin-bottom:1rem;font-size:1.1rem">Pipeline splitting en 5 lignes</h3>
+      <div class="code-block">
+<span class="kw">from</span> ainonymous_torch <span class="kw">import</span> PipelineSplit, LayerRange
+
+pipe = <span class="fn">PipelineSplit</span>(
+    local_layers=<span class="fn">LayerRange</span>(model.model.layers[:<span class="num">18</span>], <span class="num">0</span>, <span class="num">18</span>),
+    remote_url=<span class="str">"http://node-b:9337"</span>,  <span class="cmt"># mTLS auto</span>
+    remote_layers=<span class="fn">LayerRange</span>(start=<span class="num">18</span>, end=<span class="num">36</span>),
+    transfer_dtype=torch.float16,  <span class="cmt"># -50% bande passante</span>
+)
+
+<span class="cmt"># Forward transparent — local + remote via QUIC</span>
+hidden_out = <span class="fn">pipe</span>(hidden)
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:1rem;font-size:1.1rem">Format d'activation sécurisé</h3>
+      <div class="code-block">
+<span class="kw">from</span> ainonymous_torch <span class="kw">import</span> pack_activation, unpack_activation
+
+<span class="cmt"># Sérialisation sans pickle</span>
+wire = <span class="fn">pack_activation</span>(hidden_state)
+<span class="cmt"># Magic 0xA1A0C1C0 + dtype + shape + raw bytes</span>
+
+<span class="cmt"># Désérialisation safe</span>
+tensor = <span class="fn">unpack_activation</span>(wire)
+
+<span class="cmt"># bfloat16 → 2× moins de bande passante</span>
+<span class="cmt"># float32 → précision maximale</span>
+<span class="cmt"># Supporte: f32, f16, bf16, i8, i32, i64</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:1.5rem">
+    <div>
+      <h3 style="margin-bottom:1rem;font-size:1.1rem">Wrapper transparent avec fallback local</h3>
+      <div class="code-block">
+<span class="kw">from</span> ainonymous_torch <span class="kw">import</span> DistributedInferenceModule
+
+model = <span class="fn">DistributedInferenceModule</span>(
+    MyModel(),
+    ainonymous_url=<span class="str">"http://localhost:9337"</span>,
+    fallback_to_local=<span class="kw">True</span>,  <span class="cmt"># dégradation gracieuse</span>
+)
+
+out = <span class="fn">model</span>(x)  <span class="cmt"># réseau si dispo, local sinon</span>
+<span class="kw">print</span>(model.stats)
+<span class="cmt"># {"remote_calls": 42, "local_fallbacks": 1}</span>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:1rem;font-size:1.1rem">Export GGUF + attestation Holochain</h3>
+      <div class="code-block">
+<span class="kw">from</span> ainonymous_torch.model_export <span class="kw">import</span> export_to_gguf
+
+manifest = <span class="fn">export_to_gguf</span>(
+    model_id=<span class="str">"google/gemma-2-9b-it"</span>,
+    output_dir=<span class="str">"~/.ainonymous/models"</span>,
+    quantization=<span class="str">"Q4_K_M"</span>,  <span class="cmt"># ~4 bits/poids</span>
+    llama_cpp_dir=<span class="str">"~/llama.cpp"</span>,
+)
+
+<span class="cmt"># SHA-256 → Holochain ModelManifest</span>
+<span class="kw">print</span>(manifest.sha256)
+<span class="cmt"># Publié dans le DHT, vérifiable par ≥2 pairs</span>
+      </div>
+    </div>
+  </div>
+</section>
+<hr class="section-sep">
+
+<!-- COMPARAISON -->
+<section id="comparaison">
+  <div class="section-tag">Comparaison</div>
+  <h2>AInonymous vs alternatives</h2>
+  <p class="section-intro">
+    Seule solution combinant inférence distribuée P2P, attestation cryptographique et
+    absence totale de serveur central.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Critère</th>
+          <th class="highlight-col">AInonymous HybridNode</th>
+          <th>Ray Serve</th>
+          <th>vLLM Cluster</th>
+          <th>Ollama (local)</th>
+          <th>Petals (HuggingFace)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Architecture</td>
+          <td class="highlight-col">P2P DHT + SD-WAN</td>
+          <td>Centralisé (head node)</td>
+          <td>Centralisé</td>
+          <td>Local uniquement</td>
+          <td>P2P semi-centralisé</td>
+        </tr>
+        <tr>
+          <td>Authentification des pairs</td>
+          <td class="highlight-col"><span class="check">✓</span> mTLS ed25519 strict</td>
+          <td><span class="partial">∼</span> TLS optionnel</td>
+          <td><span class="cross">✗</span> Confiance réseau</td>
+          <td><span class="cross">✗</span> N/A</td>
+          <td><span class="cross">✗</span> Confiance</td>
+        </tr>
+        <tr>
+          <td>Attestation matérielle</td>
+          <td class="highlight-col"><span class="check">✓</span> NodeAttestation DHT</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Intégrité modèle</td>
+          <td class="highlight-col"><span class="check">✓</span> SHA-256 + ≥2 pairs</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="partial">∼</span> Local seulement</td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Serveur central</td>
+          <td class="highlight-col"><span class="check">✓</span> Zéro</td>
+          <td><span class="cross">✗</span> Head node requis</td>
+          <td><span class="cross">✗</span> Orchestrateur</td>
+          <td><span class="check">✓</span> N/A</td>
+          <td><span class="partial">∼</span> Bootstrap servers</td>
+        </tr>
+        <tr>
+          <td>Pipeline splitting</td>
+          <td class="highlight-col"><span class="check">✓</span> QUIC mTLS</td>
+          <td><span class="check">✓</span> TCP</td>
+          <td><span class="partial">∼</span> Tensor parallel</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="check">✓</span> HTTP</td>
+        </tr>
+        <tr>
+          <td>QoS / SD-WAN</td>
+          <td class="highlight-col"><span class="check">✓</span> DSCP 46 + SLA</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Réputation + Warrants</td>
+          <td class="highlight-col"><span class="check">✓</span> DHT cryptographique</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Open source</td>
+          <td class="highlight-col"><span class="check">✓</span> Apache-2.0</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>PyTorch natif</td>
+          <td class="highlight-col"><span class="check">✓</span> nn.Module + pip</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="partial">∼</span> REST</td>
+          <td><span class="check">✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<hr class="section-sep">
+
+<!-- USE CASES -->
+<section id="usecases">
+  <div class="section-tag">Use Cases</div>
+  <h2>Qui utilise AInonymous ?</h2>
+  <p class="section-intro">Des architectures sans compromis pour les contextes les plus exigeants.</p>
+
+  <div class="usecase-grid">
+    <div class="usecase">
+      <div class="uc-badge uc-enterprise">Enterprise</div>
+      <h4>Consortium bancaire</h4>
+      <p>5 banques partagent un réseau d'inférence privé (PrivateNetworkProof). Aucune donnée client ne quitte le périmètre réglementaire. Audit trail Holochain pour conformité RGPD.</p>
+    </div>
+    <div class="usecase">
+      <div class="uc-badge uc-research">Recherche</div>
+      <h4>Cluster universitaire</h4>
+      <p>20 nœuds GPU sur 3 campus interconnectés via SD-WAN. Les modèles 70B s'exécutent en pipeline splitting inter-site. Chaque contribution est attestée.</p>
+    </div>
+    <div class="usecase">
+      <div class="uc-badge uc-enterprise">Enterprise</div>
+      <h4>MSP / Cloud souverain</h4>
+      <p>Fournisseur de services managés proposant de l'inférence IA souveraine à ses clients. Réputation par Warrant, SLA garanti par SD-WAN, facturation par attestation.</p>
+    </div>
+    <div class="usecase">
+      <div class="uc-badge uc-edge">Edge</div>
+      <h4>Déploiement industriel</h4>
+      <p>Usines connectées en SD-WAN. Les modèles de vision (qualité, maintenance prédictive) s'exécutent sur GPU edge avec fallback vers le cloud interne si SLA non respecté.</p>
+    </div>
+    <div class="usecase">
+      <div class="uc-badge uc-research">Recherche</div>
+      <h4>Fine-tuning distribué</h4>
+      <p>Les gradients transitent via le même canal QUIC sécurisé que l'inférence. La topologie SD-WAN optimise le transfer learning entre nœuds à haute bande passante.</p>
+    </div>
+    <div class="usecase">
+      <div class="uc-badge uc-enterprise">Enterprise</div>
+      <h4>Defense / Souveraineté</h4>
+      <p>Réseau air-gapped avec bootstrap privé Holochain. ed25519 + mTLS sans CA externe. Les warrants remplacent le besoin d'une PKI centralisée.</p>
+    </div>
+  </div>
+</section>
+<hr class="section-sep">
+
+<!-- STACK TECHNIQUE -->
+<section>
+  <div class="section-tag">Stack</div>
+  <h2>Stack technique complète</h2>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-icon">🦀</div>
+      <h3>Rust — HybridNode Core</h3>
+      <p>quinn (QUIC), iroh-net, hdk 0.6.1, hdi 0.7.1, tokio, prometheus, clap. Compilation statique, déploiement binaire unique.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔗</div>
+      <h3>Holochain 0.6.1</h3>
+      <p>DNA integrity zome (entrées, liens, validation). Coordinator zome (API publish/get/verify). iroh comme transport P2P par défaut.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🐍</div>
+      <h3>Python — ainonymous-torch</h3>
+      <p>PyTorch ≥ 2.3, transformers, safetensors. REST client + PipelineSplit + DistributedInferenceModule + export GGUF.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📊</div>
+      <h3>Observabilité</h3>
+      <p>Prometheus scrape endpoint, OTEL traces, logs structurés JSON. Métriques par SLA : latence P99, bande passante, taux de succès, warrants émis.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚙️</div>
+      <h3>Configuration YAML</h3>
+      <p>Schéma JSON validé par CI. Politiques séparées : SD-WAN, sécurité baseline, observabilité, validation de modèles.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🚀</div>
+      <h3>CI/CD GitHub Actions</h3>
+      <p>Validation YAML, clippy Rust, lint politiques, vérification sécurité (mTLS strict, no anonymous). Test PyTorch activation transfer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="padding-top:2rem">
+  <div class="cta-section">
+    <h2>Prêt à déployer ?</h2>
+    <p>AInonymous est open source sous licence Apache-2.0.<br>Clonez, lisez HYBRIDNODE_APPLY.md, lancez votre premier nœud.</p>
+    <div class="hero-btns">
+      <a href="https://github.com/Geoking2104/AInonymous" class="btn-primary" target="_blank">GitHub — Geoking2104/AInonymous</a>
+      <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/HYBRIDNODE.md" class="btn-ghost" target="_blank">Lire la doc HybridNode</a>
+    </div>
+    <div style="margin-top:2rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;font-size:0.85rem;color:var(--muted)">
+      <span>📄 <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/ARCHITECTURE.md" style="color:var(--accent)" target="_blank">ARCHITECTURE.md</a></span>
+      <span>📄 <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/NETWORK.md" style="color:var(--accent)" target="_blank">NETWORK.md</a></span>
+      <span>📄 <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/HOLOCHAIN_ZOMES.md" style="color:var(--accent)" target="_blank">HOLOCHAIN_ZOMES.md</a></span>
+      <span>📄 <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/PYTORCH_INTEGRATION.md" style="color:var(--accent)" target="_blank">PYTORCH_INTEGRATION.md</a></span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>AInonymous · Open Source · <a href="https://github.com/Geoking2104/AInonymous" target="_blank">github.com/Geoking2104/AInonymous</a> · Licence Apache-2.0</p>
+  <p style="margin-top:0.5rem">Construit sur Holochain 0.6.1 · QUIC/mTLS ed25519 · SD-WAN · PyTorch</p>
+</footer>
+
+</body>
+</html>

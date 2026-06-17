@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ainonymous-torch"
+version = "0.1.0"
+description = "PyTorch integration for AInonymous HybridNode distributed inference"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+keywords = ["pytorch", "distributed-inference", "holochain", "p2p", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.3.0",
+    "requests>=2.31.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+transformers = [
+    "transformers>=4.42.0",
+    "safetensors>=0.4.3",
+    "tokenizers>=0.19.0",
+    "huggingface-hub>=0.23.0",
+]
+async = [
+    "httpx>=0.27.0",
+    "anyio>=4.4.0",
+]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "mypy>=1.10.0",
+    "ruff>=0.4.0",
+]
+all = [
+    "ainonymous-torch[transformers,async,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/Geoking2104/AInonymous"
+Documentation = "https://github.com/Geoking2104/AInonymous/blob/main/docs/PYTORCH_INTEGRATION.md"
+Issues = "https://github.com/Geoking2104/AInonymous/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ainonymous_torch*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
