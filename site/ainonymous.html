@@ -709,6 +709,7 @@
       <a onclick="navlink('d1')"><span id="lbl-d1">Le terrain</span></a>
       <a onclick="navlink('d2')"><span id="lbl-d2">Architecture</span></a>
       <a onclick="navlink('d3')"><span id="lbl-d3">Cas d'emploi</span></a>
+      <a onclick="navlink('d4')"><span id="lbl-d4">Audit EDSTAR</span></a>
       <a href="./architecture.html" style="color:var(--accent);font-weight:600">Tech docs →</a>
     </div>
     <div class="lang-sw">
@@ -2658,6 +2659,44 @@ curl http://localhost:9337/v1/chat/completions \
   </div>
 </div>
 
+<!-- AUDIT EDSTAR -->
+<div class="section" id="df-audit">
+  <div class="eyebrow">Audit · Référentiel EDSTAR (EDA)</div>
+  <h2>AInonymous au regard<br>des domaines techniques EDSTAR.</h2>
+  <p class="section-sub">EDSTAR (European Defence Standards Reference System), maintenu par l'Agence européenne de défense (EDA), organise les standards de défense en domaines techniques. Ci-dessous, le positionnement d'AInonymous domaine par domaine. <strong>Auto-évaluation indicative appliquant la taxonomie EDSTAR — ce n'est ni une évaluation officielle de l'EDA, ni une certification.</strong></p>
+
+  <div class="biz-kpi-grid" style="margin:36px 0">
+    <div class="biz-kpi"><div class="biz-kpi-num">3</div><div class="biz-kpi-lbl">domaines adressés par conception — ITC, LCMS, DS</div></div>
+    <div class="biz-kpi"><div class="biz-kpi-num">3</div><div class="biz-kpi-lbl">domaines partiellement couverts — TERM, AIT, RANGE</div></div>
+    <div class="biz-kpi"><div class="biz-kpi-num">9</div><div class="biz-kpi-lbl">domaines matériels — N/A, exploitation applicative possible</div></div>
+    <div class="biz-kpi"><div class="biz-kpi-num">CIS</div><div class="biz-kpi-lbl">positionnement : systèmes d'information et cyber</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Domaine technique EDSTAR</th><th>Applicabilité</th><th>Évaluation</th><th>Éléments d'appréciation</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Information Technologies / Cyber (ITC)</td><td><span class="ok">Cœur</span></td><td class="col ok">🟢 Par conception</td><td>P2P chiffré, ed25519, Membrane Proofs, air-gap, source chain auditable, zero-trust. Homologation (ex. IGI 1300) à conduire au cas par cas.</td></tr>
+      <tr><td>System Life Cycle Management (LCMS)</td><td><span class="ok">Forte</span></td><td class="col ok">🟢 Par conception</td><td>Open source Apache 2.0, sans dépendance éditeur, MCO souverain, traçabilité de bout en bout.</td></tr>
+      <tr><td>Dependability and Safety (DS)</td><td><span class="ok">Forte</span></td><td class="col ok">🟢 Par conception</td><td>Mesh auto-cicatrisant, sans point de défaillance unique, dégradation gracieuse, offline-first, reprise sans perte (RAMS). Dossier de sûreté formel à produire.</td></tr>
+      <tr><td>Methodology and Terminology (TERM)</td><td>Indirecte</td><td><span style="color:var(--amber)">🟡 Partiel</span></td><td>Documentation et terminologie alignables sur les gabarits EDSTAR ; formalisation à mener.</td></tr>
+      <tr><td>Automatic Identification Technology (AIT)</td><td>Partielle</td><td><span style="color:var(--amber)">🟡 Partiel</span></td><td>Identité cryptographique et attribution des nœuds (ed25519) ; l'AIT couvre surtout l'identification automatique d'objets (RFID, codes).</td></tr>
+      <tr><td>Range Interoperability (RANGE)</td><td>Indirecte</td><td><span style="color:var(--amber)">🟡 Partiel</span></td><td>Interopérabilité par API compatible OpenAI et fédération STANAG ; RANGE vise l'interopérabilité des champs d'essais.</td></tr>
+      <tr><td>Military Airworthiness (EMARS)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Non applicable, sauf intégration aéroportée (ISR/drone) : le logiciel embarqué relèverait alors de la navigabilité.</td></tr>
+      <tr><td>Armoured Land Vehicle Technology (ALVT)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Déployable comme charge utile CIS à bord d'un véhicule, sans relever du domaine véhicule.</td></tr>
+      <tr><td>CBRN Defence (CBRN)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Peut exploiter et fusionner des données de capteurs CBRN (usage applicatif), sans être un moyen CBRN.</td></tr>
+      <tr><td>Batteries (BAT)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Le tiering automatique optimise l'empreinte énergétique des nœuds ; la solution ne relève pas du domaine batteries.</td></tr>
+      <tr><td>Ammunition Technologies (AMMO)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Hors périmètre d'un logiciel d'inférence.</td></tr>
+      <tr><td>Energetic Materials (EMAT)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Hors périmètre d'un logiciel d'inférence.</td></tr>
+      <tr><td>Disposal of Munitions (DMUNI)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Hors périmètre d'un logiciel d'inférence.</td></tr>
+      <tr><td>Water Purification (WATER)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Hors périmètre d'un logiciel d'inférence.</td></tr>
+      <tr><td>Air Traffic Management (ATM)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Matériel</span></td><td>Hors périmètre ; exploitation applicative de données ATM possible.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:var(--muted);margin-top:16px;line-height:1.6">* N/A = domaine matériel hors du périmètre d'un logiciel d'inférence — AInonymous peut néanmoins y intervenir comme charge utile CIS d'exploitation et de fusion de données. Cartographie indicative au regard des 15 domaines techniques EDSTAR publiés par l'EDA, sans valeur d'évaluation officielle ni de certification.</p>
+</div>
+
 <!-- CTA DÉFENSE -->
 <div class="cta-section">
   <div class="cta-inner">
@@ -2889,6 +2928,44 @@ curl http://localhost:9337/v1/chat/completions \
   </div>
 </div>
 
+<!-- EDSTAR AUDIT -->
+<div class="section" id="de-audit">
+  <div class="eyebrow">Audit · EDSTAR framework (EDA)</div>
+  <h2>AInonymous against<br>the EDSTAR technical domains.</h2>
+  <p class="section-sub">EDSTAR (European Defence Standards Reference System), maintained by the European Defence Agency (EDA), organizes defence standards into technical domains. Below, AInonymous is positioned domain by domain. <strong>Indicative self-assessment applying the EDSTAR taxonomy — this is neither an official EDA assessment nor a certification.</strong></p>
+
+  <div class="biz-kpi-grid" style="margin:36px 0">
+    <div class="biz-kpi"><div class="biz-kpi-num">3</div><div class="biz-kpi-lbl">domains addressed by design — ITC, LCMS, DS</div></div>
+    <div class="biz-kpi"><div class="biz-kpi-num">3</div><div class="biz-kpi-lbl">domains partially covered — TERM, AIT, RANGE</div></div>
+    <div class="biz-kpi"><div class="biz-kpi-num">9</div><div class="biz-kpi-lbl">materiel domains — N/A, application-level use possible</div></div>
+    <div class="biz-kpi"><div class="biz-kpi-num">CIS</div><div class="biz-kpi-lbl">positioning: information systems and cyber</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>EDSTAR technical domain</th><th>Applicability</th><th>Assessment</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Information Technologies / Cyber (ITC)</td><td><span class="ok">Core</span></td><td class="col ok">🟢 By design</td><td>Encrypted P2P, ed25519, Membrane Proofs, air-gap, auditable source chain, zero-trust. Accreditation to be conducted case by case.</td></tr>
+      <tr><td>System Life Cycle Management (LCMS)</td><td><span class="ok">Strong</span></td><td class="col ok">🟢 By design</td><td>Open source Apache 2.0, no vendor lock-in, sovereign support, end-to-end traceability.</td></tr>
+      <tr><td>Dependability and Safety (DS)</td><td><span class="ok">Strong</span></td><td class="col ok">🟢 By design</td><td>Self-healing mesh, no single point of failure, graceful degradation, offline-first, lossless recovery (RAMS). Formal safety case to be produced.</td></tr>
+      <tr><td>Methodology and Terminology (TERM)</td><td>Indirect</td><td><span style="color:var(--amber)">🟡 Partial</span></td><td>Documentation and terminology can be aligned to EDSTAR templates; formalization required.</td></tr>
+      <tr><td>Automatic Identification Technology (AIT)</td><td>Partial</td><td><span style="color:var(--amber)">🟡 Partial</span></td><td>Cryptographic node identity and attribution (ed25519); AIT mainly covers automatic object identification (RFID, codes).</td></tr>
+      <tr><td>Range Interoperability (RANGE)</td><td>Indirect</td><td><span style="color:var(--amber)">🟡 Partial</span></td><td>Interoperability via OpenAI-compatible API and STANAG federation; RANGE targets test-range interoperability.</td></tr>
+      <tr><td>Military Airworthiness (EMARS)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Not applicable, except for airborne integration (ISR/UAV): embedded software would then fall under airworthiness.</td></tr>
+      <tr><td>Armoured Land Vehicle Technology (ALVT)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Deployable as a CIS payload onboard a vehicle, without belonging to the vehicle domain.</td></tr>
+      <tr><td>CBRN Defence (CBRN)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Can exploit and fuse CBRN sensor data (application-level), without being a CBRN asset.</td></tr>
+      <tr><td>Batteries (BAT)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Automatic tiering optimizes node energy footprint; the solution does not belong to the batteries domain.</td></tr>
+      <tr><td>Ammunition Technologies (AMMO)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Outside the scope of an inference software.</td></tr>
+      <tr><td>Energetic Materials (EMAT)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Outside the scope of an inference software.</td></tr>
+      <tr><td>Disposal of Munitions (DMUNI)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Outside the scope of an inference software.</td></tr>
+      <tr><td>Water Purification (WATER)</td><td style="color:var(--muted)">N/A</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Outside the scope of an inference software.</td></tr>
+      <tr><td>Air Traffic Management (ATM)</td><td style="color:var(--muted)">N/A*</td><td><span style="color:var(--muted)">⚪ Materiel</span></td><td>Out of scope; application-level exploitation of ATM data is possible.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:var(--muted);margin-top:16px;line-height:1.6">* N/A = materiel domain outside the scope of an inference software — AInonymous can still act there as a CIS payload for data exploitation and fusion. Indicative mapping against the 15 EDSTAR technical domains published by the EDA, with no value as an official assessment or certification.</p>
+</div>
+
 <!-- CTA DEFENSE -->
 <div class="cta-section">
   <div class="cta-inner">
@@ -2924,6 +3001,7 @@ var i18n = {
   'lbl-d1':   { fr: 'Le terrain',        en: 'The field' },
   'lbl-d2':   { fr: 'Architecture',      en: 'Architecture' },
   'lbl-d3':   { fr: "Cas d'emploi",      en: 'Use cases' },
+  'lbl-d4':   { fr: 'Audit EDSTAR',      en: 'EDSTAR audit' },
 };
 
 // ── LIENS NAV (fr-id → section dans panneau FR, en-id → panneau EN)
@@ -2938,6 +3016,7 @@ var navLinks = {
   d1: { fr: 'df-terrain',     en: 'de-terrain' },
   d2: { fr: 'df-archi',       en: 'de-archi' },
   d3: { fr: 'df-cases',       en: 'de-cases' },
+  d4: { fr: 'df-audit',       en: 'de-audit' },
 };
 
 // ── RENDER
