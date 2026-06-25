@@ -690,6 +690,7 @@
     <button class="nav-tab" id="tab-ent" onclick="go('enterprise',state.lang)">Enterprise</button>
     <button class="nav-tab" id="tab-def" onclick="go('defense',state.lang)"><span id="lbl-def">Défense</span></button>
     <a class="nav-tab" href="./architecture.html" style="text-decoration:none">Tech docs</a>
+    <a class="nav-tab" href="#contact" style="text-decoration:none">Contact</a>
   </div>
   <div class="nav-right">
     <div class="nav-land-links" id="nav-land">
@@ -2984,6 +2985,26 @@ curl http://localhost:9337/v1/chat/completions \
 
 
 
+<!-- ══════ CONTACT (partagé — bas de chaque panneau) ══════ -->
+<div class="cta-section" id="contact" style="scroll-margin-top:80px">
+  <div class="cta-inner">
+    <div class="eyebrow" style="text-align:center" id="ct-eyebrow">Contact</div>
+    <h2 id="ct-title">Parlons de votre déploiement.</h2>
+    <p id="ct-sub">Une question, un cas d'usage, un projet souverain ? Écrivez-nous — nous revenons vers vous rapidement.</p>
+    <form id="contact-form" style="max-width:540px;margin:28px auto 0;text-align:left;display:flex;flex-direction:column;gap:14px">
+      <input type="hidden" name="_subject" value="Nouveau contact — AInonymous">
+      <input type="hidden" name="_captcha" value="false">
+      <input type="hidden" name="_template" value="table">
+      <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none">
+      <input id="ct-name" type="text" name="name" required placeholder="Nom / Organisation" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box">
+      <input id="ct-email" type="email" name="email" required placeholder="Votre e-mail" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box">
+      <textarea id="ct-msg" name="message" rows="5" required placeholder="Votre message" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box;resize:vertical"></textarea>
+      <button type="submit" class="btn-p" id="ct-btn" style="justify-content:center;cursor:pointer;border:none">Envoyer →</button>
+      <div id="ct-status" style="font-size:13px;color:var(--muted);min-height:18px;text-align:center"></div>
+    </form>
+  </div>
+</div>
+
 <script>
 // ── ÉTAT
 var state = { page: 'landing', lang: 'fr' };
@@ -3002,6 +3023,10 @@ var i18n = {
   'lbl-d2':   { fr: 'Architecture',      en: 'Architecture' },
   'lbl-d3':   { fr: "Cas d'emploi",      en: 'Use cases' },
   'lbl-d4':   { fr: 'Audit EDSTAR',      en: 'EDSTAR audit' },
+  'ct-eyebrow': { fr: 'Contact', en: 'Contact' },
+  'ct-title':   { fr: 'Parlons de votre déploiement.', en: "Let's talk about your deployment." },
+  'ct-sub':     { fr: "Une question, un cas d'usage, un projet souverain ? Écrivez-nous — nous revenons vers vous rapidement.", en: "A question, a use case, a sovereign project? Write to us — we'll get back to you quickly." },
+  'ct-btn':     { fr: 'Envoyer →', en: 'Send →' },
 };
 
 // ── LIENS NAV (fr-id → section dans panneau FR, en-id → panneau EN)
@@ -3044,6 +3069,7 @@ function render() {
     var el = document.getElementById(id);
     if (el) el.textContent = i18n[id][state.lang];
   }
+  applyContactI18n();
 }
 
 // ── NAVIGATION
@@ -3072,6 +3098,43 @@ function navlink(key) {
   var map = navLinks[key];
   if (map) scrollTo2(map[state.lang]);
 }
+
+// ── CONTACT
+function applyContactI18n() {
+  var L = state.lang;
+  var ph = {
+    'ct-name':  { fr: 'Nom / Organisation', en: 'Name / Organization' },
+    'ct-email': { fr: 'Votre e-mail',        en: 'Your email' },
+    'ct-msg':   { fr: 'Votre message',       en: 'Your message' }
+  };
+  for (var id in ph) { var el = document.getElementById(id); if (el) el.placeholder = ph[id][L]; }
+}
+
+(function() {
+  var cf = document.getElementById('contact-form');
+  if (!cf) return;
+  cf.addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    var L = state.lang;
+    var status = document.getElementById('ct-status');
+    var btn = document.getElementById('ct-btn');
+    status.style.color = 'var(--muted)';
+    status.textContent = (L === 'fr' ? 'Envoi…' : 'Sending…');
+    if (btn) btn.disabled = true;
+    fetch('https://formsubmit.co/ajax/geoffroydelatournelle@gmail.com', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: new FormData(cf)
+    }).then(function(r) { return r.json(); }).then(function() {
+      cf.reset();
+      status.style.color = 'var(--accent2)';
+      status.textContent = (L === 'fr' ? 'Merci ! Votre message a bien été envoyé.' : 'Thank you! Your message has been sent.');
+    }).catch(function() {
+      status.style.color = 'var(--accent3)';
+      status.textContent = (L === 'fr' ? "Échec de l'envoi. Réessayez ou écrivez à geoffroydelatournelle@gmail.com." : 'Sending failed. Please retry or email geoffroydelatournelle@gmail.com.');
+    }).then(function() { if (btn) btn.disabled = false; });
+  });
+})();
 
 // ── INIT
 render();
