@@ -2992,15 +2992,12 @@ curl http://localhost:9337/v1/chat/completions \
     <h2 id="ct-title">Parlons de votre déploiement.</h2>
     <p id="ct-sub">Une question, un cas d'usage, un projet souverain ? Écrivez-nous — nous revenons vers vous rapidement.</p>
     <form id="contact-form" style="max-width:540px;margin:28px auto 0;text-align:left;display:flex;flex-direction:column;gap:14px">
-      <input type="hidden" name="_subject" value="Nouveau contact — AInonymous">
-      <input type="hidden" name="_captcha" value="false">
-      <input type="hidden" name="_template" value="table">
-      <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none">
       <input id="ct-name" type="text" name="name" required placeholder="Nom / Organisation" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box">
       <input id="ct-email" type="email" name="email" required placeholder="Votre e-mail" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box">
       <textarea id="ct-msg" name="message" rows="5" required placeholder="Votre message" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box;resize:vertical"></textarea>
       <button type="submit" class="btn-p" id="ct-btn" style="justify-content:center;cursor:pointer;border:none">Envoyer →</button>
       <div id="ct-status" style="font-size:13px;color:var(--muted);min-height:18px;text-align:center"></div>
+      <p id="ct-note" style="font-size:12px;color:var(--muted);text-align:center;margin:0">Pas d'intermédiaire : le message part directement via votre logiciel de messagerie.</p>
     </form>
   </div>
 </div>
@@ -3027,6 +3024,7 @@ var i18n = {
   'ct-title':   { fr: 'Parlons de votre déploiement.', en: "Let's talk about your deployment." },
   'ct-sub':     { fr: "Une question, un cas d'usage, un projet souverain ? Écrivez-nous — nous revenons vers vous rapidement.", en: "A question, a use case, a sovereign project? Write to us — we'll get back to you quickly." },
   'ct-btn':     { fr: 'Envoyer →', en: 'Send →' },
+  'ct-note':    { fr: "Pas d'intermédiaire : le message part directement via votre logiciel de messagerie.", en: 'No middleman: the message goes straight through your own email app.' },
 };
 
 // ── LIENS NAV (fr-id → section dans panneau FR, en-id → panneau EN)
@@ -3118,21 +3116,23 @@ function applyContactI18n() {
     var L = state.lang;
     var status = document.getElementById('ct-status');
     var btn = document.getElementById('ct-btn');
-    status.style.color = 'var(--muted)';
-    status.textContent = (L === 'fr' ? 'Envoi…' : 'Sending…');
-    if (btn) btn.disabled = true;
-    fetch('https://formsubmit.co/ajax/geoffroydelatournelle@gmail.com', {
-      method: 'POST',
-      headers: { 'Accept': 'application/json' },
-      body: new FormData(cf)
-    }).then(function(r) { return r.json(); }).then(function() {
-      cf.reset();
-      status.style.color = 'var(--accent2)';
-      status.textContent = (L === 'fr' ? 'Merci ! Votre message a bien été envoyé.' : 'Thank you! Your message has been sent.');
-    }).catch(function() {
-      status.style.color = 'var(--accent3)';
-      status.textContent = (L === 'fr' ? "Échec de l'envoi. Réessayez ou écrivez à geoffroydelatournelle@gmail.com." : 'Sending failed. Please retry or email geoffroydelatournelle@gmail.com.');
-    }).then(function() { if (btn) btn.disabled = false; });
+    var name = (document.getElementById('ct-name').value || '').trim();
+    var email = (document.getElementById('ct-email').value || '').trim();
+    var msg = (document.getElementById('ct-msg').value || '').trim();
+    var subject = 'Contact AInonymous' + (name ? ' — ' + name : '');
+    var body = [
+      (L === 'fr' ? 'Nom / Organisation : ' : 'Name / Organization: ') + name,
+      (L === 'fr' ? 'E-mail : ' : 'Email: ') + email,
+      '',
+      msg
+    ].join('\n');
+    window.location.href = 'mailto:geoffroydelatournelle@gmail.com'
+      + '?subject=' + encodeURIComponent(subject)
+      + '&body=' + encodeURIComponent(body);
+    status.style.color = 'var(--accent2)';
+    status.textContent = (L === 'fr'
+      ? "Votre messagerie va s'ouvrir avec le message pré-rempli."
+      : 'Your email app will open with the message pre-filled.');
   });
 })();
 
