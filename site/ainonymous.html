@@ -688,6 +688,7 @@
       <span id="lbl-home">Accueil</span>
     </button>
     <button class="nav-tab" id="tab-ent" onclick="go('enterprise',state.lang)">Enterprise</button>
+    <button class="nav-tab" id="tab-def" onclick="go('defense',state.lang)"><span id="lbl-def">Défense</span></button>
     <a class="nav-tab" href="./architecture.html" style="text-decoration:none">Tech docs</a>
   </div>
   <div class="nav-right">
@@ -702,6 +703,12 @@
       <a onclick="navlink('e2')">Architecture</a>
       <a onclick="navlink('e3')"><span id="lbl-e3">Sécurité</span></a>
       <a onclick="navlink('e4')">Business case</a>
+      <a href="./architecture.html" style="color:var(--accent);font-weight:600">Tech docs →</a>
+    </div>
+    <div class="nav-ent-links" id="nav-def">
+      <a onclick="navlink('d1')"><span id="lbl-d1">Le terrain</span></a>
+      <a onclick="navlink('d2')"><span id="lbl-d2">Architecture</span></a>
+      <a onclick="navlink('d3')"><span id="lbl-d3">Cas d'emploi</span></a>
       <a href="./architecture.html" style="color:var(--accent);font-weight:600">Tech docs →</a>
     </div>
     <div class="lang-sw">
@@ -2436,6 +2443,470 @@ curl http://localhost:9337/v1/chat/completions \
 
 
 
+<!-- ══════ PANEL: DÉFENSE FR ══════ -->
+<div class="panel" id="p-defense-fr">
+
+<!-- HERO DÉFENSE -->
+<div class="section" id="df-terrain">
+  <div style="display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent2);background:rgba(93,216,168,0.1);border:1px solid var(--border);padding:7px 14px;border-radius:999px;margin-bottom:24px">● Résilience opérationnelle · DDIL-ready · Souveraineté nationale</div>
+  <div class="eyebrow">AInonymous · Défense</div>
+  <h2>L'IA qui tient<br>en environnement contesté.</h2>
+  <p class="section-sub">Conçu pour les opérations où la liaison n'est jamais garantie. AInonymous fonctionne en <strong>mesh de nœuds tactiques</strong>, continue à produire en <strong>mode déconnecté</strong>, et <strong>resynchronise le savoir dès le retour de liaison</strong> — sans jamais perdre une remontée. Chaque échelon adapte sa configuration à ses moyens locaux ; le renseignement circule en temps réel quand le réseau le permet, et en différé quand il ne le permet pas.</p>
+</div>
+
+<!-- LE DÉFI DDIL -->
+<div class="vs-wrap">
+  <div class="vs-inner">
+    <div class="eyebrow">Le terrain</div>
+    <h2>Déni, dégradation, intermittence, limitation.</h2>
+    <p class="section-sub">En opération, la connectivité est l'exception — pas la règle. Brouillage, A2/AD, EMCON, zones blanches, saturation SATCOM : l'IA centralisée s'effondre dès la première coupure. AInonymous est pensé <em>offline-first</em> pour le cadre <strong>DDIL</strong> (Denied, Degraded, Intermittent, Limited).</p>
+    <div class="feat-grid" style="margin-top:44px">
+      <div class="feat-card">
+        <div class="feat-icon fi-c">🛰️</div>
+        <h3>Liaisons contestées</h3>
+        <p>Brouillage GNSS/SATCOM, guerre électronique, déni d'accès A2/AD. Le mesh route en multi-bond et se reconfigure automatiquement autour des nœuds tombés.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-a">📵</div>
+        <h3>Zones blanches</h3>
+        <p>Patrouilles débarquées, relief, souterrain : hors de toute couverture, chaque nœud continue d'inférer en local et journalise pour plus tard.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-p">🔇</div>
+        <h3>EMCON / silence radio</h3>
+        <p>Émission interdite (discrétion, bâtiment en EMCON). Le calcul reste embarqué ; rien ne sort tant que la posture d'émission ne le permet pas.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-t">☁️</div>
+        <h3>Pas de cloud, pas de backhaul</h3>
+        <p>Aucune dépendance à un datacenter distant ni à un éditeur étranger. Modèles à poids ouverts, préchargés, exécutés sur le matériel de l'unité.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHITECTURE RÉSILIENTE -->
+<div class="section" id="df-archi">
+  <div class="eyebrow">Architecture résiliente</div>
+  <h2>Mesh tactique, calcul à la frontière.</h2>
+  <p class="section-sub">Du combattant débarqué au poste de commandement, chaque échelon est un nœud. Le réseau s'auto-cicatrise, dégrade gracieusement, et reprend la liaison sans intervention.</p>
+
+  <div style="text-align:center;margin:44px 0">
+    <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Boucle tactique — du nœud porté au PC, et retour</p>
+    <div class="loop-diagram">
+      <div class="loop-node">
+        <div class="loop-node-icon">🎒</div>
+        <div class="loop-node-lbl">Nœud porté</div>
+        <div class="loop-node-sub">man-pack · edge</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-node" style="border-color:rgba(124,109,235,0.6);background:rgba(124,109,235,0.08)">
+        <div class="loop-node-icon">📡</div>
+        <div class="loop-node-lbl">Mesh tactique</div>
+        <div class="loop-node-sub">radio IP · 4G priv. · SATCOM</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-node">
+        <div class="loop-node-icon">🛡️</div>
+        <div class="loop-node-lbl">PC tactique</div>
+        <div class="loop-node-sub">fusion · 26B–31B</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-node">
+        <div class="loop-node-icon">🔄</div>
+        <div class="loop-node-lbl">Reprise de liaison</div>
+        <div class="loop-node-sub">synchro · zéro perte</div>
+      </div>
+      <div class="loop-arrow" style="color:rgba(93,216,168,0.6)">↺</div>
+    </div>
+    <div class="loop-shield">🔒 Les données restent dans la bulle de l'unité — aucune sortie non maîtrisée</div>
+  </div>
+
+  <div class="tech-grid" style="margin-top:32px">
+    <div class="tech-card">
+      <span class="tech-layer layer-infra">Réseau</span>
+      <h3>Mesh auto-cicatrisant</h3>
+      <p>P2P Holochain, sans serveur central ni point de défaillance unique. Routage multi-bond, découverte de pairs, dégradation gracieuse quand des nœuds tombent ou sont brouillés.</p>
+      <div class="tech-tag">WebRTC · radio IP · SATCOM · multi-bond</div>
+    </div>
+    <div class="tech-card">
+      <span class="tech-layer layer-model">Calcul</span>
+      <h3>Edge computing tactique</h3>
+      <p>Le modèle est dimensionné au nœud : E2B sur une radio portée, jusqu'au 31B/MoE au PC. Le pipeline-splitting agrège plusieurs machines d'un même échelon.</p>
+      <div class="tech-tag">GGUF · E2B → 31B · Qwen3.6 · pipeline-splitting</div>
+    </div>
+    <div class="tech-card">
+      <span class="tech-layer layer-sec">Mode déconnecté</span>
+      <h3>Store-and-forward offline-first</h3>
+      <p>Coupé du réseau, le nœud continue d'inférer et journalise chaque tâche dans sa source chain locale signée. Rien n'est perdu, tout est horodaté et attribué.</p>
+      <div class="tech-tag">source chain · offline-first · ed25519</div>
+    </div>
+    <div class="tech-card">
+      <span class="tech-layer layer-api">Reprise de liaison</span>
+      <h3>Réconciliation sans perte</h3>
+      <p>Au retour de liaison, les nœuds rejouent et fusionnent leurs journaux via réplication CRDT. Convergence automatique multi-nœuds, sans conflit ni écrasement.</p>
+      <div class="tech-tag">CRDT · cohérence à terme · DHT · gossip</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTINUITÉ DU SAVOIR -->
+<div class="biz-banner">
+  <div class="biz-inner">
+    <div class="eyebrow">Aucune remontée perdue</div>
+    <h2 style="margin-bottom:14px">Le savoir circule,<br>même en pointillé.</h2>
+    <p style="font-size:17px;color:var(--muted);max-width:640px;margin-bottom:40px;line-height:1.6">
+      Une observation faite hors liaison n'est pas une observation perdue. Elle est inférée, signée et stockée localement, puis propagée à tout l'échelon dès que la bulle se rouvre — enrichissant la situation tactique commune (COP) en quasi temps réel.
+    </p>
+    <div class="biz-kpi-grid">
+      <div class="biz-kpi"><div class="biz-kpi-num">0</div><div class="biz-kpi-lbl">remontée perdue après reprise de liaison</div></div>
+      <div class="biz-kpi"><div class="biz-kpi-num">100%</div><div class="biz-kpi-lbl">horodatage et attribution (source chain signée)</div></div>
+      <div class="biz-kpi"><div class="biz-kpi-num">ms → h</div><div class="biz-kpi-lbl">tolérance de coupure, de la milliseconde à plusieurs heures</div></div>
+      <div class="biz-kpi"><div class="biz-kpi-num">↺</div><div class="biz-kpi-lbl">réconciliation automatique, multi-nœuds, sans conflit</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CAS CONCRETS -->
+<div class="section" id="df-cases">
+  <div class="eyebrow">Cas d'emploi</div>
+  <h2>Du combattant débarqué<br>au théâtre interarmées.</h2>
+  <p class="section-sub">Mêmes briques, configurations différentes. Chaque emploi adapte le modèle, le transport et la posture d'émission à ses conditions locales.</p>
+  <div class="deploy-grid">
+    <div class="deploy-card">
+      <div class="deploy-icon">🎒</div>
+      <h3>Section débarquée / SGTIA</h3>
+      <p>Nœud man-pack en zone blanche : synthèse d'ordres, traduction, triage ISR et aide à la décision en local. Synchronisation au retour dans la bulle du PC.</p>
+      <div class="deploy-tags"><span class="dtag dtag-t">E2B / E4B</span><span class="dtag dtag-p">man-pack</span><span class="dtag dtag-a">offline</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🛡️</div>
+      <h3>Poste de commandement (PC TAC)</h3>
+      <p>Fusion renseignement multi-capteurs, modèles 26B/31B agrégés par pipeline-splitting, redistribution des synthèses vers les nœuds subordonnés.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">26B–31B</span><span class="dtag dtag-t">C2 / C4ISR</span><span class="dtag dtag-a">mesh</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">⚓</div>
+      <h3>Théâtre maritime / EMCON</h3>
+      <p>Bâtiment en silence radio : inférence entièrement embarquée, exploitation du renseignement à bord, partage différé à la levée d'EMCON.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">air-gap</span><span class="dtag dtag-t">EMCON</span><span class="dtag dtag-a">onboard</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🚁</div>
+      <h3>ISR & drones</h3>
+      <p>Détection et triage embarqués sans backhaul : seules les alertes priorisées sont remontées, économisant une bande passante rare et contestée.</p>
+      <div class="deploy-tags"><span class="dtag dtag-t">edge</span><span class="dtag dtag-p">ISR</span><span class="dtag dtag-a">faible latence</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🌐</div>
+      <h3>Coalition / OTAN</h3>
+      <p>Interopérabilité multinationale et partage cross-domain contrôlé entre nations. Fédération de sous-réseaux par échelon, cloisonnement par appartenance.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">STANAG</span><span class="dtag dtag-t">cross-domain</span><span class="dtag dtag-a">fédération</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🔒</div>
+      <h3>Base avancée air-gap</h3>
+      <p>Réseau totalement isolé, sans accès Internet. Modèles préchargés, dépendance externe nulle, journal d'audit immuable pour l'homologation.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">air-gap</span><span class="dtag dtag-t">IGI 1300</span><span class="dtag dtag-a">ITAR-free</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADAPTATION CONDITIONS LOCALES -->
+<div class="section" style="padding-top:0">
+  <div class="eyebrow">Plasticité opérationnelle</div>
+  <h2>Chaque nœud s'adapte<br>à sa réalité matérielle.</h2>
+  <p class="section-sub">Énergie, thermique, calcul, bande passante : les conditions changent d'un échelon à l'autre et d'une minute à l'autre. La configuration suit.</p>
+  <div class="feat-grid" style="margin-top:32px">
+    <div class="feat-card">
+      <div class="feat-icon fi-p">⚙️</div>
+      <h3>Tiering automatique</h3>
+      <p>Sur batterie ou en surchauffe, le nœud bascule vers un modèle plus léger (E2B) ; raccordé au PC sur secteur, il monte en gamme (31B/MoE).</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-t">🔀</div>
+      <h3>Bascule de configuration</h3>
+      <p>L'opérateur alterne les profils — autonomie, discrétion, performance — selon la mission. Le mesh rééquilibre la charge entre les nœuds disponibles.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-a">🧠</div>
+      <h3>Fusion temps réel</h3>
+      <p>Quand la liaison tient, les remontées de tous les nœuds alimentent une réponse adaptée aux conditions locales — au plus près de l'action.</p>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARAISON -->
+<div class="vs-wrap">
+  <div class="vs-inner">
+    <div class="eyebrow">Pourquoi pas un SaaS</div>
+    <h2>AInonymous Défense vs. les alternatives</h2>
+    <table>
+      <thead>
+        <tr><th>Critère</th><th>IA SaaS cloud</th><th>IA isolée classique</th><th class="hl">AInonymous Défense ✦</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fonctionne déconnecté</td><td><span class="no">✗ Non</span></td><td><span class="ok">✓ Oui</span></td><td class="col ok">✓ Offline-first</td></tr>
+        <tr><td>Reprise de liaison sans perte</td><td><span class="no">✗ N/A</span></td><td>Manuelle</td><td class="col ok">✓ Auto (CRDT)</td></tr>
+        <tr><td>Partage temps réel inter-nœuds</td><td>Via cloud</td><td><span class="no">✗ Silo</span></td><td class="col ok">✓ Mesh P2P</td></tr>
+        <tr><td>Souveraineté des données</td><td><span class="no">✗ Tiers étranger</span></td><td><span class="ok">✓ Locale</span></td><td class="col ok">✓ Bulle de l'unité</td></tr>
+        <tr><td>Auditabilité / homologation</td><td>Opaque</td><td>Partielle</td><td class="col ok">✓ Source chain signée</td></tr>
+        <tr><td>Montée en charge au feu</td><td>Quota / facture</td><td>Figée</td><td class="col ok">✓ Linéaire (par nœud)</td></tr>
+        <tr><td>Dépendance export (ITAR)</td><td>Élevée</td><td>Variable</td><td class="col ok">✓ Poids ouverts</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CTA DÉFENSE -->
+<div class="cta-section">
+  <div class="cta-inner">
+    <div class="eyebrow" style="text-align:center">Passer à l'action</div>
+    <h2>Une IA souveraine,<br>résiliente au feu.</h2>
+    <p>AInonymous est open source, Apache 2.0. Déployable en bulle tactique, au PC ou en base avancée air-gap — auditable de bout en bout, sans dépendance étrangère.</p>
+    <div class="cta-actions">
+      <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Accéder au code source →</a>
+      <a href="./architecture.html" class="btn-g">Documentation technique</a>
+      <a href="javascript:void(0)" onclick="go('enterprise','fr')" class="btn-g">Voir la page Entreprise →</a>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ══════ PANEL: DEFENSE EN ══════ -->
+<div class="panel" id="p-defense-en">
+
+<!-- HERO DEFENSE -->
+<div class="section" id="de-terrain">
+  <div style="display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent2);background:rgba(93,216,168,0.1);border:1px solid var(--border);padding:7px 14px;border-radius:999px;margin-bottom:24px">● Operational resilience · DDIL-ready · National sovereignty</div>
+  <div class="eyebrow">AInonymous · Defense</div>
+  <h2>AI that holds up<br>in contested environments.</h2>
+  <p class="section-sub">Built for operations where connectivity is never guaranteed. AInonymous runs as a <strong>mesh of tactical nodes</strong>, keeps producing while <strong>disconnected</strong>, and <strong>resynchronizes knowledge the moment the link returns</strong> — without ever losing a report. Every echelon adapts its configuration to local resources; intelligence flows in real time when the network allows, and store-and-forward when it doesn't.</p>
+</div>
+
+<!-- THE DDIL CHALLENGE -->
+<div class="vs-wrap">
+  <div class="vs-inner">
+    <div class="eyebrow">The field</div>
+    <h2>Denied, degraded, intermittent, limited.</h2>
+    <p class="section-sub">In the field, connectivity is the exception — not the rule. Jamming, A2/AD, EMCON, comms-dead zones, SATCOM saturation: centralized AI collapses at the first outage. AInonymous is <em>offline-first</em> by design, for the <strong>DDIL</strong> environment (Denied, Degraded, Intermittent, Limited).</p>
+    <div class="feat-grid" style="margin-top:44px">
+      <div class="feat-card">
+        <div class="feat-icon fi-c">🛰️</div>
+        <h3>Contested links</h3>
+        <p>GNSS/SATCOM jamming, electronic warfare, A2/AD access denial. The mesh routes multi-hop and reconfigures automatically around downed nodes.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-a">📵</div>
+        <h3>Comms-dead zones</h3>
+        <p>Dismounted patrols, terrain, subterranean: out of all coverage, every node keeps inferring locally and logs for later.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-p">🔇</div>
+        <h3>EMCON / radio silence</h3>
+        <p>Emission prohibited (low-signature posture, ship under EMCON). Compute stays onboard; nothing leaves until the emission posture allows it.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-t">☁️</div>
+        <h3>No cloud, no backhaul</h3>
+        <p>No dependence on a remote datacenter or foreign vendor. Open-weight models, pre-loaded, running on the unit's own hardware.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESILIENT ARCHITECTURE -->
+<div class="section" id="de-archi">
+  <div class="eyebrow">Resilient architecture</div>
+  <h2>Tactical mesh, compute at the edge.</h2>
+  <p class="section-sub">From the dismounted soldier to the command post, every echelon is a node. The network self-heals, degrades gracefully, and re-establishes the link with no intervention.</p>
+
+  <div style="text-align:center;margin:44px 0">
+    <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Tactical loop — from man-pack node to CP, and back</p>
+    <div class="loop-diagram">
+      <div class="loop-node">
+        <div class="loop-node-icon">🎒</div>
+        <div class="loop-node-lbl">Man-pack node</div>
+        <div class="loop-node-sub">man-pack · edge</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-node" style="border-color:rgba(124,109,235,0.6);background:rgba(124,109,235,0.08)">
+        <div class="loop-node-icon">📡</div>
+        <div class="loop-node-lbl">Tactical mesh</div>
+        <div class="loop-node-sub">IP radio · private 4G · SATCOM</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-node">
+        <div class="loop-node-icon">🛡️</div>
+        <div class="loop-node-lbl">Command post</div>
+        <div class="loop-node-sub">fusion · 26B–31B</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-node">
+        <div class="loop-node-icon">🔄</div>
+        <div class="loop-node-lbl">Link recovery</div>
+        <div class="loop-node-sub">sync · zero loss</div>
+      </div>
+      <div class="loop-arrow" style="color:rgba(93,216,168,0.6)">↺</div>
+    </div>
+    <div class="loop-shield">🔒 Data stays inside the unit's bubble — no uncontrolled egress</div>
+  </div>
+
+  <div class="tech-grid" style="margin-top:32px">
+    <div class="tech-card">
+      <span class="tech-layer layer-infra">Network</span>
+      <h3>Self-healing mesh</h3>
+      <p>Holochain P2P, no central server and no single point of failure. Multi-hop routing, peer discovery, graceful degradation when nodes drop or are jammed.</p>
+      <div class="tech-tag">WebRTC · IP radio · SATCOM · multi-hop</div>
+    </div>
+    <div class="tech-card">
+      <span class="tech-layer layer-model">Compute</span>
+      <h3>Tactical edge computing</h3>
+      <p>The model is sized to the node: E2B on a handheld radio, up to 31B/MoE at the CP. Pipeline-splitting aggregates several machines within the same echelon.</p>
+      <div class="tech-tag">GGUF · E2B → 31B · Qwen3.6 · pipeline-splitting</div>
+    </div>
+    <div class="tech-card">
+      <span class="tech-layer layer-sec">Disconnected mode</span>
+      <h3>Offline-first store-and-forward</h3>
+      <p>Cut off from the network, the node keeps inferring and logs every task to its signed local source chain. Nothing is lost; everything is timestamped and attributed.</p>
+      <div class="tech-tag">source chain · offline-first · ed25519</div>
+    </div>
+    <div class="tech-card">
+      <span class="tech-layer layer-api">Link recovery</span>
+      <h3>Lossless reconciliation</h3>
+      <p>On reconnection, nodes replay and merge their logs via CRDT replication. Automatic multi-node convergence, with no conflict or overwrite.</p>
+      <div class="tech-tag">CRDT · eventual consistency · DHT · gossip</div>
+    </div>
+  </div>
+</div>
+
+<!-- KNOWLEDGE CONTINUITY -->
+<div class="biz-banner">
+  <div class="biz-inner">
+    <div class="eyebrow">No report left behind</div>
+    <h2 style="margin-bottom:14px">Knowledge keeps flowing,<br>even intermittently.</h2>
+    <p style="font-size:17px;color:var(--muted);max-width:640px;margin-bottom:40px;line-height:1.6">
+      An observation made off-link is not a lost observation. It is inferred, signed and stored locally, then propagated to the whole echelon the moment the bubble reopens — enriching the Common Operational Picture (COP) in near real time.
+    </p>
+    <div class="biz-kpi-grid">
+      <div class="biz-kpi"><div class="biz-kpi-num">0</div><div class="biz-kpi-lbl">reports lost after link recovery</div></div>
+      <div class="biz-kpi"><div class="biz-kpi-num">100%</div><div class="biz-kpi-lbl">timestamped and attributed (signed source chain)</div></div>
+      <div class="biz-kpi"><div class="biz-kpi-num">ms → h</div><div class="biz-kpi-lbl">outage tolerance, from milliseconds to several hours</div></div>
+      <div class="biz-kpi"><div class="biz-kpi-num">↺</div><div class="biz-kpi-lbl">automatic multi-node reconciliation, conflict-free</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- USE CASES -->
+<div class="section" id="de-cases">
+  <div class="eyebrow">Use cases</div>
+  <h2>From the dismounted soldier<br>to the joint theater.</h2>
+  <p class="section-sub">Same building blocks, different configurations. Each use case adapts the model, the transport and the emission posture to its local conditions.</p>
+  <div class="deploy-grid">
+    <div class="deploy-card">
+      <div class="deploy-icon">🎒</div>
+      <h3>Dismounted squad / platoon</h3>
+      <p>Man-pack node in a comms-dead zone: order summaries, translation, ISR triage and decision support, all local. Synchronizes on return into the CP bubble.</p>
+      <div class="deploy-tags"><span class="dtag dtag-t">E2B / E4B</span><span class="dtag dtag-p">man-pack</span><span class="dtag dtag-a">offline</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🛡️</div>
+      <h3>Command post (TAC CP)</h3>
+      <p>Multi-sensor intelligence fusion, 26B/31B models aggregated via pipeline-splitting, redistribution of synthesized products to subordinate nodes.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">26B–31B</span><span class="dtag dtag-t">C2 / C4ISR</span><span class="dtag dtag-a">mesh</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">⚓</div>
+      <h3>Maritime theater / EMCON</h3>
+      <p>Vessel under radio silence: fully onboard inference, intelligence exploitation at sea, deferred sharing when EMCON is lifted.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">air-gap</span><span class="dtag dtag-t">EMCON</span><span class="dtag dtag-a">onboard</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🚁</div>
+      <h3>ISR & drones</h3>
+      <p>Onboard detection and triage with no backhaul: only prioritized alerts are pushed up, saving scarce and contested bandwidth.</p>
+      <div class="deploy-tags"><span class="dtag dtag-t">edge</span><span class="dtag dtag-p">ISR</span><span class="dtag dtag-a">low-latency</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🌐</div>
+      <h3>Coalition / NATO</h3>
+      <p>Multinational interoperability and controlled cross-domain sharing between nations. Federation of per-echelon sub-networks, compartmented by membership.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">STANAG</span><span class="dtag dtag-t">cross-domain</span><span class="dtag dtag-a">federation</span></div>
+    </div>
+    <div class="deploy-card">
+      <div class="deploy-icon">🔒</div>
+      <h3>Air-gapped forward base</h3>
+      <p>Fully isolated network, no internet access. Pre-loaded models, zero external dependency, immutable audit log for accreditation.</p>
+      <div class="deploy-tags"><span class="dtag dtag-p">air-gap</span><span class="dtag dtag-t">accredited</span><span class="dtag dtag-a">ITAR-free</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADAPTING TO LOCAL CONDITIONS -->
+<div class="section" style="padding-top:0">
+  <div class="eyebrow">Operational plasticity</div>
+  <h2>Every node adapts<br>to its physical reality.</h2>
+  <p class="section-sub">Power, thermals, compute, bandwidth: conditions change from one echelon to the next and minute to minute. The configuration follows.</p>
+  <div class="feat-grid" style="margin-top:32px">
+    <div class="feat-card">
+      <div class="feat-icon fi-p">⚙️</div>
+      <h3>Automatic tiering</h3>
+      <p>On battery or overheating, the node falls back to a lighter model (E2B); plugged in at the CP on mains power, it scales up (31B/MoE).</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-t">🔀</div>
+      <h3>Configuration switching</h3>
+      <p>The operator alternates profiles — endurance, low-signature, performance — per mission. The mesh rebalances load across available nodes.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon fi-a">🧠</div>
+      <h3>Real-time fusion</h3>
+      <p>When the link holds, reports from all nodes feed a response tailored to local conditions — as close to the action as possible.</p>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARISON -->
+<div class="vs-wrap">
+  <div class="vs-inner">
+    <div class="eyebrow">Why not a SaaS</div>
+    <h2>AInonymous Defense vs. the alternatives</h2>
+    <table>
+      <thead>
+        <tr><th>Criteria</th><th>Cloud SaaS AI</th><th>Classic isolated AI</th><th class="hl">AInonymous Defense ✦</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Works disconnected</td><td><span class="no">✗ No</span></td><td><span class="ok">✓ Yes</span></td><td class="col ok">✓ Offline-first</td></tr>
+        <tr><td>Lossless link recovery</td><td><span class="no">✗ N/A</span></td><td>Manual</td><td class="col ok">✓ Auto (CRDT)</td></tr>
+        <tr><td>Real-time node-to-node sharing</td><td>Via cloud</td><td><span class="no">✗ Siloed</span></td><td class="col ok">✓ P2P mesh</td></tr>
+        <tr><td>Data sovereignty</td><td><span class="no">✗ Foreign third party</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Unit bubble</td></tr>
+        <tr><td>Auditability / accreditation</td><td>Opaque</td><td>Partial</td><td class="col ok">✓ Signed source chain</td></tr>
+        <tr><td>Scaling under fire</td><td>Quota / bill</td><td>Fixed</td><td class="col ok">✓ Linear (per node)</td></tr>
+        <tr><td>Export dependency (ITAR)</td><td>High</td><td>Varies</td><td class="col ok">✓ Open weights</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CTA DEFENSE -->
+<div class="cta-section">
+  <div class="cta-inner">
+    <div class="eyebrow" style="text-align:center">Take action</div>
+    <h2>Sovereign AI,<br>resilient under fire.</h2>
+    <p>AInonymous is open source, Apache 2.0. Deployable in a tactical bubble, at the CP or in an air-gapped forward base — auditable end to end, with no foreign dependency.</p>
+    <div class="cta-actions">
+      <a href="https://github.com/Geoking2104/AInonymous" class="btn-p">Access source code →</a>
+      <a href="./architecture.html" class="btn-g">Technical documentation</a>
+      <a href="javascript:void(0)" onclick="go('enterprise','en')" class="btn-g">View Enterprise page →</a>
+    </div>
+  </div>
+</div>
+
+</div>
+
+
+
 <script>
 // ── ÉTAT
 var state = { page: 'landing', lang: 'fr' };
@@ -2449,6 +2920,10 @@ var i18n = {
   'lbl-l3':   { fr: 'Installer',         en: 'Install' },
   'lbl-e1':   { fr: 'Boucle fermée', en: 'Closed loop' },
   'lbl-e3':   { fr: 'Sécurité', en: 'Security' },
+  'lbl-def':  { fr: 'Défense',           en: 'Defense' },
+  'lbl-d1':   { fr: 'Le terrain',        en: 'The field' },
+  'lbl-d2':   { fr: 'Architecture',      en: 'Architecture' },
+  'lbl-d3':   { fr: "Cas d'emploi",      en: 'Use cases' },
 };
 
 // ── LIENS NAV (fr-id → section dans panneau FR, en-id → panneau EN)
@@ -2460,6 +2935,9 @@ var navLinks = {
   e2: { fr: 'ef-architecture',en: 'ee-architecture' },
   e3: { fr: 'ef-securite',    en: 'ee-security' },
   e4: { fr: 'ef-business',    en: 'ee-business' },
+  d1: { fr: 'df-terrain',     en: 'de-terrain' },
+  d2: { fr: 'df-archi',       en: 'de-archi' },
+  d3: { fr: 'df-cases',       en: 'de-cases' },
 };
 
 // ── RENDER
@@ -2471,11 +2949,13 @@ function render() {
   // Onglets
   document.getElementById('tab-land').className = 'nav-tab' + (state.page === 'landing'    ? ' active' : '');
   document.getElementById('tab-ent').className  = 'nav-tab' + (state.page === 'enterprise' ? ' active' : '');
+  document.getElementById('tab-def').className  = 'nav-tab' + (state.page === 'defense'    ? ' active' : '');
   // Badge
   document.getElementById('ent-badge').style.display = (state.page === 'enterprise') ? '' : 'none';
   // Liens nav
   document.getElementById('nav-land').style.display = (state.page === 'landing')    ? 'flex' : 'none';
   document.getElementById('nav-ent').style.display  = (state.page === 'enterprise') ? 'flex' : 'none';
+  document.getElementById('nav-def').style.display  = (state.page === 'defense')    ? 'flex' : 'none';
   // Boutons langue
   document.getElementById('btn-fr').className = (state.lang === 'fr') ? 'active' : '';
   document.getElementById('btn-en').className = (state.lang === 'en') ? 'active' : '';
