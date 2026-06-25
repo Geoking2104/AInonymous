@@ -842,7 +842,7 @@
     <div class="feat-card">
       <div class="feat-icon fi-a">🤖</div>
       <h3>Les meilleurs modèles ouverts</h3>
-      <p>Gemma 4 (Google), Qwen3, Llama 3.3 — les modèles utilisés rivalisent avec GPT-4 sur de nombreuses tâches, et ils sont 100% open source.</p>
+      <p>Gemma 4 (Google), Qwen3.6 (MoE 35B-A3B, multimodal), Llama 3.3 — les modèles utilisés rivalisent avec GPT-4 sur de nombreuses tâches, et ils sont 100% open source.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-p">🔌</div>
@@ -865,20 +865,20 @@
     <table>
       <thead>
         <tr>
-          <th>Criteria</th>
+          <th>Critère</th>
           <th>ChatGPT / Claude</th>
           <th>Ollama (local)</th>
           <th class="hl">AInonymous ✦</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td>Prix</td><td>~$20/month</td><td>Gratuit</td><td class="col ok">Free</td></tr>
-        <tr><td>Confidentialité</td><td><span class="no">✗ Données envoyées to servers</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ P2P encrypted</td></tr>
-        <tr><td>GPU requis</td><td>Non (cloud)</td><td>Oui (≥8 GB VRAM)</td><td class="col ok">No (pooled)</td></tr>
-        <tr><td>Résistance censure</td><td><span class="no">✗ Centralisé</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Décentralisé</td></tr>
-        <tr><td>Qualité modèle</td><td>Très haute</td><td>Haute (selon GPU)</td><td class="col ok">High (Gemma 4)</td></tr>
-        <tr><td>Account required</td><td><span class="no">✗ Mandatory</span></td><td><span class="ok">✓ None</span></td><td class="col ok">✓ None</td></tr>
-        <tr><td>OpenAI API compatible</td><td>Yes (paid)</td><td>Yes</td><td class="col ok">Yes (localhost)</td></tr>
+        <tr><td>Prix</td><td>~20€/mois</td><td>Gratuit</td><td class="col ok">Gratuit</td></tr>
+        <tr><td>Confidentialité</td><td><span class="no">✗ Données envoyées aux serveurs</span></td><td><span class="ok">✓ 100% local</span></td><td class="col ok">✓ Chiffré P2P</td></tr>
+        <tr><td>GPU requis</td><td>Non (cloud)</td><td>Oui (≥8 Go VRAM)</td><td class="col ok">Non (mutualisé)</td></tr>
+        <tr><td>Résistance à la censure</td><td><span class="no">✗ Centralisé</span></td><td><span class="ok">✓ Local</span></td><td class="col ok">✓ Décentralisé</td></tr>
+        <tr><td>Qualité modèle</td><td>Très haute</td><td>Haute (selon GPU)</td><td class="col ok">Haute (Gemma 4)</td></tr>
+        <tr><td>Compte requis</td><td><span class="no">✗ Obligatoire</span></td><td><span class="ok">✓ Aucun</span></td><td class="col ok">✓ Aucun</td></tr>
+        <tr><td>API OpenAI compatible</td><td>Oui (payant)</td><td>Oui</td><td class="col ok">Oui (localhost)</td></tr>
       </tbody>
     </table>
   </div>
@@ -921,6 +921,12 @@
       <div class="model-use">Code · Raisonnement</div>
     </div>
     <div class="model-card">
+      <div class="model-name">Qwen3.6 · 35B-A3B</div>
+      <div class="model-meta">~21 GB · MoE · 3B actifs</div>
+      <div class="bar-bg"><div class="bar bar-p" style="width:90%"></div></div>
+      <div class="model-use">Code agentique · Multimodal</div>
+    </div>
+    <div class="model-card">
       <div class="model-name">Llama 3.3 · 70B</div>
       <div class="model-meta">~43 GB · Multi-node</div>
       <div class="bar-bg"><div class="bar bar-c" style="width:94%"></div></div>
@@ -932,16 +938,16 @@
 <!-- BUSINESS CASE -->
 <div class="biz-banner" id="lf-enterprise">
   <div class="biz-inner">
-    <div class="eyebrow">For enterprises</div>
-    <h2 style="margin-bottom: 14px">Your servers are already running.<br>Make them work for you.</h2>
+    <div class="eyebrow">Pour les entreprises</div>
+    <h2 style="margin-bottom: 14px">Vos serveurs tournent déjà.<br>Faites-les travailler pour vous.</h2>
     <p style="font-size:17px;color:var(--muted);max-width:600px;margin-bottom:48px;line-height:1.6">
-      AInonymous Enterprise creates a closed, sovereign AI network inside your infrastructure.
-      Your machines share compute power to run state-of-the-art models — without a single byte leaving your network.
+      AInonymous Enterprise crée un réseau d'IA fermé et souverain au sein de votre infrastructure.
+      Vos machines mutualisent leur puissance de calcul pour faire tourner des modèles de pointe — sans qu'un seul octet ne quitte votre réseau.
     </p>
 
     <!-- Closed loop diagram -->
     <div style="text-align:center;margin-bottom:48px">
-      <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Closed P2P loop — 100% on-premises</p>
+      <p style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;margin-bottom:20px">Boucle P2P fermée — 100% sur site</p>
       <div class="loop-diagram">
         <div class="loop-node">
           <div class="loop-node-icon">🖥️</div>
@@ -958,46 +964,46 @@
         <div class="loop-node">
           <div class="loop-node-icon">🤖</div>
           <div class="loop-node-lbl">Modèles IA</div>
-          <div class="loop-node-sub">Gemma 4 · Qwen3</div>
+          <div class="loop-node-sub">Gemma 4 · Qwen3.6</div>
         </div>
         <div class="loop-arrow">→</div>
         <div class="loop-node">
           <div class="loop-node-icon">👥</div>
           <div class="loop-node-lbl">Vos équipes</div>
-          <div class="loop-node-sub">OpenAI-compat. API</div>
+          <div class="loop-node-sub">API compat. OpenAI</div>
         </div>
         <div class="loop-arrow" style="color:rgba(93,216,168,0.6)">↺</div>
       </div>
-      <div class="loop-shield">🔒 Data confined to corporate network — zero external traffic</div>
+      <div class="loop-shield">🔒 Données confinées au réseau de l'entreprise — zéro trafic externe</div>
     </div>
 
     <!-- KPIs + description -->
     <div class="biz-top">
       <div>
-        <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">The compute you're already paying for sleeps at night.</h3>
+        <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">La puissance de calcul que vous payez déjà dort la nuit.</h3>
         <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">
-          A 200-person company has on average several teraflops sitting idle between 7pm and 8am. AInonymous turns them into AI inference infrastructure — without buying a single additional GPU.
+          Une entreprise de 200 personnes dispose en moyenne de plusieurs téraflops inutilisés entre 19h et 8h. AInonymous les transforme en infrastructure d'inférence IA — sans acheter le moindre GPU supplémentaire.
         </p>
         <p style="font-size:14px;color:var(--muted);line-height:1.7">
-          The bigger your organization, the more powerful your AI. Every new machine is an additional compute unit. The network grows stronger with your headcount — not with a cloud vendor's credit card.
+          Plus votre organisation est grande, plus votre IA est puissante. Chaque nouvelle machine est une unité de calcul de plus. Le réseau se renforce avec vos effectifs — pas avec la carte bancaire d'un fournisseur cloud.
         </p>
       </div>
       <div class="biz-kpi-grid">
         <div class="biz-kpi">
           <div class="biz-kpi-num">~70%</div>
-          <div class="biz-kpi-lbl">of enterprise CPU/GPU idle outside business hours</div>
+          <div class="biz-kpi-lbl">de CPU/GPU d'entreprise inactifs hors heures ouvrées</div>
         </div>
         <div class="biz-kpi">
-          <div class="biz-kpi-num">$0</div>
-          <div class="biz-kpi-lbl">additional cloud AI cost using existing hardware</div>
+          <div class="biz-kpi-num">0€</div>
+          <div class="biz-kpi-lbl">de coût IA cloud supplémentaire avec le matériel existant</div>
         </div>
         <div class="biz-kpi">
           <div class="biz-kpi-num">100%</div>
-          <div class="biz-kpi-lbl">of data stays within your GDPR perimeter</div>
+          <div class="biz-kpi-lbl">des données restent dans votre périmètre RGPD</div>
         </div>
         <div class="biz-kpi">
           <div class="biz-kpi-num">×N</div>
-          <div class="biz-kpi-lbl">power scales with every new employee</div>
+          <div class="biz-kpi-lbl">la puissance grandit avec chaque nouvel employé</div>
         </div>
       </div>
     </div>
@@ -1006,43 +1012,43 @@
     <div class="biz-adv-grid">
       <div class="biz-adv">
         <div class="biz-adv-icon">🏛️</div>
-        <h3>Complete data sovereignty</h3>
-        <p>GDPR, HIPAA, SOC 2 compliance guaranteed by architecture. No data leaves your infrastructure — no Data Processing Agreement needed with any third party.</p>
+        <h3>Souveraineté totale des données</h3>
+        <p>Conformité RGPD, HIPAA, SOC 2 garantie par l'architecture. Aucune donnée ne quitte votre infrastructure — aucun accord de traitement des données nécessaire avec un tiers.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">📈</div>
-        <h3>AI that grows with your fleet</h3>
-        <p>Every machine added increases inference capacity. No pricing tiers, no quota negotiation — power scales linearly with your headcount.</p>
+        <h3>Une IA qui grandit avec votre parc</h3>
+        <p>Chaque machine ajoutée augmente la capacité d'inférence. Pas de paliers tarifaires, pas de négociation de quotas — la puissance évolue linéairement avec vos effectifs.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">🔐</div>
-        <h3>Enterprise cryptographic identities</h3>
-        <p>Every node is authenticated via ed25519. Holochain Membrane Proofs enable granular access control: who can submit tasks, who can run models.</p>
+        <h3>Identités cryptographiques d'entreprise</h3>
+        <p>Chaque nœud est authentifié via ed25519. Les Membrane Proofs Holochain permettent un contrôle d'accès granulaire : qui peut soumettre des tâches, qui peut exécuter des modèles.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">🧠</div>
-        <h3>Fine-tuning on internal data</h3>
-        <p>Models can be fine-tuned on your documents, processes, and domain vocabulary — without ever leaving the network. Your AI becomes an expert in your industry.</p>
+        <h3>Fine-tuning sur vos données internes</h3>
+        <p>Les modèles peuvent être affinés sur vos documents, processus et vocabulaire métier — sans jamais quitter le réseau. Votre IA devient experte de votre secteur.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">🔌</div>
-        <h3>Transparent integration</h3>
-        <p>Local OpenAI-compatible API on <code style="font-size:12px;color:var(--accent2)">localhost:9337</code>. Your existing tools (Copilot, n8n, LangChain, Cursor) connect with no changes.</p>
+        <h3>Intégration transparente</h3>
+        <p>API locale compatible OpenAI sur <code style="font-size:12px;color:var(--accent2)">localhost:9337</code>. Vos outils existants (Copilot, n8n, LangChain, Cursor) se connectent sans aucune modification.</p>
       </div>
       <div class="biz-adv">
         <div class="biz-adv-icon">📋</div>
-        <h3>Immutable audit trail</h3>
-        <p>Every inference task is cryptographically chained in the Holochain source chain. Full traceability for compliance and internal audits.</p>
+        <h3>Piste d'audit immuable</h3>
+        <p>Chaque tâche d'inférence est chaînée cryptographiquement dans la source chain Holochain. Traçabilité complète pour la conformité et les audits internes.</p>
       </div>
     </div>
 
     <!-- CTA -->
     <div class="biz-cta-box">
       <div>
-        <h3>Private AI network for your enterprise</h3>
-        <p>Explore the technical architecture, use cases, and detailed business model on our dedicated enterprise deployment page.</p>
+        <h3>Réseau d'IA privé pour votre entreprise</h3>
+        <p>Explorez l'architecture technique, les cas d'usage et le modèle économique détaillé sur notre page de déploiement entreprise dédiée.</p>
       </div>
-      <a href="javascript:void(0)" onclick="go('enterprise','en')" class="btn-enterprise">Voir la page Entreprise →</a>
+      <a href="javascript:void(0)" onclick="go('enterprise','fr')" class="btn-enterprise">Voir la page Entreprise →</a>
     </div>
   </div>
 </div>
@@ -1051,18 +1057,18 @@
 <div class="section" id="lf-install" style="padding-top: 0">
   <div class="eyebrow">Installation</div>
   <h2>Prêt en 30 secondes.</h2>
-  <p class="section-sub">One command. Your machine joins the network, picks a model suited to its power, and starts contributing — and receiving.</p>
+  <p class="section-sub">Une seule commande. Votre machine rejoint le réseau, choisit un modèle adapté à sa puissance, et commence à contribuer — et à recevoir.</p>
   <div class="install-box">
-    <pre><span class="comment"># 1. Install AInonymous</span>
+    <pre><span class="comment"># 1. Installer AInonymous</span>
 curl -fsSL https://ainonymous.network/install.sh | sh
 
-<span class="comment"># 2. Join the network automatically</span>
+<span class="comment"># 2. Rejoindre le réseau automatiquement</span>
 ainonymous --auto
 
-<span class="comment"># 3. Or pick your model</span>
-ainonymous --model gemma4-26b-moe
+<span class="comment"># 3. Ou choisir votre modèle</span>
+ainonymous --model qwen3.6-35b-a3b
 
-<span class="comment"># 4. Test in 5 seconds</span>
+<span class="comment"># 4. Tester en 5 secondes</span>
 curl http://localhost:9337/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"gemma4-31b","messages":[{"role":"user","content":"Hello!"}]}'</pre>
@@ -1202,7 +1208,7 @@ curl http://localhost:9337/v1/chat/completions \
     <div class="feat-card">
       <div class="feat-icon fi-a">🤖</div>
       <h3>The best open models</h3>
-      <p>Gemma 4 (Google), Qwen3, Llama 3.3 — the models we use rival GPT-4 on many tasks, and they're 100% open source.</p>
+      <p>Gemma 4 (Google), Qwen3.6 (MoE 35B-A3B, multimodal), Llama 3.3 — the models we use rival GPT-4 on many tasks, and they're 100% open source.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-p">🔌</div>
@@ -1281,6 +1287,12 @@ curl http://localhost:9337/v1/chat/completions \
       <div class="model-use">Code · Reasoning</div>
     </div>
     <div class="model-card">
+      <div class="model-name">Qwen3.6 · 35B-A3B</div>
+      <div class="model-meta">~21 GB · MoE · 3B active</div>
+      <div class="bar-bg"><div class="bar bar-p" style="width:90%"></div></div>
+      <div class="model-use">Agentic coding · Multimodal</div>
+    </div>
+    <div class="model-card">
       <div class="model-name">Llama 3.3 · 70B</div>
       <div class="model-meta">~43 GB · Multi-node</div>
       <div class="bar-bg"><div class="bar bar-c" style="width:94%"></div></div>
@@ -1318,7 +1330,7 @@ curl http://localhost:9337/v1/chat/completions \
         <div class="loop-node">
           <div class="loop-node-icon">🤖</div>
           <div class="loop-node-lbl">AI Models</div>
-          <div class="loop-node-sub">Gemma 4 · Qwen3</div>
+          <div class="loop-node-sub">Gemma 4 · Qwen3.6</div>
         </div>
         <div class="loop-arrow">→</div>
         <div class="loop-node">
@@ -1420,7 +1432,7 @@ curl -fsSL https://ainonymous.network/install.sh | sh
 ainonymous --auto
 
 <span class="comment"># 3. Or pick your model</span>
-ainonymous --model gemma4-26b-moe
+ainonymous --model qwen3.6-35b-a3b
 
 <span class="comment"># 4. Test in 5 seconds</span>
 curl http://localhost:9337/v1/chat/completions \
@@ -1551,9 +1563,9 @@ curl http://localhost:9337/v1/chat/completions \
 <span class="c-acc">│  COUCHE 1 — MOTEUR D'INFÉRENCE (llama.cpp)                         │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
 │  │  Nœud A    │  │  Nœud B    │  │  Nœud C    │  │  Nœud D    │   │
-│  │  Gemma4-31B│  │  Gemma4-31B│  │  Gemma4-E4B│  │  Qwen3-32B │   │
-│  │  couches   │  │  couches   │  │  draft spec│  │  code tasks│   │
-│  │  [0 → 15]  │  │  [16 → 31] │  │  spéculatif│  │            │   │
+│  │  Gemma4-31B│  │  Gemma4-31B│  │  Gemma4-E4B│  │  Qwen3.6   │   │
+│  │  couches   │  │  couches   │  │  draft spec│  │  MoE · A3B │   │
+│  │  [0 → 15]  │  │  [16 → 31] │  │  spéculatif│  │  multimodal│   │
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘   │</span>
 <span class="c-muted">│                                                                      │
 └─────────────────────────────────────────────────────────────────────┘</span>
@@ -1592,8 +1604,8 @@ curl http://localhost:9337/v1/chat/completions \
     </div>
     <div class="tech-card">
       <span class="tech-layer layer-infra">Modèles</span>
-      <h3>Gemma 4 · Qwen3 · Llama 3.3</h3>
-      <p>Modèles GGUF open source. Gemma 4 (Google, Apache 2.0) en priorité pour sa densité qualité/VRAM. Support complet du pipeline-splitting sur modèles denses et MoE.</p>
+      <h3>Gemma 4 · Qwen3.6 · Llama 3.3</h3>
+      <p>Modèles GGUF open source. Gemma 4 (Google, Apache 2.0) en priorité pour sa densité qualité/VRAM. Qwen3.6-35B-A3B (MoE, 3B actifs) ajoute le code agentique et le multimodal à très faible coût de calcul. Support complet du pipeline-splitting sur modèles denses et MoE.</p>
       <div class="tech-tag">GGUF · quantization Q4-Q8 · MoE · dense</div>
     </div>
   </div>
@@ -2045,9 +2057,9 @@ curl http://localhost:9337/v1/chat/completions \
 <span class="c-acc">│  LAYER 1 — INFERENCE ENGINE (llama.cpp)                             │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
 │  │  Node A    │  │  Node B    │  │  Node C    │  │  Node D    │   │
-│  │  Gemma4-31B│  │  Gemma4-31B│  │  Gemma4-E4B│  │  Qwen3-32B │   │
-│  │  layers    │  │  layers    │  │  draft spec│  │  code tasks│   │
-│  │  [0 → 15]  │  │  [16 → 31] │  │  specul.   │  │            │   │
+│  │  Gemma4-31B│  │  Gemma4-31B│  │  Gemma4-E4B│  │  Qwen3.6   │   │
+│  │  layers    │  │  layers    │  │  draft spec│  │  MoE · A3B │   │
+│  │  [0 → 15]  │  │  [16 → 31] │  │  specul.   │  │  multimodal│   │
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘   │</span>
 <span class="c-muted">│                                                                      │
 └─────────────────────────────────────────────────────────────────────┘</span>
@@ -2086,8 +2098,8 @@ curl http://localhost:9337/v1/chat/completions \
     </div>
     <div class="tech-card">
       <span class="tech-layer layer-infra">Models</span>
-      <h3>Gemma 4 · Qwen3 · Llama 3.3</h3>
-      <p>Open-source GGUF models. Gemma 4 (Google, Apache 2.0) is prioritized for its quality/VRAM density. Full pipeline-splitting support for both dense and MoE architectures.</p>
+      <h3>Gemma 4 · Qwen3.6 · Llama 3.3</h3>
+      <p>Open-source GGUF models. Gemma 4 (Google, Apache 2.0) is prioritized for its quality/VRAM density. Qwen3.6-35B-A3B (MoE, 3B active) adds agentic coding and multimodal capability at a very low compute cost. Full pipeline-splitting support for both dense and MoE architectures.</p>
       <div class="tech-tag">GGUF · quantization Q4-Q8 · MoE · dense</div>
     </div>
   </div>
