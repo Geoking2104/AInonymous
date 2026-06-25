@@ -49,35 +49,47 @@ async fn main() -> Result<()> {
         heartbeat::run_heartbeat(hb_holochain, hb_config).await;
     });
 
-    // Démarrer le serveur REST interne (pour le proxy)
-    let app = router::build(conductor.clone(), holochain.clone());
-    let addr = format!("127.0.0.1:{}", config.daemon_port);
-    info!("Daemon REST interne sur http://{}", addr);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-
-    // Démarrer le listener QUIC
+    // Démarrer le listener QUIC (data plane)
     let quic_addr = format!("0.0.0.0:{}", config.quic_port).parse()?;
     let quic_listener = ainonymous_quic::QuicListener::new(quic_addr).await?;
     let quic_addr_public = quic_listener.local_addr()?;
     info!("QUIC listener sur {}", quic_addr_public);
+
+    // Handle partagé pour enregistrer les sessions depuis le plan de contrôle REST
+    let registry = quic_listener.registry();
 
     // Annoncer l'adresse QUIC dans le DHT
     holochain.update_quic_endpoint(quic_addr_public).await?;
 
     // Lancer le listener QUIC en background
     let hl = holochain.clone();
+    let pipeline = conductor.pipeline.clone();
     tokio::spawn(async move {
         quic_listener.run(move |conn, offer| {
             let hl = hl.clone();
+            let pipeline = pipeline.clone();
             async move {
                 info!("Session QUIC entrante, couches: {:?}", offer.layer_range);
                 // Traiter la session (inférence des couches assignées)
-                if let Err(e) = conductor::handle_pipeline_session(conn, offer, &hl).await {
+                if let Err(e) =
+                    conductor::handle_pipeline_session(conn, offer, &hl, &pipeline).await
+                {
                     error!("Erreur session pipeline: {}", e);
                 }
             }
         }).await;
     });
+
+    // Démarrer le serveur REST interne (pour le proxy + plan de contrôle pairs)
+    let app = router::build(
+        conductor.clone(),
+        holochain.clone(),
+        registry,
+        quic_addr_public,
+    );
+    let addr = format!("127.0.0.1:{}", config.daemon_port);
+    info!("Daemon REST interne sur http://{}", addr);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     axum::serve(listener, app).await?;
     Ok(())

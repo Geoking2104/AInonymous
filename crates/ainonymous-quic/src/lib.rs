@@ -19,7 +19,7 @@ pub mod error;
 
 pub use session::{QuicSession, SessionOffer, SessionConfig};
 pub use transfer::{ActivationTransfer, TokenStream};
-pub use listener::QuicListener;
+pub use listener::{QuicListener, SessionRegistry};
 pub use error::QuicError;
 
 use std::net::SocketAddr;

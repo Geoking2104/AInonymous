@@ -322,16 +322,22 @@ async fn forward_activations_to_next(
         offer.next_layer_range,
     ).await.context("Négociation QUIC nœud suivant")?;
 
-    // 3. Connexion QUIC directe
-    let endpoint = next_offer.quic_endpoint
+    // 3. Connexion QUIC directe (endpoint client éphémère local)
+    next_offer.quic_endpoint
         .ok_or_else(|| anyhow::anyhow!("endpoint QUIC absent dans l'offre"))?;
-
-    let next_session = ainonymous_quic::QuicSession::connect(endpoint, &next_offer)
+    let client_endpoint = ainonymous_quic::create_endpoint(None)
+        .await
+        .context("Création endpoint QUIC client")?;
+    let next_session = ainonymous_quic::QuicSession::connect(
+        &client_endpoint,
+        next_offer.clone(),
+        ainonymous_quic::SessionConfig::default(),
+    )
         .await
         .context("Connexion QUIC nœud suivant")?;
 
     // 4. Envoyer les activations
-    ActivationTransfer::send(&next_session, header, activations)
+    ActivationTransfer::send(&next_session, header.clone(), activations)
         .await
         .context("Envoi activations nœud suivant")?;
 

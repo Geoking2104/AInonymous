@@ -17,6 +17,24 @@ pub struct DaemonConfig {
     pub max_concurrent_requests: u8,
     pub network: NetworkConfig,
     pub inference: InferenceConfig,
+    /// Pairs connus pour le bootstrap statique du testnet (plan de contrôle
+    /// hors Holochain). Vide = mode solo / découverte DHT uniquement.
+    #[serde(default)]
+    pub peers: Vec<PeerConfig>,
+}
+
+/// Pair statique du mesh (testnet). Permet la négociation de session QUIC
+/// daemon↔daemon sans dépendre du DHT Holochain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerConfig {
+    /// Identifiant logique du pair (ex: AgentPubKey hex, ou alias testnet)
+    pub agent_id: String,
+    /// URL du daemon REST du pair, ex: "http://192.168.1.20:8889"
+    pub daemon_url: String,
+    /// Endpoint QUIC public du pair, ex: "192.168.1.20:9000" (optionnel,
+    /// sinon fourni par la réponse de négociation)
+    #[serde(default)]
+    pub quic_endpoint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +131,7 @@ impl Default for DaemonConfig {
                 kv_cache_type: "q8_0".into(),
                 parallel_requests: 4,
             },
+            peers: Vec::new(),
         }
     }
 }

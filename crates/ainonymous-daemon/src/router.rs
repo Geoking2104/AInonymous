@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
 use axum::{
     extract::{Path, Query, State},
@@ -9,16 +10,26 @@ use axum::{
 use serde::Deserialize;
 use tower_http::trace::TraceLayer;
 
+use ainonymous_quic::{SessionOffer, SessionRegistry};
 use crate::{conductor::Conductor, holochain::HolochainClient};
 
 #[derive(Clone)]
 struct DaemonState {
     conductor: Arc<Conductor>,
     holochain: HolochainClient,
+    /// Registre des sessions QUIC en attente (plan de contrôle)
+    registry: SessionRegistry,
+    /// Endpoint QUIC public annoncé aux pairs
+    quic_endpoint: SocketAddr,
 }
 
-pub fn build(conductor: Arc<Conductor>, holochain: HolochainClient) -> Router {
-    let state = DaemonState { conductor, holochain };
+pub fn build(
+    conductor: Arc<Conductor>,
+    holochain: HolochainClient,
+    registry: SessionRegistry,
+    quic_endpoint: SocketAddr,
+) -> Router {
+    let state = DaemonState { conductor, holochain, registry, quic_endpoint };
 
     Router::new()
         // Endpoints pour le proxy ainonymous-proxy
@@ -29,11 +40,40 @@ pub fn build(conductor: Arc<Conductor>, holochain: HolochainClient) -> Router {
         .route("/mesh/blackboard/post", post(blackboard_post))
         .route("/mesh/blackboard/search", post(blackboard_search))
 
+        // Plan de contrôle : négociation de session QUIC entre pairs
+        .route("/mesh/session/negotiate", post(session_negotiate))
+
         // Endpoints internes (zome calls via daemon)
         .route("/zome/:dna/:zome/:function", post(zome_call))
 
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+#[derive(Deserialize)]
+struct NegotiateBody {
+    #[serde(default)]
+    layer_range: Option<(u32, u32)>,
+    #[serde(default)]
+    next_agent_id: Option<String>,
+    #[serde(default)]
+    next_layer_range: Option<(u32, u32)>,
+}
+
+/// POST /mesh/session/negotiate
+/// Un pair demande à ouvrir une session QUIC entrante sur ce nœud.
+/// On génère une offre (token + endpoint), on l'enregistre dans le listener,
+/// puis on la retourne. Le pair se connectera ensuite en QUIC avec ce token.
+async fn session_negotiate(
+    State(s): State<DaemonState>,
+    Json(body): Json<NegotiateBody>,
+) -> impl IntoResponse {
+    let mut offer = SessionOffer::new(s.quic_endpoint, body.layer_range);
+    offer.next_agent_id = body.next_agent_id;
+    offer.next_layer_range = body.next_layer_range;
+
+    s.registry.register(offer.clone());
+    Json(offer)
 }
 
 async fn mesh_status(State(s): State<DaemonState>) -> impl IntoResponse {
