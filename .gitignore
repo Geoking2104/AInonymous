@@ -47,3 +47,6 @@ logs/
 # Temporaires
 tmp/
 temp/
+
+# Artefacts d'exécution du testnet loopback
+.testnet-run/
