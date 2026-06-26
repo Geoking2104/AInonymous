@@ -21,6 +21,23 @@ pub struct DaemonConfig {
     /// hors Holochain). Vide = mode solo / découverte DHT uniquement.
     #[serde(default)]
     pub peers: Vec<PeerConfig>,
+    /// Plan d'exécution statique (testnet, sans Holochain) : tranches de couches
+    /// par étage. Vide = on s'appuie sur le plan calculé par Holochain.
+    #[serde(default)]
+    pub pipeline_stages: Vec<PipelineStageConfig>,
+    /// Adresse QUIC à annoncer aux pairs (ex: "127.0.0.1:9000" en loopback, ou
+    /// l'IP publique du nœud). Absent = adresse locale du listener (0.0.0.0:port).
+    #[serde(default)]
+    pub quic_advertise: Option<String>,
+}
+
+/// Un étage du pipeline pour le plan statique de testnet. Le `quic_endpoint`
+/// est résolu via l'entrée `peers` correspondante (par `agent_id`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PipelineStageConfig {
+    pub agent_id: String,
+    pub layer_start: u32,
+    pub layer_end: u32,
 }
 
 /// Pair statique du mesh (testnet). Permet la négociation de session QUIC
@@ -66,7 +83,7 @@ pub struct InferenceConfig {
 
 impl DaemonConfig {
     pub fn load() -> Result<Self> {
-        let config_path = Self::default_config_path();
+        let config_path = Self::resolve_config_path();
 
         if config_path.exists() {
             let content = std::fs::read_to_string(&config_path)?;
@@ -83,6 +100,15 @@ impl DaemonConfig {
         }
     }
 
+    /// Chemin du fichier de config. La variable d'environnement `AINON_CONFIG`
+    /// permet de lancer plusieurs daemons sur une même machine (testnet loopback).
+    pub fn resolve_config_path() -> PathBuf {
+        if let Ok(p) = std::env::var("AINON_CONFIG") {
+            return PathBuf::from(p);
+        }
+        Self::default_config_path()
+    }
+
     pub fn default_config_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
@@ -91,7 +117,7 @@ impl DaemonConfig {
     }
 
     pub fn config_path(&self) -> PathBuf {
-        Self::default_config_path()
+        Self::resolve_config_path()
     }
 
     pub fn models_dir(&self) -> &PathBuf {
@@ -132,6 +158,8 @@ impl Default for DaemonConfig {
                 parallel_requests: 4,
             },
             peers: Vec::new(),
+            pipeline_stages: Vec::new(),
+            quic_advertise: None,
         }
     }
 }

@@ -1,4 +1,4 @@
-.PHONY: all build build-rust build-happ install clean dev test
+.PHONY: all build build-rust build-happ install clean dev test testnet-2
 
 # ─── Variables ────────────────────────────────────────────────────────────────
 CARGO        := cargo
@@ -40,6 +40,13 @@ dev: build-dev
 ## test: lance les tests unitaires
 test:
 	$(CARGO) test
+
+## testnet-2: lance un testnet 2 nœuds en loopback (pipeline-split, debug)
+##            Variables : TOTAL_LAYERS (obligatoire), MODEL, SPLIT, DEVICE, DTYPE
+##            Ex : make testnet-2 TOTAL_LAYERS=18 MODEL=google/gemma-3-1b-it
+testnet-2:
+	$(CARGO) build
+	@BIN=$(CURDIR)/target/debug bash scripts/testnet/run_testnet_2.sh
 
 ## clippy: linter Rust
 clippy:

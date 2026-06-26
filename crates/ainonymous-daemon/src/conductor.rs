@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use anyhow::{Context, Result};
 use tracing::{debug, info, warn};
 
@@ -162,6 +163,30 @@ pub struct CoordinatorResult {
     pub text: String,
     pub token_count: u32,
     pub node_ids: Vec<String>,
+}
+
+/// Construit un plan d'exécution PipelineSplit à partir de la config statique
+/// (testnet sans Holochain). Les endpoints QUIC sont résolus via `peers`.
+/// Retourne None si aucun `pipeline_stages` n'est défini ou si un endpoint
+/// manque/est invalide.
+pub fn static_plan_from_config(config: &DaemonConfig) -> Option<ExecutionPlan> {
+    if config.pipeline_stages.is_empty() {
+        return None;
+    }
+    let n = config.pipeline_stages.len();
+    let mut stages = Vec::with_capacity(n);
+    for (i, st) in config.pipeline_stages.iter().enumerate() {
+        let peer = config.peers.iter().find(|p| p.agent_id == st.agent_id)?;
+        let ep: SocketAddr = peer.quic_endpoint.as_ref()?.parse().ok()?;
+        stages.push(ainonymous_types::PipelineStage {
+            node: st.agent_id.clone(),
+            quic_endpoint: ep,
+            layer_start: st.layer_start,
+            layer_end: st.layer_end,
+            is_last: i == n - 1,
+        });
+    }
+    Some(ExecutionPlan::PipelineSplit { stages })
 }
 
 /// Coordinateur : lance une inférence pipeline-split (topologie chaîne).

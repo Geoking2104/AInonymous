@@ -12,7 +12,7 @@ mod pipeline_client;
 
 use std::sync::Arc;
 use anyhow::Result;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 pub use config::DaemonConfig;
@@ -32,20 +32,26 @@ async fn main() -> Result<()> {
     // Démarrer les sous-systèmes
     let conductor = Arc::new(conductor::Conductor::new(config.clone()).await?);
 
-    // Démarrer llama-server si pas déjà en cours
+    // Démarrer llama-server si pas déjà en cours (non-fatal : le mode mesh/
+    // pipeline n'en dépend pas).
     let llama = llama::LlamaManager::new(config.clone());
     if !llama.is_running().await {
         info!("Démarrage llama-server...");
-        llama.start().await?;
+        if let Err(e) = llama.start().await {
+            warn!("llama-server non démarré ({}). Mode mesh/pipeline uniquement.", e);
+        }
     }
 
     // Connexion au conducteur Holochain
     info!("Connexion au conducteur Holochain...");
     let holochain = holochain::HolochainClient::connect(&config).await?;
 
-    // Annoncer les capacités de ce nœud dans le DHT
-    holochain.announce_capabilities(&config).await?;
-    info!("Capacités annoncées dans le mesh");
+    // Annoncer les capacités de ce nœud dans le DHT (non-fatal hors Holochain)
+    if let Err(e) = holochain.announce_capabilities(&config).await {
+        warn!("announce_capabilities ignoré ({})", e);
+    } else {
+        info!("Capacités annoncées dans le mesh");
+    }
 
     // Démarrer le heartbeat périodique (toutes les 30s)
     let hb_holochain = holochain.clone();
@@ -63,8 +69,17 @@ async fn main() -> Result<()> {
     // Handle partagé pour enregistrer les sessions depuis le plan de contrôle REST
     let registry = quic_listener.registry();
 
-    // Annoncer l'adresse QUIC dans le DHT
-    holochain.update_quic_endpoint(quic_addr_public).await?;
+    // Adresse QUIC annoncée aux pairs : `quic_advertise` si défini (loopback /
+    // IP publique), sinon l'adresse locale du listener.
+    let advertise = config.quic_advertise.as_ref()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(quic_addr_public);
+    info!("Endpoint QUIC annoncé : {}", advertise);
+
+    // Annoncer l'adresse QUIC dans le DHT (non-fatal hors Holochain)
+    if let Err(e) = holochain.update_quic_endpoint(advertise).await {
+        warn!("update_quic_endpoint ignoré ({})", e);
+    }
 
     // Lancer le listener QUIC en background
     let hl = holochain.clone();
@@ -90,7 +105,7 @@ async fn main() -> Result<()> {
         conductor.clone(),
         holochain.clone(),
         registry,
-        quic_addr_public,
+        advertise,
     );
     let addr = format!("127.0.0.1:{}", config.daemon_port);
     info!("Daemon REST interne sur http://{}", addr);

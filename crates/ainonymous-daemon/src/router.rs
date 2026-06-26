@@ -94,10 +94,14 @@ async fn mesh_infer(
     State(s): State<DaemonState>,
     Json(body): Json<InferBody>,
 ) -> impl IntoResponse {
-    let plan = match s.holochain.get_execution_plan(&body.model_id).await {
-        Ok(p) => p,
-        Err(e) => return (StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"error": format!("plan indisponible: {}", e)}))).into_response(),
+    // Plan statique (testnet) prioritaire, sinon plan calculé par Holochain.
+    let plan = match crate::conductor::static_plan_from_config(&s.conductor.config) {
+        Some(p) => p,
+        None => match s.holochain.get_execution_plan(&body.model_id).await {
+            Ok(p) => p,
+            Err(e) => return (StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({"error": format!("plan indisponible: {}", e)}))).into_response(),
+        },
     };
 
     match crate::conductor::run_pipeline_inference(
@@ -146,6 +150,10 @@ async fn mesh_plan(
     State(s): State<DaemonState>,
     Json(body): Json<serde_json::Value>,
 ) -> impl IntoResponse {
+    // Plan statique (testnet) prioritaire, sinon plan calculé par Holochain.
+    if let Some(plan) = crate::conductor::static_plan_from_config(&s.conductor.config) {
+        return Json(plan).into_response();
+    }
     let model_id = body["model_id"].as_str().unwrap_or("");
     match s.holochain.get_execution_plan(model_id).await {
         Ok(plan) => Json(plan).into_response(),
