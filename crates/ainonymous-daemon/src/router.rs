@@ -94,8 +94,6 @@ async fn mesh_infer(
     State(s): State<DaemonState>,
     Json(body): Json<InferBody>,
 ) -> impl IntoResponse {
-    let _ = body.max_tokens; // réservé (boucle multi-token, ADR-001)
-
     let plan = match s.holochain.get_execution_plan(&body.model_id).await {
         Ok(p) => p,
         Err(e) => return (StatusCode::SERVICE_UNAVAILABLE,
@@ -103,7 +101,7 @@ async fn mesh_infer(
     };
 
     match crate::conductor::run_pipeline_inference(
-        &s.holochain, &s.conductor.pipeline, &plan, body.messages,
+        &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens,
     ).await {
         Ok(r) => Json(serde_json::json!({
             "content": r.text,

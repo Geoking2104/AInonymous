@@ -7,6 +7,9 @@ use ainonymous_types::ExecutionPlan;
 use crate::{DaemonConfig, holochain::HolochainClient};
 use crate::pipeline_client::{PipelineClient, PrefillRequest, DecodeRequest};
 
+/// Token de fin de séquence (Gemma 4 : <eos> = 1)
+const EOS_TOKEN_ID: i32 = 1;
+
 /// Orchestrateur central du daemon
 pub struct Conductor {
     pub config: DaemonConfig,
@@ -76,23 +79,32 @@ pub async fn handle_pipeline_session(
         &request_id, &header, &raw_activations, pipeline,
     ).await?;
 
-    // Vérifier si c'est le dernier nœud (le plan d'exécution est dans l'offre)
-    let is_last_node = output.is_last_node;
-
-    if is_last_node {
-        // Décoder en streaming et envoyer les tokens au nœud coordinateur
-        if let Some(first_token_id) = output.first_token_id {
-            stream_tokens_to_coordinator(
-                &session, &request_id, first_token_id,
-                &header, pipeline,
-            ).await?;
-        }
+    // Une passe = un token. La boucle de génération est pilotée par le
+    // coordinateur (cf. ADR-001) ; le KV-cache persiste par request_id côté
+    // pipeline_server entre les passes (pas de clear ici).
+    if output.is_last_node {
+        // Dernier nœud : produire UN token et le renvoyer en amont
+        // (vers le nœud précédent ou le coordinateur) sur la session entrante.
+        let token_id = output.first_token_id
+            .ok_or_else(|| anyhow::anyhow!("dernier nœud sans token généré"))?;
+        let tok = GeneratedToken {
+            token_id: token_id as u32,
+            text: output.next_token_text.clone().unwrap_or_default(),
+            logprob: None,
+            finish_reason: if token_id == EOS_TOKEN_ID {
+                Some(FinishReason::Stop)
+            } else {
+                None
+            },
+        };
+        send_single_token(&session, &tok).await?;
     } else {
-        // Transmettre les activations au nœud suivant
+        // Nœud intermédiaire : transmettre les activations au nœud suivant,
+        // récupérer le token produit en bout de chaîne, et le relayer en amont.
         let out_header = ActivationHeader {
             request_id: header.request_id,
             layer_start: layer_range.1,
-            layer_end: layer_range.1,   // sera mis à jour par le prochain nœud
+            layer_end: layer_range.1,
             seq_len: output.seq_len as u32,
             hidden_size: output.hidden_size as u32,
             dtype: header.dtype,
@@ -102,14 +114,10 @@ pub async fn handle_pipeline_session(
         let out_activations = output.hidden_states_bytes
             .ok_or_else(|| anyhow::anyhow!("hidden_states manquants en sortie"))?;
 
-        forward_activations_to_next(
+        let tok = forward_and_receive_token(
             &out_header, &out_activations, &offer, holochain,
         ).await?;
-    }
-
-    // Nettoyage KV-cache si dernier nœud
-    if is_last_node {
-        let _ = pipeline.clear(&request_id).await;
+        send_single_token(&session, &tok).await?;
     }
 
     Ok(())
@@ -140,6 +148,7 @@ pub async fn run_pipeline_inference(
     pipeline: &PipelineClient,
     plan: &ExecutionPlan,
     messages: serde_json::Value,
+    max_tokens: u32,
 ) -> Result<CoordinatorResult> {
     let stages = match plan {
         ExecutionPlan::PipelineSplit { stages } => stages,
@@ -154,9 +163,59 @@ pub async fn run_pipeline_inference(
     if token_ids.is_empty() {
         anyhow::bail!("tokenisation vide");
     }
-    info!("Coordinateur : {} tokens en entrée, {} étage(s)", token_ids.len(), stages.len());
+    let request_id = uuid::Uuid::new_v4().to_string();
+    info!(
+        "Coordinateur : {} tokens d'entrée, {} étage(s), req={}",
+        token_ids.len(), stages.len(), request_id
+    );
 
-    // 2. Négocier la session avec le 1er étage (chaînage vers l'étage suivant)
+    let budget = if max_tokens == 0 { 512 } else { max_tokens };
+    let mut out_ids: Vec<i32> = Vec::new();
+    let mut text = String::new();
+
+    // 2. Passe de prefill : envoie tout le prompt, reçoit le 1er token
+    let mut tok = run_chain_pass(holochain, first, next, &request_id, &token_ids)
+        .await.context("passe prefill")?;
+
+    // 3. Boucle de décodage pilotée par le coordinateur (un token par passe)
+    loop {
+        out_ids.push(tok.token_id as i32);
+        text.push_str(&tok.text);
+
+        let is_eos = tok.token_id as i32 == EOS_TOKEN_ID || tok.finish_reason.is_some();
+        if is_eos || out_ids.len() as u32 >= budget {
+            break;
+        }
+
+        // Passe de décodage : renvoie le dernier token (seq_len = 1)
+        let last = tok.token_id as i32;
+        tok = run_chain_pass(holochain, first, next, &request_id, &[last])
+            .await.context("passe decode")?;
+    }
+
+    // Repli : si le bout de chaîne n'a pas fourni le texte, détokeniser localement
+    if text.is_empty() && !out_ids.is_empty() {
+        text = pipeline.detokenize(&out_ids).await.unwrap_or_default();
+    }
+
+    info!("Coordinateur : génération terminée — {} tokens", out_ids.len());
+    Ok(CoordinatorResult {
+        text,
+        token_count: out_ids.len() as u32,
+        node_ids: stages.iter().map(|s| s.node.clone()).collect(),
+    })
+}
+
+/// Une passe complète du pipeline (prefill ou decode) : ouvre une session vers
+/// le 1er étage, envoie les token_ids, reçoit UN token relayé en bout de chaîne.
+/// Le KV-cache persiste côté pipeline_server entre les passes (même request_id).
+async fn run_chain_pass(
+    holochain: &HolochainClient,
+    first: &ainonymous_types::PipelineStage,
+    next: Option<&ainonymous_types::PipelineStage>,
+    request_id: &str,
+    input_ids: &[i32],
+) -> Result<GeneratedToken> {
     let offer = holochain.negotiate_quic_session(
         &first.node,
         Some((first.layer_start, first.layer_end)),
@@ -164,16 +223,12 @@ pub async fn run_pipeline_inference(
         next.map(|s| (s.layer_start, s.layer_end)),
     ).await.context("négociation session 1er étage")?;
 
-    // 3. Connexion QUIC + envoi des token_ids
     let endpoint = ainonymous_quic::create_endpoint(None)
         .await.context("endpoint QUIC coordinateur")?;
     let session = QuicSession::connect(
-        &endpoint,
-        offer,
-        ainonymous_quic::SessionConfig::default(),
+        &endpoint, offer, ainonymous_quic::SessionConfig::default(),
     ).await.context("connexion QUIC 1er étage")?;
 
-    let request_id = uuid::Uuid::new_v4().to_string(); // 36 chars
     let mut rid = [0u8; 36];
     let rb = request_id.as_bytes();
     let n = rb.len().min(36);
@@ -183,42 +238,23 @@ pub async fn run_pipeline_inference(
         request_id: rid,
         layer_start: 0,
         layer_end: first.layer_end,
-        seq_len: token_ids.len() as u32,
+        seq_len: input_ids.len() as u32,
         hidden_size: 0,
         dtype: DType::F16,
         compressed: false,
     };
-    ActivationTransfer::send(&session, header, &token_ids_to_bytes(&token_ids))
+    ActivationTransfer::send(&session, header, &token_ids_to_bytes(input_ids))
         .await
         .map_err(|e| anyhow::anyhow!("envoi token_ids: {}", e))?;
 
-    // 4. Réception du flux de tokens
     let mut ts = TokenStream::receiver(&session)
         .await
         .map_err(|e| anyhow::anyhow!("ouverture token stream: {}", e))?;
-
-    let mut out_ids: Vec<i32> = Vec::new();
-    let mut text = String::new();
-    while let Some(tok) = ts.recv_token().await
+    let tok = ts.recv_token()
+        .await
         .map_err(|e| anyhow::anyhow!("réception token: {}", e))?
-    {
-        out_ids.push(tok.token_id as i32);
-        text.push_str(&tok.text);
-        if tok.finish_reason.is_some() {
-            break;
-        }
-    }
-
-    // Si le bout de chaîne n'a pas fourni le texte, détokeniser localement
-    if text.is_empty() && !out_ids.is_empty() {
-        text = pipeline.detokenize(&out_ids).await.unwrap_or_default();
-    }
-
-    Ok(CoordinatorResult {
-        text,
-        token_count: out_ids.len() as u32,
-        node_ids: stages.iter().map(|s| s.node.clone()).collect(),
-    })
+        .ok_or_else(|| anyhow::anyhow!("aucun token reçu"))?;
+    Ok(tok)
 }
 
 /// Encode des token_ids en u32 LE (convention AInonymous, lue par
@@ -239,6 +275,7 @@ struct LayerOutput {
     hidden_size: usize,
     is_last_node: bool,
     first_token_id: Option<i32>,
+    next_token_text: Option<String>,
 }
 
 /// Appel au pipeline_server.py pour exécuter la tranche de couches.
@@ -249,9 +286,10 @@ async fn run_pipeline_layers_real(
     raw_activations: &[u8],
     pipeline: &PipelineClient,
 ) -> Result<LayerOutput> {
-    // Déterminer si c'est un prefill ou un decode
-    // Convention : layer_start == 0 && pas de KV-cache en mémoire → prefill
-    let is_prefill = header.layer_start == 0 && header.seq_len > 1;
+    // Prefill = traitement du prompt complet (seq_len > 1) ; decode = 1 token.
+    // (Indépendant de layer_start : un nœud intermédiaire/dernier reçoit aussi
+    // un prefill avec seq_len > 1 sous forme de hidden states.)
+    let is_prefill = header.seq_len > 1;
 
     if is_prefill && header.layer_start == 0 {
         // Cas premier nœud : les raw_activations contiennent les token_ids
@@ -318,6 +356,7 @@ async fn run_pipeline_layers_real(
             hidden_size: resp.hidden_size,
             is_last_node: resp.is_last_node,
             first_token_id: resp.next_token_id,
+            next_token_text: resp.next_token_text,
         })
     }
 }
@@ -333,102 +372,40 @@ fn build_layer_output_from_prefill(
         hidden_size: resp.hidden_size,
         is_last_node: resp.is_last_node,
         first_token_id: resp.next_token_id,
+        next_token_text: resp.next_token_text,
     }
 }
 
-// ── Streaming tokens ─────────────────────────────────────────────────────────
+// ── Renvoi d'un token en amont ───────────────────────────────────────────────
 
-/// Dernier nœud : génère les tokens en boucle decode et les streame via QUIC.
-async fn stream_tokens_to_coordinator(
-    session: &QuicSession,
-    request_id: &str,
-    first_token_id: i32,
-    header: &ActivationHeader,
-    pipeline: &PipelineClient,
-) -> Result<()> {
-    let max_new_tokens = 512usize; // TODO: récupérer depuis la requête originale
-    let eos_token_id = 1i32;       // Gemma4 EOS token (1 = <eos>)
-
-    let mut token_stream = TokenStream::sender(session)
+/// Envoyer un unique token en amont (vers le nœud précédent ou le coordinateur)
+/// sur la session entrante, puis clôturer le stream. La génération multi-token
+/// est pilotée par le coordinateur (cf. ADR-001).
+async fn send_single_token(session: &QuicSession, tok: &GeneratedToken) -> Result<()> {
+    let mut ts = TokenStream::sender(session)
         .await
-        .map_err(|e| anyhow::anyhow!("TokenStream: {}", e))?;
-
-    // Streamer le premier token (issu du prefill)
-    let first_tok = GeneratedToken {
-        token_id: first_token_id as u32,
-        text: String::new(), // le texte sera décodé par le coordinateur
-        logprob: None,
-        finish_reason: None,
-    };
-    token_stream.send_token(&first_tok)
+        .map_err(|e| anyhow::anyhow!("ouverture TokenStream: {}", e))?;
+    ts.send_token(tok)
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
-
-    if first_token_id == eos_token_id {
-        token_stream.finish()
-            .await
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
-        return Ok(());
-    }
-
-    // Boucle de décodage
-    let mut last_token_id = first_token_id;
-
-    for _ in 0..max_new_tokens - 1 {
-        // Decode pass : le premier nœud du pipeline reçoit le dernier token
-        // et relance le forward pass complet via QUIC
-        // Dans cette architecture single-node (dernier nœud = nœud courant),
-        // on peut boucler localement
-        let resp = pipeline.decode(&DecodeRequest {
-            request_id: request_id.to_string(),
-            input_ids: Some(vec![last_token_id]),
-            hidden_states_b64: None,
-            seq_len: 1,
-            hidden_size: header.hidden_size as usize,
-        }).await?;
-
-        let token_id = resp.next_token_id
-            .ok_or_else(|| anyhow::anyhow!("next_token_id manquant"))?;
-
-        let tok = GeneratedToken {
-            token_id: token_id as u32,
-            text: resp.next_token_text.unwrap_or_default(),
-            logprob: None,
-            finish_reason: if token_id == eos_token_id {
-                Some(FinishReason::Stop)
-            } else {
-                None
-            },
-        };
-
-        token_stream.send_token(&tok)
-            .await
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
-
-        last_token_id = token_id;
-
-        if token_id == eos_token_id {
-            break;
-        }
-    }
-
-    token_stream.finish()
+        .map_err(|e| anyhow::anyhow!("envoi token: {}", e))?;
+    ts.finish()
         .await
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
-
-    info!("Stream tokens terminé pour {}", request_id);
+        .map_err(|e| anyhow::anyhow!("clôture TokenStream: {}", e))?;
     Ok(())
 }
 
-// ── Transmission au nœud suivant ─────────────────────────────────────────────
+// ── Transmission au nœud suivant + relais du token ───────────────────────────
 
-async fn forward_activations_to_next(
+/// Nœud intermédiaire : transmet les activations au nœud suivant de la chaîne,
+/// puis attend le token produit en bout de chaîne (un token par passe). Le
+/// token est ensuite relayé en amont par l'appelant.
+async fn forward_and_receive_token(
     header: &ActivationHeader,
     activations: &[u8],
     offer: &SessionOffer,
     holochain: &HolochainClient,
-) -> Result<()> {
-    // 1. Le plan d'exécution dans l'offre donne l'agent suivant
+) -> Result<GeneratedToken> {
+    // 1. L'offre de session indique l'agent suivant
     let next_agent = offer.next_agent_id.as_deref()
         .ok_or_else(|| anyhow::anyhow!("Pas de nœud suivant dans l'offre de session"))?;
 
@@ -442,14 +419,12 @@ async fn forward_activations_to_next(
     ).await.context("Négociation QUIC nœud suivant")?;
 
     // 3. Connexion QUIC directe (endpoint client éphémère local)
-    next_offer.quic_endpoint
-        .ok_or_else(|| anyhow::anyhow!("endpoint QUIC absent dans l'offre"))?;
     let client_endpoint = ainonymous_quic::create_endpoint(None)
         .await
         .context("Création endpoint QUIC client")?;
-    let next_session = ainonymous_quic::QuicSession::connect(
+    let next_session = QuicSession::connect(
         &client_endpoint,
-        next_offer.clone(),
+        next_offer,
         ainonymous_quic::SessionConfig::default(),
     )
         .await
@@ -465,7 +440,15 @@ async fn forward_activations_to_next(
         next_agent, header.layer_start, header.layer_end
     );
 
-    Ok(())
+    // 5. Recevoir le token produit en bout de chaîne
+    let mut ts = TokenStream::receiver(&next_session)
+        .await
+        .map_err(|e| anyhow::anyhow!("réception token du suivant: {}", e))?;
+    let tok = ts.recv_token()
+        .await
+        .map_err(|e| anyhow::anyhow!("lecture token du suivant: {}", e))?
+        .ok_or_else(|| anyhow::anyhow!("aucun token reçu du nœud suivant"))?;
+    Ok(tok)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
