@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use anyhow::Result;
 use serde_json::{json, Value};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use ainonymous_types::{ExecutionPlan, NodeCapabilities, NodeHeartbeat};
 use crate::DaemonConfig;
@@ -12,6 +12,8 @@ pub struct HolochainClient {
     app_port: u16,
     app_id: String,
     http: reqwest::Client,
+    /// Pairs statiques (bootstrap testnet, plan de contrôle hors DHT)
+    peers: Vec<crate::config::PeerConfig>,
 }
 
 impl HolochainClient {
@@ -22,8 +24,16 @@ impl HolochainClient {
             http: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?,
+            peers: config.peers.clone(),
         };
         Ok(client)
+    }
+
+    /// Résoudre l'URL du daemon REST d'un pair via la config bootstrap.
+    fn peer_daemon_url(&self, agent_id: &str) -> Option<String> {
+        self.peers.iter()
+            .find(|p| p.agent_id == agent_id)
+            .map(|p| p.daemon_url.clone())
     }
 
     fn base_url(&self) -> String {
@@ -109,24 +119,45 @@ impl HolochainClient {
         Ok(serde_json::from_value(resp)?)
     }
 
-    /// Négocier une session QUIC avec un nœud distant
-    /// Retourne l'offre de session incluant l'endpoint et le token
+    /// Négocier une session QUIC avec un nœud distant.
+    ///
+    /// Plan de contrôle bootstrap statique (testnet) : appelle directement le
+    /// daemon REST du pair `target_agent` sur `POST /mesh/session/negotiate`.
+    /// Le pair génère un token, enregistre l'offre dans son listener QUIC, et
+    /// retourne l'offre (endpoint + token). Remplace l'ancien zome_call
+    /// auto-référent. L'intégration Holochain réelle se branchera ici plus tard.
     pub async fn negotiate_quic_session(
         &self,
         target_agent: &str,
         layer_range: Option<(u32, u32)>,
+        next_agent: Option<String>,
+        next_layer_range: Option<(u32, u32)>,
     ) -> Result<ainonymous_quic::SessionOffer> {
-        let resp = self.zome_call(
-            "inference-mesh",
-            "coordinator",
-            "negotiate_quic_session",
-            json!({
-                "target_agent": target_agent,
-                "layer_range": layer_range,
-            }),
-        ).await?;
+        let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Pair '{}' introuvable dans la config bootstrap (peers)",
+                target_agent
+            )
+        })?;
 
-        Ok(serde_json::from_value(resp)?)
+        debug!("Négociation session QUIC → pair {} ({})", target_agent, daemon_url);
+
+        let resp = self.http
+            .post(format!("{}/mesh/session/negotiate", daemon_url))
+            .json(&json!({
+                "layer_range": layer_range,
+                "next_agent_id": next_agent,
+                "next_layer_range": next_layer_range,
+            }))
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Négociation refusée par {}: {}", target_agent, body);
+        }
+
+        Ok(resp.json::<ainonymous_quic::SessionOffer>().await?)
     }
 
     /// Mettre à jour l'endpoint QUIC publié dans le DHT
@@ -211,7 +242,7 @@ fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
 }
 
 fn detect_compute_backends() -> Vec<ainonymous_types::ComputeBackend> {
-    let mut backends = vec![ainonymous_types::ComputeBackend::Cpu];
+    let backends = vec![ainonymous_types::ComputeBackend::Cpu];
     #[cfg(target_os = "macos")]
     backends.push(ainonymous_types::ComputeBackend::Metal);
     backends

@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use axum::response::sse::Event;
-use futures::stream::{self, StreamExt};
+use futures::stream::StreamExt;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
@@ -13,7 +13,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use ainonymous_types::api::*;
-use ainonymous_types::inference::*;
+use ainonymous_types::ExecutionPlan;
 use crate::AppState;
 
 /// POST /v1/chat/completions
@@ -39,7 +39,16 @@ async fn handle_blocking(
     req: ChatCompletionRequest,
     request_id: String,
     start: Instant,
-) -> impl IntoResponse {
+) -> Response {
+    // Routage Phase 2 (chaîne) : si le plan d'exécution est multi-nœuds,
+    // passer par le mesh distribué. Sinon (ou si le plan est indisponible),
+    // exécution solo via llama-server local.
+    if let Ok(plan) = state.mesh.get_execution_plan(&req.model).await {
+        if matches!(plan, ExecutionPlan::PipelineSplit { .. }) {
+            return mesh_pipeline_response(&state, &req, request_id, start).await;
+        }
+    }
+
     // Construire la requête pour llama-server
     let llama_req = build_llama_request(&req, false);
 
@@ -108,11 +117,71 @@ async fn handle_blocking(
     }
 }
 
+/// Réponse d'inférence distribuée (pipeline-split) via le daemon mesh.
+async fn mesh_pipeline_response(
+    state: &Arc<AppState>,
+    req: &ChatCompletionRequest,
+    request_id: String,
+    start: Instant,
+) -> Response {
+    let messages = serde_json::to_value(&req.messages)
+        .unwrap_or_else(|_| serde_json::json!([]));
+
+    match state.mesh.run_mesh_inference(&req.model, &messages, req.max_tokens).await {
+        Ok(v) => {
+            let content = v["content"].as_str().unwrap_or("").to_string();
+            let completion_tokens = v["token_count"].as_u64().unwrap_or(0) as u32;
+            let node_ids: Vec<String> = v["node_ids"].as_array()
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+                .unwrap_or_default();
+            let nodes_used = node_ids.len().max(1) as u8;
+            let latency = start.elapsed().as_millis() as u32;
+            state.record_request(true, latency, completion_tokens);
+            let tps = if latency > 0 {
+                completion_tokens as f32 / (latency as f32 / 1000.0)
+            } else { 0.0 };
+
+            info!("✓ {} (pipeline_split, {} nœuds) — {}ms", req.model, nodes_used, latency);
+
+            let response = ChatCompletionResponse {
+                id: request_id,
+                object: "chat.completion",
+                created: chrono::Utc::now().timestamp(),
+                model: req.model.clone(),
+                choices: vec![ChatChoice {
+                    index: 0,
+                    message: AssistantMessage { role: "assistant", content },
+                    finish_reason: Some("stop".into()),
+                }],
+                usage: UsageStats {
+                    prompt_tokens: 0,
+                    completion_tokens,
+                    total_tokens: completion_tokens,
+                },
+                ainonymous: Some(AInonymousMeta {
+                    execution_mode: "pipeline_split".into(),
+                    nodes_used,
+                    node_ids,
+                    total_latency_ms: latency,
+                    tokens_per_second: tps,
+                    speculative_acceptance_rate: None,
+                }),
+            };
+            (StatusCode::OK, Json(response)).into_response()
+        }
+        Err(e) => {
+            error!("Inférence mesh échouée: {}", e);
+            let err = ApiError::internal(&e.to_string());
+            (StatusCode::BAD_GATEWAY, Json(err)).into_response()
+        }
+    }
+}
+
 async fn handle_streaming(
     state: Arc<AppState>,
     req: ChatCompletionRequest,
     request_id: String,
-    start: Instant,
+    _start: Instant,
 ) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
     let llama_url = state.config.llama_server_url.clone();
     let model = req.model.clone();
@@ -133,7 +202,6 @@ async fn handle_streaming(
             .await
         {
             Ok(resp) => {
-                use tokio_stream::StreamExt as _;
                 let mut byte_stream = resp.bytes_stream();
 
                 while let Some(chunk_result) = byte_stream.next().await {

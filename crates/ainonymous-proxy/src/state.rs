@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use anyhow::Result;
-use ainonymous_types::{NodeCapabilities, NodeHeartbeat};
 use crate::{mesh_client::MeshClient, ProxyConfig};
 
 /// État partagé du proxy (injecté dans tous les handlers via Arc)
@@ -29,7 +28,7 @@ pub enum ModelArchitecture {
     DenseEdge,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ProxyMetrics {
     pub requests_total: u64,
     pub requests_success: u64,
@@ -37,6 +36,19 @@ pub struct ProxyMetrics {
     pub tokens_generated: u64,
     pub avg_latency_ms: f32,
     pub start_time: std::time::Instant,
+}
+
+impl Default for ProxyMetrics {
+    fn default() -> Self {
+        Self {
+            requests_total: 0,
+            requests_success: 0,
+            requests_failed: 0,
+            tokens_generated: 0,
+            avg_latency_ms: 0.0,
+            start_time: std::time::Instant::now(),
+        }
+    }
 }
 
 impl AppState {

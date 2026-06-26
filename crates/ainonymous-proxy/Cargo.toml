@@ -15,6 +15,7 @@ ainonymous-types = { path = "../ainonymous-types" }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 futures = { workspace = true }
+async-stream = { workspace = true }
 
 # HTTP
 axum = { workspace = true }

@@ -19,7 +19,7 @@ pub mod error;
 
 pub use session::{QuicSession, SessionOffer, SessionConfig};
 pub use transfer::{ActivationTransfer, TokenStream};
-pub use listener::QuicListener;
+pub use listener::{QuicListener, SessionRegistry};
 pub use error::QuicError;
 
 use std::net::SocketAddr;
@@ -27,6 +27,9 @@ use anyhow::Result;
 
 /// Point d'entrée principal : créer un endpoint QUIC local
 pub async fn create_endpoint(bind_addr: Option<SocketAddr>) -> Result<quinn::Endpoint> {
+    // Installer le provider crypto par défaut (ring) — idempotent
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let addr = bind_addr.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
 
     // TLS self-signed pour le transport QUIC
@@ -45,14 +48,15 @@ pub async fn create_endpoint(bind_addr: Option<SocketAddr>) -> Result<quinn::End
     Ok(endpoint)
 }
 
-fn generate_self_signed_cert() -> Result<(Vec<rustls::Certificate>, rustls::PrivateKey)> {
+fn generate_self_signed_cert() -> Result<(
+    Vec<rustls::pki_types::CertificateDer<'static>>,
+    rustls::pki_types::PrivateKeyDer<'static>,
+)> {
     let cert = rcgen::generate_simple_self_signed(vec!["ainonymous.local".to_string()])?;
-    let cert_der = cert.serialize_der()?;
-    let key_der = cert.serialize_private_key_der();
-    Ok((
-        vec![rustls::Certificate(cert_der)],
-        rustls::PrivateKey(key_der),
-    ))
+    let cert_der = cert.cert.der().clone();
+    let key_der = rustls::pki_types::PrivateKeyDer::try_from(cert.key_pair.serialize_der())
+        .map_err(|e| anyhow::anyhow!("clé privée invalide: {}", e))?;
+    Ok((vec![cert_der], key_der))
 }
 
 /// Taille maximale d'un bloc d'activations (512 MB)

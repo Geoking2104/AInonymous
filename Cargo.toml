@@ -23,6 +23,7 @@ rust-version = "1.80"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 futures = "0.3"
+async-stream = "0.3"
 
 # HTTP
 axum = { version = "0.7", features = ["ws", "macros"] }
@@ -41,6 +42,8 @@ toml = "0.8"
 quinn = "0.11"
 iroh = "0.26"
 iroh-net = "0.26"
+rustls = "0.23"
+rcgen = "0.13"
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
@@ -56,6 +59,7 @@ thiserror = "1"
 bytes = "1"
 zstd = "0.13"
 sha2 = "0.10"
+base64 = "0.22"
 hex = "0.4"
 rand = "0.8"
 chrono = { version = "0.4", features = ["serde"] }

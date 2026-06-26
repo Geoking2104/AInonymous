@@ -5,7 +5,27 @@ use std::time::SystemTime;
 use anyhow::Result;
 use tracing::{debug, info, warn};
 
-use crate::{QuicError, SessionOffer, SESSION_TOKEN_TTL_SECS};
+use crate::{QuicError, SessionOffer};
+
+/// Registre partageable des sessions en attente.
+/// Permet au plan de contrôle (REST/Holochain) d'enregistrer une offre de
+/// session avant que le pair distant n'ouvre la connexion QUIC.
+#[derive(Clone)]
+pub struct SessionRegistry {
+    pending: Arc<Mutex<HashMap<Vec<u8>, SessionOffer>>>,
+}
+
+impl SessionRegistry {
+    /// Enregistrer une offre de session (indexée par son token).
+    /// Purge au passage les sessions expirées.
+    pub fn register(&self, offer: SessionOffer) {
+        let mut sessions = self.pending.lock().unwrap();
+        sessions.retain(|_, v| !v.is_expired());
+        let token = offer.session_token.clone();
+        sessions.insert(token, offer);
+        debug!("Session enregistrée ({} sessions actives)", sessions.len());
+    }
+}
 
 /// Listener QUIC côté nœud worker
 /// Attend les connexions entrantes, vérifie les tokens de session
@@ -27,6 +47,12 @@ impl QuicListener {
 
     pub fn local_addr(&self) -> Result<SocketAddr> {
         Ok(self.endpoint.local_addr()?)
+    }
+
+    /// Obtenir un handle partageable pour enregistrer des sessions depuis
+    /// le plan de contrôle (router REST du daemon).
+    pub fn registry(&self) -> SessionRegistry {
+        SessionRegistry { pending: self.pending_sessions.clone() }
     }
 
     /// Enregistrer une offre de session (appelé après négociation Holochain)
@@ -62,7 +88,7 @@ impl QuicListener {
     }
 
     async fn accept_connection<F, Fut>(
-        incoming: quinn::Connecting,
+        incoming: quinn::Incoming,
         sessions: Arc<Mutex<HashMap<Vec<u8>, SessionOffer>>>,
         handler: F,
     ) -> Result<(), QuicError>
@@ -70,7 +96,9 @@ impl QuicListener {
         F: Fn(quinn::Connection, SessionOffer) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        let conn = incoming.await
+        let conn = incoming.accept()
+            .map_err(|e| QuicError::ConnectFailed(e.to_string()))?
+            .await
             .map_err(|e| QuicError::ConnectFailed(e.to_string()))?;
 
         debug!("Connexion QUIC entrante depuis {}", conn.remote_address());

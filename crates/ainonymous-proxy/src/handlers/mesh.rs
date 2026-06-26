@@ -6,7 +6,6 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use std::time::UNIX_EPOCH;
 use tracing::warn;
 
 use ainonymous_types::api::*;

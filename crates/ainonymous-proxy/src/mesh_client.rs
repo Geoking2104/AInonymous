@@ -101,4 +101,27 @@ impl MeshClient {
             .await?;
         Ok(resp.json().await?)
     }
+
+    /// Lancer une inférence distribuée (pipeline-split) via le daemon.
+    pub async fn run_mesh_inference(
+        &self,
+        model_id: &str,
+        messages: &Value,
+        max_tokens: u32,
+    ) -> Result<Value> {
+        let resp = self.http
+            .post(format!("{}/mesh/infer", self.holochain_url))
+            .json(&serde_json::json!({
+                "model_id": model_id,
+                "messages": messages,
+                "max_tokens": max_tokens,
+            }))
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("mesh /infer: {}", body);
+        }
+        Ok(resp.json().await?)
+    }
 }

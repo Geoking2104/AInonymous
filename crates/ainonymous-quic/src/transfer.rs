@@ -1,9 +1,8 @@
 use std::time::Instant;
 use anyhow::Result;
-use bytes::Bytes;
 use tracing::{debug, info};
 
-use ainonymous_types::inference::{ActivationHeader, DType, GeneratedToken};
+use ainonymous_types::inference::{ActivationHeader, GeneratedToken};
 use crate::{QuicError, QuicSession, MAX_ACTIVATION_SIZE, COMPRESSION_THRESHOLD_BPS};
 
 /// Transfert d'activations tensorielles via QUIC
@@ -56,7 +55,7 @@ impl ActivationTransfer {
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
         stream.write_all(&data).await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        stream.finish().await
+        stream.finish()
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
         let elapsed = start.elapsed();
@@ -174,7 +173,7 @@ impl TokenStream {
     /// Fermer le stream d'émission
     pub async fn finish(&mut self) -> Result<(), QuicError> {
         if let Some(stream) = self.send_stream.as_mut() {
-            stream.finish().await
+            stream.finish()
                 .map_err(|e| QuicError::StreamError(e.to_string()))?;
         }
         Ok(())

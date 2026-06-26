@@ -1,5 +1,4 @@
 use anyhow::Result;
-use tracing::info;
 use super::check_daemon_running;
 
 pub async fn run(port: u16) -> Result<()> {

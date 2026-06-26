@@ -1,13 +1,18 @@
+// Code WIP : certaines API (load_model, métriques, champs de désérialisation,
+// helpers Phase 2) ne sont pas encore toutes câblées. Évite le bruit de warnings.
+#![allow(dead_code)]
+
 mod config;
 mod conductor;
 mod holochain;
 mod llama;
 mod router;
 mod heartbeat;
+mod pipeline_client;
 
 use std::sync::Arc;
 use anyhow::Result;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 pub use config::DaemonConfig;
@@ -27,20 +32,26 @@ async fn main() -> Result<()> {
     // Démarrer les sous-systèmes
     let conductor = Arc::new(conductor::Conductor::new(config.clone()).await?);
 
-    // Démarrer llama-server si pas déjà en cours
+    // Démarrer llama-server si pas déjà en cours (non-fatal : le mode mesh/
+    // pipeline n'en dépend pas).
     let llama = llama::LlamaManager::new(config.clone());
     if !llama.is_running().await {
         info!("Démarrage llama-server...");
-        llama.start().await?;
+        if let Err(e) = llama.start().await {
+            warn!("llama-server non démarré ({}). Mode mesh/pipeline uniquement.", e);
+        }
     }
 
     // Connexion au conducteur Holochain
     info!("Connexion au conducteur Holochain...");
     let holochain = holochain::HolochainClient::connect(&config).await?;
 
-    // Annoncer les capacités de ce nœud dans le DHT
-    holochain.announce_capabilities(&config).await?;
-    info!("Capacités annoncées dans le mesh");
+    // Annoncer les capacités de ce nœud dans le DHT (non-fatal hors Holochain)
+    if let Err(e) = holochain.announce_capabilities(&config).await {
+        warn!("announce_capabilities ignoré ({})", e);
+    } else {
+        info!("Capacités annoncées dans le mesh");
+    }
 
     // Démarrer le heartbeat périodique (toutes les 30s)
     let hb_holochain = holochain.clone();
@@ -49,35 +60,56 @@ async fn main() -> Result<()> {
         heartbeat::run_heartbeat(hb_holochain, hb_config).await;
     });
 
-    // Démarrer le serveur REST interne (pour le proxy)
-    let app = router::build(conductor.clone(), holochain.clone());
-    let addr = format!("127.0.0.1:{}", config.daemon_port);
-    info!("Daemon REST interne sur http://{}", addr);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-
-    // Démarrer le listener QUIC
+    // Démarrer le listener QUIC (data plane)
     let quic_addr = format!("0.0.0.0:{}", config.quic_port).parse()?;
     let quic_listener = ainonymous_quic::QuicListener::new(quic_addr).await?;
     let quic_addr_public = quic_listener.local_addr()?;
     info!("QUIC listener sur {}", quic_addr_public);
 
-    // Annoncer l'adresse QUIC dans le DHT
-    holochain.update_quic_endpoint(quic_addr_public).await?;
+    // Handle partagé pour enregistrer les sessions depuis le plan de contrôle REST
+    let registry = quic_listener.registry();
+
+    // Adresse QUIC annoncée aux pairs : `quic_advertise` si défini (loopback /
+    // IP publique), sinon l'adresse locale du listener.
+    let advertise = config.quic_advertise.as_ref()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(quic_addr_public);
+    info!("Endpoint QUIC annoncé : {}", advertise);
+
+    // Annoncer l'adresse QUIC dans le DHT (non-fatal hors Holochain)
+    if let Err(e) = holochain.update_quic_endpoint(advertise).await {
+        warn!("update_quic_endpoint ignoré ({})", e);
+    }
 
     // Lancer le listener QUIC en background
     let hl = holochain.clone();
+    let pipeline = conductor.pipeline.clone();
     tokio::spawn(async move {
         quic_listener.run(move |conn, offer| {
             let hl = hl.clone();
+            let pipeline = pipeline.clone();
             async move {
                 info!("Session QUIC entrante, couches: {:?}", offer.layer_range);
                 // Traiter la session (inférence des couches assignées)
-                if let Err(e) = conductor::handle_pipeline_session(conn, offer, &hl).await {
+                if let Err(e) =
+                    conductor::handle_pipeline_session(conn, offer, &hl, &pipeline).await
+                {
                     error!("Erreur session pipeline: {}", e);
                 }
             }
         }).await;
     });
+
+    // Démarrer le serveur REST interne (pour le proxy + plan de contrôle pairs)
+    let app = router::build(
+        conductor.clone(),
+        holochain.clone(),
+        registry,
+        advertise,
+    );
+    let addr = format!("127.0.0.1:{}", config.daemon_port);
+    info!("Daemon REST interne sur http://{}", addr);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     axum::serve(listener, app).await?;
     Ok(())

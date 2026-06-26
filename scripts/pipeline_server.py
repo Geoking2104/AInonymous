@@ -447,6 +447,67 @@ async def clear(req: ClearRequest):
     return {"cleared": req.request_id}
 
 
+# ── Tokenisation (déléguée par le coordinateur) ───────────────────────────────
+# Le tokenizer est chargé sur chaque nœud (cf. load_partial_model). Le
+# coordinateur appelle /tokenize sur le PREMIER nœud du pipeline pour convertir
+# le prompt (texte ou messages chat) en token_ids, garantissant l'alignement
+# exact avec le modèle. Évite de réimplémenter un tokenizer côté Rust.
+
+class TokenizeRequest(BaseModel):
+    # Soit du texte brut…
+    text: Optional[str] = None
+    # …soit des messages chat (role/content) → apply_chat_template
+    messages: Optional[List[Dict[str, str]]] = None
+    add_generation_prompt: bool = True
+
+class TokenizeResponse(BaseModel):
+    input_ids: List[int]
+    n_tokens: int
+
+class DetokenizeRequest(BaseModel):
+    token_ids: List[int]
+    skip_special_tokens: bool = True
+
+class DetokenizeResponse(BaseModel):
+    text: str
+
+
+@app.post("/tokenize", response_model=TokenizeResponse)
+async def tokenize(req: TokenizeRequest):
+    """Texte | messages chat → token_ids (tokenizer du modèle local)."""
+    from fastapi import HTTPException
+    if _tokenizer is None:
+        raise HTTPException(status_code=503, detail="tokenizer non chargé")
+
+    if req.messages:
+        ids = _tokenizer.apply_chat_template(
+            req.messages,
+            add_generation_prompt=req.add_generation_prompt,
+            tokenize=True,
+        )
+    elif req.text is not None:
+        ids = _tokenizer(req.text)["input_ids"]
+    else:
+        raise HTTPException(status_code=400, detail="fournir 'text' ou 'messages'")
+
+    ids = [int(x) for x in ids]
+    return TokenizeResponse(input_ids=ids, n_tokens=len(ids))
+
+
+@app.post("/detokenize", response_model=DetokenizeResponse)
+async def detokenize(req: DetokenizeRequest):
+    """token_ids → texte (utile au coordinateur si le dernier nœud n'a pas
+    renvoyé le texte décodé)."""
+    from fastapi import HTTPException
+    if _tokenizer is None:
+        raise HTTPException(status_code=503, detail="tokenizer non chargé")
+    text = _tokenizer.decode(
+        [int(x) for x in req.token_ids],
+        skip_special_tokens=req.skip_special_tokens,
+    )
+    return DetokenizeResponse(text=text)
+
+
 # ── Entrée CLI ────────────────────────────────────────────────────────────────
 
 def parse_args():

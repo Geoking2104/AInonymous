@@ -1,7 +1,7 @@
 use std::process::{Child, Stdio};
 use std::sync::{Arc, Mutex};
 use anyhow::Result;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::DaemonConfig;
 

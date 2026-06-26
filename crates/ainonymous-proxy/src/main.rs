@@ -1,3 +1,6 @@
+// Code WIP : quelques champs (ex. models::source) pas encore lus.
+#![allow(dead_code)]
+
 mod handlers;
 mod mesh_client;
 mod router;
@@ -6,7 +9,6 @@ mod state;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
-use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
