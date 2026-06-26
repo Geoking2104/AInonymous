@@ -188,10 +188,16 @@ curl http://localhost:9337/v1/chat/completions \
 - [x] HybridNode — crate Rust `hybridnode-core` + daemon + DNA Holochain
 - [x] DNA `attestation` — zomes integrity + coordinator (Holochain 0.6.1)
 - [x] Politique SD-WAN + configs + schéma JSON + CI GitHub Actions
-- [ ] Zomes Holochain — MVP `inference-mesh` (compilation WASM)
-- [ ] Intégration llama.cpp + pipeline-splitting
-- [ ] MCP server pour Goose
-- [ ] API proxy OpenAI-compatible
+- [x] Workspace Rust compile — `cargo build --workspace` vert (0 warning), 4 binaires (daemon, proxy, cli, mcp)
+- [x] API proxy OpenAI-compatible — `/v1/chat/completions` (solo + routage `pipeline_split`)
+- [x] MCP server pour Goose — stdio JSON-RPC (outils mesh + blackboard)
+- [x] Pipeline-splitting — inférence distribuée, topologie chaîne : coordinateur prefill+decode, relais worker, session QUIC réutilisée, purge KV-cache (cf. [`docs/ADR_001_coordinator_decode_loop.md`](docs/ADR_001_coordinator_decode_loop.md))
+- [x] Harnais testnet 2 nœuds (loopback) — `make testnet-2`, validé en runtime via mock (cf. [`docs/TESTNET_2NODES.md`](docs/TESTNET_2NODES.md))
+- [ ] Validation bout-en-bout avec un **vrai modèle** (torch/transformers)
+- [ ] Intégration Holochain réelle — zomes WASM buildés + `AppWebsocket` (remplace le bootstrap statique)
+- [ ] mTLS QUIC réel — vérification ed25519 du pair (actuellement skip-verify + token de session)
+- [ ] Intégration llama.cpp (chemin solo GGUF) + détection GPU NVIDIA/AMD
+- [ ] Tests d'intégration + CI Rust
 - [ ] Testnet public
 - [ ] UI dashboard
 
