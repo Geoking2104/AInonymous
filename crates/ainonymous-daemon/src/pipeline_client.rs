@@ -155,6 +155,39 @@ impl PipelineClient {
             .context("POST /clear échoué")?;
         Ok(())
     }
+
+    /// Tokeniser un prompt (messages chat) → token_ids, via le tokenizer du
+    /// modèle hébergé par ce nœud (le 1er étage du pipeline).
+    pub async fn tokenize(&self, messages: serde_json::Value) -> Result<Vec<i32>> {
+        #[derive(serde::Deserialize)]
+        struct Resp { input_ids: Vec<i32> }
+        let resp = self.http
+            .post(format!("{}/tokenize", self.base_url))
+            .json(&serde_json::json!({ "messages": messages }))
+            .send()
+            .await
+            .context("POST /tokenize échoué")?;
+        if !resp.status().is_success() {
+            anyhow::bail!("pipeline_server /tokenize → {}", resp.status());
+        }
+        Ok(resp.json::<Resp>().await?.input_ids)
+    }
+
+    /// Détokeniser des token_ids → texte (tokenizer local).
+    pub async fn detokenize(&self, token_ids: &[i32]) -> Result<String> {
+        #[derive(serde::Deserialize)]
+        struct Resp { text: String }
+        let resp = self.http
+            .post(format!("{}/detokenize", self.base_url))
+            .json(&serde_json::json!({ "token_ids": token_ids }))
+            .send()
+            .await
+            .context("POST /detokenize échoué")?;
+        if !resp.status().is_success() {
+            anyhow::bail!("pipeline_server /detokenize → {}", resp.status());
+        }
+        Ok(resp.json::<Resp>().await?.text)
+    }
 }
 
 // ── Utilitaires ──────────────────────────────────────────────────────────────

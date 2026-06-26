@@ -2,7 +2,8 @@ use anyhow::{Context, Result};
 use tracing::{debug, info, warn};
 
 use ainonymous_quic::{SessionOffer, QuicSession, ActivationTransfer, TokenStream};
-use ainonymous_types::inference::{ActivationHeader, GeneratedToken, FinishReason};
+use ainonymous_types::inference::{ActivationHeader, GeneratedToken, FinishReason, DType};
+use ainonymous_types::ExecutionPlan;
 use crate::{DaemonConfig, holochain::HolochainClient};
 use crate::pipeline_client::{PipelineClient, PrefillRequest, DecodeRequest};
 
@@ -112,6 +113,122 @@ pub async fn handle_pipeline_session(
     }
 
     Ok(())
+}
+
+// ── Côté COORDINATEUR : initiation de l'inférence pipeline (chaîne) ───────────
+
+/// Résultat d'une inférence distribuée vue du coordinateur.
+pub struct CoordinatorResult {
+    pub text: String,
+    pub token_count: u32,
+    pub node_ids: Vec<String>,
+}
+
+/// Coordinateur : lance une inférence pipeline-split (topologie chaîne).
+///
+/// 1. Tokenise le prompt via le pipeline_server local (héberge embed+tokenizer).
+/// 2. Négocie une session QUIC avec le 1er étage, en lui indiquant l'étage
+///    suivant (chaînage A→B).
+/// 3. Envoie les token_ids (u32 LE) en activations au 1er étage.
+/// 4. Reçoit le flux de tokens relayé en bout de chaîne, détokenise au besoin.
+///
+/// NB (Phase 2, tranche sûre) : la boucle de décodage multi-token complète et le
+/// relais B→A→C côté worker restent à finaliser (cf. ADR-001) ; cette fonction
+/// fournit l'initiation côté coordinateur, compilée et prête à l'emploi.
+pub async fn run_pipeline_inference(
+    holochain: &HolochainClient,
+    pipeline: &PipelineClient,
+    plan: &ExecutionPlan,
+    messages: serde_json::Value,
+) -> Result<CoordinatorResult> {
+    let stages = match plan {
+        ExecutionPlan::PipelineSplit { stages } => stages,
+        other => anyhow::bail!("run_pipeline_inference: plan non-pipeline ({:?})", other),
+    };
+    let first = stages.first()
+        .ok_or_else(|| anyhow::anyhow!("plan pipeline vide"))?;
+    let next = stages.get(1);
+
+    // 1. Tokenisation (déléguée au tokenizer du modèle, 1er nœud)
+    let token_ids = pipeline.tokenize(messages).await.context("tokenisation prompt")?;
+    if token_ids.is_empty() {
+        anyhow::bail!("tokenisation vide");
+    }
+    info!("Coordinateur : {} tokens en entrée, {} étage(s)", token_ids.len(), stages.len());
+
+    // 2. Négocier la session avec le 1er étage (chaînage vers l'étage suivant)
+    let offer = holochain.negotiate_quic_session(
+        &first.node,
+        Some((first.layer_start, first.layer_end)),
+        next.map(|s| s.node.clone()),
+        next.map(|s| (s.layer_start, s.layer_end)),
+    ).await.context("négociation session 1er étage")?;
+
+    // 3. Connexion QUIC + envoi des token_ids
+    let endpoint = ainonymous_quic::create_endpoint(None)
+        .await.context("endpoint QUIC coordinateur")?;
+    let session = QuicSession::connect(
+        &endpoint,
+        offer,
+        ainonymous_quic::SessionConfig::default(),
+    ).await.context("connexion QUIC 1er étage")?;
+
+    let request_id = uuid::Uuid::new_v4().to_string(); // 36 chars
+    let mut rid = [0u8; 36];
+    let rb = request_id.as_bytes();
+    let n = rb.len().min(36);
+    rid[..n].copy_from_slice(&rb[..n]);
+
+    let header = ActivationHeader {
+        request_id: rid,
+        layer_start: 0,
+        layer_end: first.layer_end,
+        seq_len: token_ids.len() as u32,
+        hidden_size: 0,
+        dtype: DType::F16,
+        compressed: false,
+    };
+    ActivationTransfer::send(&session, header, &token_ids_to_bytes(&token_ids))
+        .await
+        .map_err(|e| anyhow::anyhow!("envoi token_ids: {}", e))?;
+
+    // 4. Réception du flux de tokens
+    let mut ts = TokenStream::receiver(&session)
+        .await
+        .map_err(|e| anyhow::anyhow!("ouverture token stream: {}", e))?;
+
+    let mut out_ids: Vec<i32> = Vec::new();
+    let mut text = String::new();
+    while let Some(tok) = ts.recv_token().await
+        .map_err(|e| anyhow::anyhow!("réception token: {}", e))?
+    {
+        out_ids.push(tok.token_id as i32);
+        text.push_str(&tok.text);
+        if tok.finish_reason.is_some() {
+            break;
+        }
+    }
+
+    // Si le bout de chaîne n'a pas fourni le texte, détokeniser localement
+    if text.is_empty() && !out_ids.is_empty() {
+        text = pipeline.detokenize(&out_ids).await.unwrap_or_default();
+    }
+
+    Ok(CoordinatorResult {
+        text,
+        token_count: out_ids.len() as u32,
+        node_ids: stages.iter().map(|s| s.node.clone()).collect(),
+    })
+}
+
+/// Encode des token_ids en u32 LE (convention AInonymous, lue par
+/// `parse_token_ids_from_activations`).
+fn token_ids_to_bytes(ids: &[i32]) -> Vec<u8> {
+    let mut v = Vec::with_capacity(ids.len() * 4);
+    for &id in ids {
+        v.extend_from_slice(&id.to_le_bytes());
+    }
+    v
 }
 
 // ── Exécution réelle des couches ─────────────────────────────────────────────
@@ -315,10 +432,13 @@ async fn forward_activations_to_next(
     let next_agent = offer.next_agent_id.as_deref()
         .ok_or_else(|| anyhow::anyhow!("Pas de nœud suivant dans l'offre de session"))?;
 
-    // 2. Négocier une session QUIC avec le nœud suivant
+    // 2. Négocier une session QUIC avec le nœud suivant.
+    // (Chaîne 2 nœuds : le suivant est le dernier → pas de next-next.)
     let next_offer = holochain.negotiate_quic_session(
         next_agent,
         offer.next_layer_range,
+        None,
+        None,
     ).await.context("Négociation QUIC nœud suivant")?;
 
     // 3. Connexion QUIC directe (endpoint client éphémère local)

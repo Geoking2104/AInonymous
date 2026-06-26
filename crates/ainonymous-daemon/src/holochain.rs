@@ -130,6 +130,8 @@ impl HolochainClient {
         &self,
         target_agent: &str,
         layer_range: Option<(u32, u32)>,
+        next_agent: Option<String>,
+        next_layer_range: Option<(u32, u32)>,
     ) -> Result<ainonymous_quic::SessionOffer> {
         let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
             anyhow::anyhow!(
@@ -142,7 +144,11 @@ impl HolochainClient {
 
         let resp = self.http
             .post(format!("{}/mesh/session/negotiate", daemon_url))
-            .json(&json!({ "layer_range": layer_range }))
+            .json(&json!({
+                "layer_range": layer_range,
+                "next_agent_id": next_agent,
+                "next_layer_range": next_layer_range,
+            }))
             .send()
             .await?;
 

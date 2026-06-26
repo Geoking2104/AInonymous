@@ -43,6 +43,9 @@ pub fn build(
         // Plan de contrôle : négociation de session QUIC entre pairs
         .route("/mesh/session/negotiate", post(session_negotiate))
 
+        // Coordinateur : inférence distribuée (pipeline-split)
+        .route("/mesh/infer", post(mesh_infer))
+
         // Endpoints internes (zome calls via daemon)
         .route("/zome/:dna/:zome/:function", post(zome_call))
 
@@ -74,6 +77,43 @@ async fn session_negotiate(
 
     s.registry.register(offer.clone());
     Json(offer)
+}
+
+#[derive(Deserialize)]
+struct InferBody {
+    model_id: String,
+    /// Messages chat (format OpenAI) à tokeniser puis exécuter
+    messages: serde_json::Value,
+    #[serde(default)]
+    max_tokens: u32,
+}
+
+/// POST /mesh/infer
+/// Coordinateur : calcule le plan d'exécution puis lance l'inférence distribuée.
+async fn mesh_infer(
+    State(s): State<DaemonState>,
+    Json(body): Json<InferBody>,
+) -> impl IntoResponse {
+    let _ = body.max_tokens; // réservé (boucle multi-token, ADR-001)
+
+    let plan = match s.holochain.get_execution_plan(&body.model_id).await {
+        Ok(p) => p,
+        Err(e) => return (StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": format!("plan indisponible: {}", e)}))).into_response(),
+    };
+
+    match crate::conductor::run_pipeline_inference(
+        &s.holochain, &s.conductor.pipeline, &plan, body.messages,
+    ).await {
+        Ok(r) => Json(serde_json::json!({
+            "content": r.text,
+            "token_count": r.token_count,
+            "node_ids": r.node_ids,
+            "execution_mode": "pipeline_split",
+        })).into_response(),
+        Err(e) => (StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
 async fn mesh_status(State(s): State<DaemonState>) -> impl IntoResponse {
