@@ -1,3 +1,7 @@
+// Code WIP : certaines API (load_model, métriques, champs de désérialisation,
+// helpers Phase 2) ne sont pas encore toutes câblées. Évite le bruit de warnings.
+#![allow(dead_code)]
+
 mod config;
 mod conductor;
 mod holochain;

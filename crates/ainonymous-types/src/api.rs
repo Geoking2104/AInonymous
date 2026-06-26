@@ -1,6 +1,6 @@
 /// Types compatibles OpenAI Chat Completions API
 use serde::{Deserialize, Serialize};
-use crate::inference::{ChatMessage, FinishReason, MessageRole, MessageContent};
+use crate::inference::ChatMessage;
 
 // ─── Requêtes ────────────────────────────────────────────────────────────────
 

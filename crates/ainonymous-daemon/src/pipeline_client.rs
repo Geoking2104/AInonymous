@@ -3,8 +3,7 @@
 /// Le conductor appelle ce client pour exécuter les couches assignées.
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 /// URL du pipeline server local (configuré via DaemonConfig)
 const DEFAULT_PIPELINE_PORT: u16 = 9340;
@@ -174,7 +173,7 @@ pub fn b64_to_bytes(s: &str) -> Result<Vec<u8>> {
 
 /// Extraire les token IDs d'une requête de tokenisation simple
 /// (utilisé pour convertir le prompt texte → IDs via le daemon)
-pub fn extract_token_ids(prompt: &str) -> Vec<i32> {
+pub fn extract_token_ids(_prompt: &str) -> Vec<i32> {
     // Dans une implémentation complète, on appellerait le tokenizer local
     // Pour le MVP, le pipeline_server.py gère lui-même la tokenisation
     // → on passe le texte brut au premier nœud via l'API /tokenize si besoin

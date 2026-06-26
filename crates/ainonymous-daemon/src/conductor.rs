@@ -1,6 +1,5 @@
-use std::sync::Arc;
 use anyhow::{Context, Result};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use ainonymous_quic::{SessionOffer, QuicSession, ActivationTransfer, TokenStream};
 use ainonymous_types::inference::{ActivationHeader, GeneratedToken, FinishReason};

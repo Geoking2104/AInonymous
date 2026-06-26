@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use anyhow::Result;
 use tracing::{debug, info, warn};
 
-use crate::{QuicError, SessionOffer, SESSION_TOKEN_TTL_SECS};
+use crate::{QuicError, SessionOffer};
 
 /// Registre partageable des sessions en attente.
 /// Permet au plan de contrôle (REST/Holochain) d'enregistrer une offre de

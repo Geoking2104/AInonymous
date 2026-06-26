@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use axum::response::sse::Event;
-use futures::stream::{self, StreamExt};
+use futures::stream::StreamExt;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
@@ -13,7 +13,6 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use ainonymous_types::api::*;
-use ainonymous_types::inference::*;
 use crate::AppState;
 
 /// POST /v1/chat/completions
@@ -112,7 +111,7 @@ async fn handle_streaming(
     state: Arc<AppState>,
     req: ChatCompletionRequest,
     request_id: String,
-    start: Instant,
+    _start: Instant,
 ) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
     let llama_url = state.config.llama_server_url.clone();
     let model = req.model.clone();

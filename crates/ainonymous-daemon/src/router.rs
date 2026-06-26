@@ -117,8 +117,8 @@ async fn mesh_plan(
 }
 
 async fn mesh_metrics(
-    State(s): State<DaemonState>,
-    Json(body): Json<serde_json::Value>,
+    State(_s): State<DaemonState>,
+    Json(_body): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     // TODO: publier les métriques via zome call Holochain
     StatusCode::OK

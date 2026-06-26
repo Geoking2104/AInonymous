@@ -7,7 +7,6 @@ pub mod model;
 pub mod blackboard;
 pub mod nodes;
 
-use anyhow::Result;
 use reqwest::Client;
 
 pub fn api_client() -> Client {

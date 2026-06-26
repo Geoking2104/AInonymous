@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -58,7 +58,7 @@ pub struct PullModelRequest {
 
 /// POST /v1/ainonymous/models/pull
 pub async fn pull_model(
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     Json(req): Json<PullModelRequest>,
 ) -> impl IntoResponse {
     info!("Téléchargement modèle: {} (quant: {:?})", req.model_id, req.quantization);

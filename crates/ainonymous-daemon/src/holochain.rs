@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use anyhow::Result;
 use serde_json::{json, Value};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use ainonymous_types::{ExecutionPlan, NodeCapabilities, NodeHeartbeat};
 use crate::DaemonConfig;
@@ -236,7 +236,7 @@ fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
 }
 
 fn detect_compute_backends() -> Vec<ainonymous_types::ComputeBackend> {
-    let mut backends = vec![ainonymous_types::ComputeBackend::Cpu];
+    let backends = vec![ainonymous_types::ComputeBackend::Cpu];
     #[cfg(target_os = "macos")]
     backends.push(ainonymous_types::ComputeBackend::Metal);
     backends

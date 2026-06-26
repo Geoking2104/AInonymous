@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use anyhow::Result;
-use ainonymous_types::{NodeCapabilities, NodeHeartbeat};
 use crate::{mesh_client::MeshClient, ProxyConfig};
 
 /// État partagé du proxy (injecté dans tous les handlers via Arc)
