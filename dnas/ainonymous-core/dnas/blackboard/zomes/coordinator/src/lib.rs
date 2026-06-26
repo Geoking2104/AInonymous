@@ -31,12 +31,12 @@ pub fn post(input: PostInput) -> ExternResult<ActionHash> {
 
     // Lier chaque tag
     for tag in &clean_tags {
-        let tag_anchor = anchor("tags", tag)?;
+        let tag_anchor = anchor(LinkTypes::PathLinks, "tags".to_string(), tag.clone())?;
         create_link(tag_anchor, hash.clone(), LinkTypes::TagToPost, ())?;
     }
 
     // Lier l'agent à ses posts
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     create_link(agent, hash.clone(), LinkTypes::AgentToPosts, ())?;
 
     // Lier le post parent à cette réponse
@@ -52,7 +52,8 @@ pub fn post(input: PostInput) -> ExternResult<ActionHash> {
 pub fn get_recent_posts(_: ()) -> ExternResult<Vec<PostSummary>> {
     let timeline = anchor_for_timeline()?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(timeline, LinkTypes::TimelineToPost)?.build()
+        LinkQuery::try_new(timeline, LinkTypes::TimelineToPost)?,
+        GetStrategy::default(),
     )?;
 
     let now_ms = sys_time()?.as_millis() as i64;
@@ -92,9 +93,10 @@ pub fn get_recent_posts(_: ()) -> ExternResult<Vec<PostSummary>> {
 #[hdk_extern]
 pub fn search_by_tag(tag: String) -> ExternResult<Vec<PostSummary>> {
     let tag_lower = tag.trim().to_lowercase();
-    let tag_anchor = anchor("tags", &tag_lower)?;
+    let tag_anchor = anchor(LinkTypes::PathLinks, "tags".to_string(), tag_lower.clone())?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(tag_anchor, LinkTypes::TagToPost)?.build()
+        LinkQuery::try_new(tag_anchor, LinkTypes::TagToPost)?,
+        GetStrategy::default(),
     )?;
 
     let now_ms = sys_time()?.as_millis() as i64;
@@ -130,7 +132,8 @@ pub fn search_by_tag(tag: String) -> ExternResult<Vec<PostSummary>> {
 #[hdk_extern]
 pub fn get_replies(post_hash: ActionHash) -> ExternResult<Vec<PostSummary>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(post_hash, LinkTypes::PostToReplies)?.build()
+        LinkQuery::try_new(post_hash, LinkTypes::PostToReplies)?,
+        GetStrategy::default(),
     )?;
 
     let now_ms = sys_time()?.as_millis() as i64;
@@ -165,9 +168,10 @@ pub fn get_replies(post_hash: ActionHash) -> ExternResult<Vec<PostSummary>> {
 /// Posts de l'agent courant
 #[hdk_extern]
 pub fn my_posts(_: ()) -> ExternResult<Vec<PostSummary>> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToPosts)?.build()
+        LinkQuery::try_new(agent, LinkTypes::AgentToPosts)?,
+        GetStrategy::default(),
     )?;
 
     let now_ms = sys_time()?.as_millis() as i64;
@@ -231,7 +235,7 @@ pub fn search(input: SearchInput) -> ExternResult<Vec<PostSummary>> {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 fn anchor_for_timeline() -> ExternResult<EntryHash> {
-    anchor(TIMELINE_ANCHOR, "")
+    anchor(LinkTypes::PathLinks, TIMELINE_ANCHOR.to_string(), String::new())
 }
 
 /// Strip patterns PII du contenu (défensif, la validation integrity est la vraie gate)

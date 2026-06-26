@@ -9,6 +9,7 @@ name = "blackboard_coordinator"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdk = "0.4"
+hdk = "0.6"
+holochain_serialized_bytes = "0.0.57"
 blackboard-integrity = { path = "../integrity" }
 serde = { version = "1", features = ["derive"] }

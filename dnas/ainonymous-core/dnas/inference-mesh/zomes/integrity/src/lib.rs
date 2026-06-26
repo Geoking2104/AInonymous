@@ -71,6 +71,7 @@ pub enum LinkTypes {
     AgentToRequests,
     ModelToRequests,    // anchor "models/{model_id}" → requêtes
     AgentToSessions,    // agent → sessions QUIC actives
+    PathLinks,          // liens internes des anchors/paths (hdk anchor)
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

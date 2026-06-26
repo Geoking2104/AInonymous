@@ -5,7 +5,7 @@ use agent_registry_integrity::*;
 #[hdk_extern]
 pub fn announce_capabilities(caps: NodeCapabilities) -> ExternResult<ActionHash> {
     let hash = create_entry(EntryTypes::NodeCapabilities(caps.clone()))?;
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
 
     // Lier l'agent à ses capacités
     create_link(agent.clone(), hash.clone(), LinkTypes::AgentToCapabilities, ())?;
@@ -13,14 +13,14 @@ pub fn announce_capabilities(caps: NodeCapabilities) -> ExternResult<ActionHash>
     // Lier chaque modèle chargé à cet agent (pour recherche par modèle)
     for model in &caps.loaded_models {
         if model.ready {
-            let model_anchor = anchor("models", &model.model_id)?;
+            let model_anchor = anchor(LinkTypes::PathLinks, "models".to_string(), model.model_id.clone())?;
             create_link(model_anchor, agent.clone(), LinkTypes::ModelToAgents, ())?;
         }
     }
 
     // Lier la région à cet agent
     if let Some(ref region) = caps.region_hint {
-        let region_anchor = anchor("regions", region)?;
+        let region_anchor = anchor(LinkTypes::PathLinks, "regions".to_string(), region.clone())?;
         create_link(region_anchor, agent, LinkTypes::RegionToAgents, ())?;
     }
 
@@ -31,7 +31,7 @@ pub fn announce_capabilities(caps: NodeCapabilities) -> ExternResult<ActionHash>
 #[hdk_extern]
 pub fn heartbeat(hb: NodeHeartbeat) -> ExternResult<ActionHash> {
     let hash = create_entry(EntryTypes::NodeHeartbeat(hb))?;
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     create_link(agent, hash.clone(), LinkTypes::AgentToHeartbeats, ())?;
     Ok(hash)
 }
@@ -40,9 +40,10 @@ pub fn heartbeat(hb: NodeHeartbeat) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn update_quic_endpoint(input: UpdateQuicInput) -> ExternResult<ActionHash> {
     // Récupérer les capacités actuelles et les mettre à jour
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToCapabilities)?.build()
+        LinkQuery::try_new(agent, LinkTypes::AgentToCapabilities)?,
+        GetStrategy::default(),
     )?;
 
     if let Some(last_link) = links.last() {
@@ -63,9 +64,10 @@ pub fn update_quic_endpoint(input: UpdateQuicInput) -> ExternResult<ActionHash> 
 /// Filtre par heartbeat récent (< 60 secondes)
 #[hdk_extern]
 pub fn get_available_nodes(model_id: String) -> ExternResult<Vec<NodeSummary>> {
-    let anchor = anchor("models", &model_id)?;
+    let anchor = anchor(LinkTypes::PathLinks, "models".to_string(), model_id.clone())?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(anchor, LinkTypes::ModelToAgents)?.build()
+        LinkQuery::try_new(anchor, LinkTypes::ModelToAgents)?,
+        GetStrategy::default(),
     )?;
 
     let now_ms = sys_time()?.as_millis();
@@ -77,7 +79,8 @@ pub fn get_available_nodes(model_id: String) -> ExternResult<Vec<NodeSummary>> {
 
             // Vérifier le heartbeat récent
             let hb_links = get_links(
-                GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::AgentToHeartbeats)?.build()
+                LinkQuery::try_new(agent.clone(), LinkTypes::AgentToHeartbeats)?,
+                GetStrategy::default(),
             )?;
 
             let recent_hb = hb_links.iter().rev().find_map(|l| {
@@ -122,13 +125,15 @@ pub fn get_node_capabilities(agent: AgentPubKey) -> ExternResult<Option<NodeCapa
 
 fn get_node_capabilities_inner(agent: &AgentPubKey) -> ExternResult<Option<NodeCapabilities>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::AgentToCapabilities)?.build()
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToCapabilities)?,
+        GetStrategy::default(),
     )?;
 
     if let Some(last_link) = links.last() {
         if let Some(hash) = last_link.target.clone().into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                return Ok(record.entry().to_app_option::<NodeCapabilities>()?);
+                return record.entry().to_app_option::<NodeCapabilities>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)));
             }
         }
     }

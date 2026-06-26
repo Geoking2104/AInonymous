@@ -22,6 +22,7 @@ pub enum LinkTypes {
     TagToPost,         // anchor "tags/{tag}" → posts
     AgentToPosts,      // agent → ses posts
     PostToReplies,     // post → réponses
+    PathLinks,         // liens internes des anchors/paths (hdk anchor)
 }
 
 #[hdk_extern]

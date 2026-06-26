@@ -1,0 +1,6 @@
+# Build des zomes en WASM (Holochain 0.6).
+# getrandom 0.3 (tire par hdk/hdi/holochain_nonce) ne supporte pas
+# wasm32-unknown-unknown par defaut : on selectionne le backend "custom"
+# fourni par l'environnement Holochain (cf. build scripts officiels).
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="custom"']
