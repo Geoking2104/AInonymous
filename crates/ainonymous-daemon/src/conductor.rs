@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use tracing::{debug, error, info, warn};
 
 use ainonymous_quic::{SessionOffer, QuicSession, ActivationTransfer, TokenStream};
-use ainonymous_types::inference::{ActivationHeader, GeneratedToken};
+use ainonymous_types::inference::{ActivationHeader, GeneratedToken, FinishReason};
 use crate::{DaemonConfig, holochain::HolochainClient};
 use crate::pipeline_client::{PipelineClient, PrefillRequest, DecodeRequest};
 
@@ -279,7 +279,7 @@ async fn stream_tokens_to_coordinator(
             text: resp.next_token_text.unwrap_or_default(),
             logprob: None,
             finish_reason: if token_id == eos_token_id {
-                Some("stop".into())
+                Some(FinishReason::Stop)
             } else {
                 None
             },

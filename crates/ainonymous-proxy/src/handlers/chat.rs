@@ -133,7 +133,6 @@ async fn handle_streaming(
             .await
         {
             Ok(resp) => {
-                use tokio_stream::StreamExt as _;
                 let mut byte_stream = resp.bytes_stream();
 
                 while let Some(chunk_result) = byte_stream.next().await {

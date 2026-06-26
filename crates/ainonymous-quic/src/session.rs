@@ -76,7 +76,7 @@ pub struct QuicSession {
 
 impl QuicSession {
     /// Établir une connexion QUIC vers un nœud distant
-    /// Le token de session doit avoir été négocié via Holochain au préalable
+    /// Le token de session doit avoir été négocié au préalable (plan de contrôle)
     pub async fn connect(
         endpoint: &quinn::Endpoint,
         offer: SessionOffer,
@@ -86,20 +86,25 @@ impl QuicSession {
             return Err(QuicError::SessionExpired);
         }
 
-        debug!("Connexion QUIC vers {}", offer.quic_endpoint);
+        let addr = offer.quic_endpoint
+            .ok_or_else(|| QuicError::ConnectFailed("endpoint QUIC manquant dans l'offre".into()))?;
 
-        // Connexion QUIC (TLS skip verify pour cert self-signed entre nœuds connus)
-        let mut client_tls = rustls::ClientConfig::builder()
-            .with_safe_defaults()
+        debug!("Connexion QUIC vers {}", addr);
+
+        // Connexion QUIC (TLS skip verify pour cert self-signed entre nœuds connus,
+        // l'authentification réelle se fait via le session token)
+        let client_tls = rustls::ClientConfig::builder()
+            .dangerous()
             .with_custom_certificate_verifier(std::sync::Arc::new(SkipVerification))
             .with_no_client_auth();
 
-        let client_config = quinn::ClientConfig::new(std::sync::Arc::new(client_tls));
-        endpoint.set_default_client_config(client_config);
+        let quic_tls = quinn::crypto::rustls::QuicClientConfig::try_from(client_tls)
+            .map_err(|e| QuicError::ConnectFailed(e.to_string()))?;
+        let client_config = quinn::ClientConfig::new(std::sync::Arc::new(quic_tls));
 
         let conn = tokio::time::timeout(
             config.connect_timeout,
-            endpoint.connect(offer.quic_endpoint, "ainonymous.local")
+            endpoint.connect_with(client_config, addr, "ainonymous.local")
                 .map_err(|e| QuicError::ConnectFailed(e.to_string()))?
         )
         .await
@@ -111,10 +116,10 @@ impl QuicSession {
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
         auth_stream.write_all(&offer.session_token).await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        auth_stream.finish().await
+        auth_stream.finish()
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
-        info!("Session QUIC établie → {}", offer.quic_endpoint);
+        info!("Session QUIC établie → {}", addr);
 
         Ok(Self {
             connection: conn,
@@ -137,19 +142,47 @@ impl QuicSession {
 }
 
 /// Vérificateur TLS qui accepte tous les certificats self-signed
-/// (l'authentification est faite via le session token Holochain)
+/// (l'authentification est faite via le session token)
+#[derive(Debug)]
 struct SkipVerification;
 
-impl rustls::client::ServerCertVerifier for SkipVerification {
+impl rustls::client::danger::ServerCertVerifier for SkipVerification {
     fn verify_server_cert(
         &self,
-        _end_entity: &rustls::Certificate,
-        _intermediates: &[rustls::Certificate],
-        _server_name: &rustls::ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
         _ocsp_response: &[u8],
-        _now: std::time::SystemTime,
-    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::ServerCertVerified::assertion())
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        use rustls::SignatureScheme::*;
+        vec![
+            RSA_PKCS1_SHA256, RSA_PKCS1_SHA384, RSA_PKCS1_SHA512,
+            ECDSA_NISTP256_SHA256, ECDSA_NISTP384_SHA384,
+            RSA_PSS_SHA256, RSA_PSS_SHA384, RSA_PSS_SHA512,
+            ED25519,
+        ]
     }
 }

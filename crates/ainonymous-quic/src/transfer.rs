@@ -56,7 +56,7 @@ impl ActivationTransfer {
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
         stream.write_all(&data).await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        stream.finish().await
+        stream.finish()
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
         let elapsed = start.elapsed();
@@ -174,7 +174,7 @@ impl TokenStream {
     /// Fermer le stream d'émission
     pub async fn finish(&mut self) -> Result<(), QuicError> {
         if let Some(stream) = self.send_stream.as_mut() {
-            stream.finish().await
+            stream.finish()
                 .map_err(|e| QuicError::StreamError(e.to_string()))?;
         }
         Ok(())

@@ -4,6 +4,7 @@ mod holochain;
 mod llama;
 mod router;
 mod heartbeat;
+mod pipeline_client;
 
 use std::sync::Arc;
 use anyhow::Result;

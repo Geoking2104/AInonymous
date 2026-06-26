@@ -88,7 +88,7 @@ impl QuicListener {
     }
 
     async fn accept_connection<F, Fut>(
-        incoming: quinn::Connecting,
+        incoming: quinn::Incoming,
         sessions: Arc<Mutex<HashMap<Vec<u8>, SessionOffer>>>,
         handler: F,
     ) -> Result<(), QuicError>
@@ -96,7 +96,9 @@ impl QuicListener {
         F: Fn(quinn::Connection, SessionOffer) -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        let conn = incoming.await
+        let conn = incoming.accept()
+            .map_err(|e| QuicError::ConnectFailed(e.to_string()))?
+            .await
             .map_err(|e| QuicError::ConnectFailed(e.to_string()))?;
 
         debug!("Connexion QUIC entrante depuis {}", conn.remote_address());
