@@ -49,6 +49,7 @@ pub enum LinkTypes {
     AgentToHeartbeats,
     ModelToAgents,       // anchor "models/{id}" → agents capables
     RegionToAgents,      // anchor "regions/{region}" → agents
+    PathLinks,           // liens internes des anchors/paths (hdk anchor)
 }
 
 #[hdk_extern]

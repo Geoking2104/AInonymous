@@ -18,7 +18,7 @@ pub fn submit_inference_request(input: SubmitRequestInput) -> ExternResult<Recor
         prompt_hash,
         max_tokens: input.max_tokens.unwrap_or(2048),
         temperature: input.temperature.unwrap_or(0.7),
-        requester: agent_info()?.agent_latest_pubkey,
+        requester: agent_info()?.agent_initial_pubkey,
         timestamp: sys_time()?,
         execution_mode: "solo".into(),
     };
@@ -27,14 +27,14 @@ pub fn submit_inference_request(input: SubmitRequestInput) -> ExternResult<Recor
 
     // Lier l'agent à ses requêtes
     create_link(
-        agent_info()?.agent_latest_pubkey,
+        agent_info()?.agent_initial_pubkey,
         action_hash.clone(),
         LinkTypes::AgentToRequests,
         (),
     )?;
 
     // Lier le modèle à ses requêtes (pour stats)
-    let model_anchor = anchor("models", &input.model_id)?;
+    let model_anchor = anchor(LinkTypes::PathLinks, "models".to_string(), input.model_id.clone())?;
     create_link(model_anchor, action_hash.clone(), LinkTypes::ModelToRequests, ())?;
 
     get(action_hash, GetOptions::default())?
@@ -46,11 +46,9 @@ pub fn submit_inference_request(input: SubmitRequestInput) -> ExternResult<Recor
 #[hdk_extern]
 pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSessionResult> {
     use sha2::{Sha256, Digest};
-    use rand::RngCore;
 
-    // Générer token éphémère (32 bytes) — jamais stocké en DHT
-    let mut token = vec![0u8; 32];
-    rand::thread_rng().fill_bytes(&mut token);
+    // Générer token éphémère (32 bytes) via le host Holochain — jamais stocké en DHT
+    let token = random_bytes(32)?.to_vec();
 
     // Stocker uniquement le hash du token en DHT
     let mut hasher = Sha256::new();
@@ -100,7 +98,7 @@ pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanRes
     let available_nodes = call(
         CallTargetCell::OtherRole("agent-registry".into()),
         "coordinator",
-        "get_available_nodes",
+        "get_available_nodes".into(),
         None,
         input.model_id.clone(),
     )?;
@@ -108,7 +106,9 @@ pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanRes
     let nodes: Vec<NodeInfo> = match available_nodes {
         ZomeCallResponse::Ok(result) => result.decode()
             .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?,
-        ZomeCallResponse::Unauthorized(..) | ZomeCallResponse::CountersigningSession(..) =>
+        ZomeCallResponse::Unauthorized(..)
+        | ZomeCallResponse::CountersigningSession(..)
+        | ZomeCallResponse::AuthenticationFailed(..) =>
             return Err(wasm_error!(WasmErrorInner::Guest("Appel non autorisé".into()))),
         ZomeCallResponse::NetworkError(e) =>
             return Err(wasm_error!(WasmErrorInner::Guest(format!("Erreur réseau: {}", e)))),
@@ -139,7 +139,8 @@ pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanRes
 #[hdk_extern]
 pub fn get_node_metrics(agent: AgentPubKey) -> ExternResult<Vec<InferenceMetrics>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToRequests)?.build()
+        LinkQuery::try_new(agent, LinkTypes::AgentToRequests)?,
+        GetStrategy::default(),
     )?;
 
     let mut metrics = Vec::new();
@@ -180,7 +181,7 @@ fn build_pipeline_split_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPla
     ExecutionPlanResult::PipelineSplit { stages }
 }
 
-fn build_expert_shard_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPlanResult {
+fn build_expert_shard_plan(nodes: &[NodeInfo], _model_id: &str) -> ExecutionPlanResult {
     // Pour Gemma 4-26B MoE : distribuer les experts entre les nœuds
     // Tous les nœuds portent le tronc dense ; les experts sparse sont distribués
     let trunk_node = nodes[0].agent_id.clone();
@@ -193,7 +194,7 @@ fn build_expert_shard_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPlanR
         .map(|(i, node)| ExpertStageResult {
             node_agent: node.agent_id.clone(),
             quic_endpoint: node.quic_endpoint.clone().unwrap_or_default(),
-            expert_ids: (0..64).filter(|e| e % nodes.len() == i).collect(),
+            expert_ids: (0..64u32).filter(|e| (*e as usize) % nodes.len() == i).collect(),
             has_trunk: true,
         })
         .collect();

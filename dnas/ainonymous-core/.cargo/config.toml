@@ -1,0 +1,11 @@
+﻿# Build des zomes en WASM (Holochain 0.6).
+# getrandom 0.3 (tire par hdk/hdi/holochain_nonce) ne supporte pas
+# wasm32-unknown-unknown par defaut : on selectionne le backend "custom".
+#
+# --import-undefined : les host functions Holochain (__hc__must_get_entry_1,
+# __hc__verify_signature_1, etc., declarees par hdi/hdk) doivent rester des
+# IMPORTS WASM resolus par le conducteur a l'execution, pas etre liees au build.
+# rustc >= 1.95 le fait par defaut ; on le force pour les toolchains plus
+# anciennes du CI (sinon: rust-lld "undefined symbol: __hc__*").
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="custom"', '-C', 'link-arg=--import-undefined']
