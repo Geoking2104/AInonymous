@@ -16,27 +16,39 @@ pub mod transfer;
 pub mod listener;
 pub mod codec;
 pub mod error;
+pub mod mtls;
 
 pub use session::{QuicSession, SessionOffer, SessionConfig};
 pub use transfer::{ActivationTransfer, TokenStream};
 pub use listener::{QuicListener, SessionRegistry};
 pub use error::QuicError;
+pub use mtls::NodeIdentity;
 
 use std::net::SocketAddr;
 use anyhow::Result;
 
-/// Point d'entrée principal : créer un endpoint QUIC local
-pub async fn create_endpoint(bind_addr: Option<SocketAddr>) -> Result<quinn::Endpoint> {
+/// Créer un endpoint QUIC local avec mTLS ed25519.
+///
+/// Le serveur présente le certificat ed25519 de `identity` et **exige** un
+/// certificat client ed25519 valide (`Ed25519ClientVerifier`). L'authentification
+/// par token de session reste un second facteur (liaison à l'agent demandeur).
+pub async fn create_endpoint(
+    bind_addr: Option<SocketAddr>,
+    identity: &mtls::NodeIdentity,
+) -> Result<quinn::Endpoint> {
     // Installer le provider crypto par défaut (ring) — idempotent
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let addr = bind_addr.unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
 
-    // TLS self-signed pour le transport QUIC
-    // (l'authentification réelle est faite via le session token Holochain)
-    let (certs, key) = generate_self_signed_cert()?;
+    let (cert, key) = identity.tls_cert()?;
+    let tls = rustls::ServerConfig::builder()
+        .with_client_cert_verifier(std::sync::Arc::new(mtls::Ed25519ClientVerifier::new()))
+        .with_single_cert(vec![cert], key)?;
+    let quic_sc = quinn::crypto::rustls::QuicServerConfig::try_from(tls)
+        .map_err(|e| anyhow::anyhow!("QuicServerConfig: {}", e))?;
 
-    let mut server_config = quinn::ServerConfig::with_single_cert(certs, key)?;
+    let mut server_config = quinn::ServerConfig::with_crypto(std::sync::Arc::new(quic_sc));
     let mut transport = quinn::TransportConfig::default();
     transport.max_idle_timeout(Some(
         std::time::Duration::from_secs(120).try_into()?
@@ -46,17 +58,6 @@ pub async fn create_endpoint(bind_addr: Option<SocketAddr>) -> Result<quinn::End
 
     let endpoint = quinn::Endpoint::server(server_config, addr)?;
     Ok(endpoint)
-}
-
-fn generate_self_signed_cert() -> Result<(
-    Vec<rustls::pki_types::CertificateDer<'static>>,
-    rustls::pki_types::PrivateKeyDer<'static>,
-)> {
-    let cert = rcgen::generate_simple_self_signed(vec!["ainonymous.local".to_string()])?;
-    let cert_der = cert.cert.der().clone();
-    let key_der = rustls::pki_types::PrivateKeyDer::try_from(cert.key_pair.serialize_der())
-        .map_err(|e| anyhow::anyhow!("clé privée invalide: {}", e))?;
-    Ok((vec![cert_der], key_der))
 }
 
 /// Taille maximale d'un bloc d'activations (512 MB)

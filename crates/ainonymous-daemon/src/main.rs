@@ -60,9 +60,14 @@ async fn main() -> Result<()> {
         heartbeat::run_heartbeat(hb_holochain, hb_config).await;
     });
 
-    // Démarrer le listener QUIC (data plane)
+    // Identité ed25519 du nœud (mTLS QUIC + AgentPubKey). Éphémère pour le
+    // testnet ; à persister (lair-keystore) en production.
+    let identity = ainonymous_quic::NodeIdentity::generate();
+    info!("Identité ed25519 du nœud : {}", identity.public_key_hex());
+
+    // Démarrer le listener QUIC (data plane, mTLS ed25519)
     let quic_addr = format!("0.0.0.0:{}", config.quic_port).parse()?;
-    let quic_listener = ainonymous_quic::QuicListener::new(quic_addr).await?;
+    let quic_listener = ainonymous_quic::QuicListener::new(quic_addr, &identity).await?;
     let quic_addr_public = quic_listener.local_addr()?;
     info!("QUIC listener sur {}", quic_addr_public);
 
@@ -84,15 +89,17 @@ async fn main() -> Result<()> {
     // Lancer le listener QUIC en background
     let hl = holochain.clone();
     let pipeline = conductor.pipeline.clone();
+    let worker_identity = identity.clone();
     tokio::spawn(async move {
         quic_listener.run(move |conn, offer| {
             let hl = hl.clone();
             let pipeline = pipeline.clone();
+            let identity = worker_identity.clone();
             async move {
                 info!("Session QUIC entrante, couches: {:?}", offer.layer_range);
                 // Traiter la session (inférence des couches assignées)
                 if let Err(e) =
-                    conductor::handle_pipeline_session(conn, offer, &hl, &pipeline).await
+                    conductor::handle_pipeline_session(conn, offer, &hl, &pipeline, &identity).await
                 {
                     error!("Erreur session pipeline: {}", e);
                 }
@@ -106,6 +113,7 @@ async fn main() -> Result<()> {
         holochain.clone(),
         registry,
         advertise,
+        identity.clone(),
     );
     let addr = format!("127.0.0.1:{}", config.daemon_port);
     info!("Daemon REST interne sur http://{}", addr);
