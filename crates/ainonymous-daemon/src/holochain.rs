@@ -215,8 +215,8 @@ fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCap
         agent_id: "local".into(), // sera rempli par Holochain avec la vraie clé
         vram_gb,
         ram_gb: get_total_ram_gb(),
-        gpu_vendor,
-        compute_backends: detect_compute_backends(),
+        gpu_vendor: gpu_vendor.clone(),
+        compute_backends: detect_compute_backends(&gpu_vendor),
         loaded_models: vec![],
         max_concurrent_requests: config.max_concurrent_requests,
         network_bandwidth_mbps: None,
@@ -226,7 +226,6 @@ fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCap
 }
 
 fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
-    // Détection via variables d'environnement ou heuristiques
     #[cfg(target_os = "macos")]
     {
         // Apple Silicon : mémoire unifiée
@@ -236,15 +235,71 @@ fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
 
     #[cfg(not(target_os = "macos"))]
     {
-        // TODO: utiliser nvml pour NVIDIA, rocm pour AMD
+        // NVIDIA via nvidia-smi (sans dépendance native nvml)
+        if let Some((vram_gb, compute_capability)) = detect_nvidia() {
+            return (
+                ainonymous_types::GpuVendor::Nvidia { vram_gb, compute_capability },
+                vram_gb,
+            );
+        }
+        // AMD via rocm-smi
+        if let Some(vram_gb) = detect_amd() {
+            return (ainonymous_types::GpuVendor::Amd { vram_gb }, vram_gb);
+        }
         (ainonymous_types::GpuVendor::CpuOnly, 0.0)
     }
 }
 
-fn detect_compute_backends() -> Vec<ainonymous_types::ComputeBackend> {
-    let backends = vec![ainonymous_types::ComputeBackend::Cpu];
-    #[cfg(target_os = "macos")]
-    backends.push(ainonymous_types::ComputeBackend::Metal);
+/// VRAM (GiB) + compute capability de la 1ère GPU NVIDIA, via `nvidia-smi`.
+#[cfg(not(target_os = "macos"))]
+fn detect_nvidia() -> Option<(f32, String)> {
+    let out = std::process::Command::new("nvidia-smi")
+        .args(["--query-gpu=memory.total,compute_cap", "--format=csv,noheader,nounits"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let line = text.lines().next()?;
+    let mut parts = line.split(',').map(|s| s.trim());
+    let mem_mib: f32 = parts.next()?.parse().ok()?;
+    let cc = parts.next().unwrap_or("").to_string();
+    Some((mem_mib / 1024.0, cc)) // MiB → GiB
+}
+
+/// VRAM (GiB) de la 1ère GPU AMD, via `rocm-smi` (heuristique best-effort).
+#[cfg(not(target_os = "macos"))]
+fn detect_amd() -> Option<f32> {
+    let out = std::process::Command::new("rocm-smi")
+        .args(["--showmeminfo", "vram", "--csv"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Plus grand entier de la sortie = total VRAM en octets (heuristique).
+    let max_bytes = text
+        .split(|c: char| !c.is_ascii_digit())
+        .filter_map(|s| s.parse::<u64>().ok())
+        .max()?;
+    if max_bytes < 1_000_000 {
+        return None;
+    }
+    Some(max_bytes as f32 / 1_073_741_824.0) // octets → GiB
+}
+
+fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
+    use ainonymous_types::{ComputeBackend, GpuVendor};
+    let mut backends = vec![ComputeBackend::Cpu];
+    match vendor {
+        GpuVendor::AppleSilicon => backends.push(ComputeBackend::Metal),
+        GpuVendor::Nvidia { .. } => backends.push(ComputeBackend::Cuda),
+        GpuVendor::Amd { .. } => backends.push(ComputeBackend::Hip),
+        GpuVendor::Intel { .. } => backends.push(ComputeBackend::Vulkan),
+        GpuVendor::CpuOnly => {}
+    }
     backends
 }
 
