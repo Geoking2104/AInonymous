@@ -19,6 +19,10 @@ pub struct SessionOffer {
     pub next_agent_id: Option<String>,
     /// Tranche de couches du nœud suivant
     pub next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 (32 octets) attendue du pair, pour la vérification
+    /// mTLS côté client. None = pas encore fournie (repli sans liaison d'identité).
+    #[serde(default)]
+    pub peer_pubkey: Option<[u8; 32]>,
 }
 
 impl SessionOffer {
@@ -36,6 +40,7 @@ impl SessionOffer {
             expert_ids: None,
             next_agent_id: None,
             next_layer_range: None,
+            peer_pubkey: None,
         }
     }
 
@@ -81,6 +86,7 @@ impl QuicSession {
         endpoint: &quinn::Endpoint,
         offer: SessionOffer,
         config: SessionConfig,
+        identity: &crate::mtls::NodeIdentity,
     ) -> Result<Self, QuicError> {
         if offer.is_expired() {
             return Err(QuicError::SessionExpired);
@@ -91,12 +97,17 @@ impl QuicSession {
 
         debug!("Connexion QUIC vers {}", addr);
 
-        // Connexion QUIC (TLS skip verify pour cert self-signed entre nœuds connus,
-        // l'authentification réelle se fait via le session token)
+        // mTLS : on présente notre certificat ed25519 et on vérifie que le
+        // certificat serveur porte la clé attendue (offer.peer_pubkey).
+        let (cert, key) = identity.tls_cert()
+            .map_err(|e| QuicError::ConnectFailed(format!("cert ed25519: {}", e)))?;
         let client_tls = rustls::ClientConfig::builder()
             .dangerous()
-            .with_custom_certificate_verifier(std::sync::Arc::new(SkipVerification))
-            .with_no_client_auth();
+            .with_custom_certificate_verifier(std::sync::Arc::new(
+                crate::mtls::PeerKeyVerifier::new(offer.peer_pubkey),
+            ))
+            .with_client_auth_cert(vec![cert], key)
+            .map_err(|e| QuicError::ConnectFailed(e.to_string()))?;
 
         let quic_tls = quinn::crypto::rustls::QuicClientConfig::try_from(client_tls)
             .map_err(|e| QuicError::ConnectFailed(e.to_string()))?;
@@ -138,51 +149,5 @@ impl QuicSession {
     /// Durée de la session
     pub fn age(&self) -> Duration {
         self.established_at.elapsed()
-    }
-}
-
-/// Vérificateur TLS qui accepte tous les certificats self-signed
-/// (l'authentification est faite via le session token)
-#[derive(Debug)]
-struct SkipVerification;
-
-impl rustls::client::danger::ServerCertVerifier for SkipVerification {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &rustls::pki_types::CertificateDer<'_>,
-        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        _server_name: &rustls::pki_types::ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: rustls::pki_types::UnixTime,
-    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::danger::ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        _message: &[u8],
-        _cert: &rustls::pki_types::CertificateDer<'_>,
-        _dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        _message: &[u8],
-        _cert: &rustls::pki_types::CertificateDer<'_>,
-        _dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        use rustls::SignatureScheme::*;
-        vec![
-            RSA_PKCS1_SHA256, RSA_PKCS1_SHA384, RSA_PKCS1_SHA512,
-            ECDSA_NISTP256_SHA256, ECDSA_NISTP384_SHA384,
-            RSA_PSS_SHA256, RSA_PSS_SHA384, RSA_PSS_SHA512,
-            ED25519,
-        ]
     }
 }

@@ -35,8 +35,8 @@ pub struct QuicListener {
 }
 
 impl QuicListener {
-    pub async fn new(bind_addr: SocketAddr) -> Result<Self> {
-        let endpoint = crate::create_endpoint(Some(bind_addr)).await?;
+    pub async fn new(bind_addr: SocketAddr, identity: &crate::mtls::NodeIdentity) -> Result<Self> {
+        let endpoint = crate::create_endpoint(Some(bind_addr), identity).await?;
         info!("QUIC listener démarré sur {}", endpoint.local_addr()?);
 
         Ok(Self {

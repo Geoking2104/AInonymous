@@ -10,7 +10,7 @@ use axum::{
 use serde::Deserialize;
 use tower_http::trace::TraceLayer;
 
-use ainonymous_quic::{SessionOffer, SessionRegistry};
+use ainonymous_quic::{NodeIdentity, SessionOffer, SessionRegistry};
 use crate::{conductor::Conductor, holochain::HolochainClient};
 
 #[derive(Clone)]
@@ -21,6 +21,8 @@ struct DaemonState {
     registry: SessionRegistry,
     /// Endpoint QUIC public annoncé aux pairs
     quic_endpoint: SocketAddr,
+    /// Identité ed25519 du nœud (mTLS + AgentPubKey annoncé)
+    identity: NodeIdentity,
 }
 
 pub fn build(
@@ -28,8 +30,9 @@ pub fn build(
     holochain: HolochainClient,
     registry: SessionRegistry,
     quic_endpoint: SocketAddr,
+    identity: NodeIdentity,
 ) -> Router {
-    let state = DaemonState { conductor, holochain, registry, quic_endpoint };
+    let state = DaemonState { conductor, holochain, registry, quic_endpoint, identity };
 
     Router::new()
         // Endpoints pour le proxy ainonymous-proxy
@@ -74,6 +77,8 @@ async fn session_negotiate(
     let mut offer = SessionOffer::new(s.quic_endpoint, body.layer_range);
     offer.next_agent_id = body.next_agent_id;
     offer.next_layer_range = body.next_layer_range;
+    // Annonce notre clé ed25519 pour que le pair vérifie le certificat mTLS.
+    offer.peer_pubkey = Some(s.identity.public_key_bytes());
 
     s.registry.register(offer.clone());
     Json(offer)
@@ -105,7 +110,7 @@ async fn mesh_infer(
     };
 
     match crate::conductor::run_pipeline_inference(
-        &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens,
+        &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens, &s.identity,
     ).await {
         Ok(r) => Json(serde_json::json!({
             "content": r.text,

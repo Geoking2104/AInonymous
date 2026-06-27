@@ -24,6 +24,11 @@ quinn = { workspace = true }
 rustls = { workspace = true }
 rcgen = { workspace = true }
 
+# mTLS ed25519
+ed25519-dalek = { workspace = true }
+x509-parser = { workspace = true }
+hex = { workspace = true }
+
 # iroh pour NAT traversal (optionnel, fallback quinn direct)
 iroh = { workspace = true, optional = true }
 

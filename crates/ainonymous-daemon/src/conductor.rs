@@ -49,6 +49,7 @@ pub async fn handle_pipeline_session(
     offer: SessionOffer,
     holochain: &HolochainClient,
     pipeline: &PipelineClient,
+    identity: &ainonymous_quic::NodeIdentity,
 ) -> Result<()> {
     let layer_range = offer.layer_range
         .unwrap_or((0, 0));
@@ -117,10 +118,10 @@ pub async fn handle_pipeline_session(
                 let next_offer = holochain.negotiate_quic_session(
                     next_agent, offer.next_layer_range, None, None,
                 ).await.context("négociation nœud suivant")?;
-                let ep = ainonymous_quic::create_endpoint(None)
+                let ep = ainonymous_quic::create_endpoint(None, identity)
                     .await.context("endpoint QUIC client")?;
                 let s = QuicSession::connect(
-                    &ep, next_offer, ainonymous_quic::SessionConfig::default(),
+                    &ep, next_offer, ainonymous_quic::SessionConfig::default(), identity,
                 ).await.context("connexion nœud suivant")?;
                 next_endpoint = Some(ep);
                 next_session = Some(s);
@@ -205,6 +206,7 @@ pub async fn run_pipeline_inference(
     plan: &ExecutionPlan,
     messages: serde_json::Value,
     max_tokens: u32,
+    identity: &ainonymous_quic::NodeIdentity,
 ) -> Result<CoordinatorResult> {
     let stages = match plan {
         ExecutionPlan::PipelineSplit { stages } => stages,
@@ -233,10 +235,10 @@ pub async fn run_pipeline_inference(
         next.map(|s| s.node.clone()),
         next.map(|s| (s.layer_start, s.layer_end)),
     ).await.context("négociation session 1er étage")?;
-    let _endpoint = ainonymous_quic::create_endpoint(None)
+    let _endpoint = ainonymous_quic::create_endpoint(None, identity)
         .await.context("endpoint QUIC coordinateur")?;
     let session = QuicSession::connect(
-        &_endpoint, offer, ainonymous_quic::SessionConfig::default(),
+        &_endpoint, offer, ainonymous_quic::SessionConfig::default(), identity,
     ).await.context("connexion QUIC 1er étage")?;
 
     let budget = if max_tokens == 0 { 512 } else { max_tokens };
