@@ -1,16 +1,15 @@
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: inference-mesh
 integrity:
   network_seed: ~
   properties: ~
-  origin_time: "2024-01-01T00:00:00Z"
   zomes:
     - name: inference-mesh-integrity
-      bundled: ../zomes/inference-mesh-integrity.wasm
+      path: ../zomes/inference-mesh-integrity.wasm
 coordinator:
   zomes:
     - name: inference-mesh-coordinator
-      bundled: ../zomes/inference-mesh-coordinator.wasm
+      path: ../zomes/inference-mesh-coordinator.wasm
       dependencies:
         - name: inference-mesh-integrity

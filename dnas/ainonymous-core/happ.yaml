@@ -1,5 +1,5 @@
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: ainonymous-core
 description: "AInonymous — Inférence LLM décentralisée sur Holochain"
 roles:
@@ -8,7 +8,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dnas/inference-mesh/workdir/inference-mesh.dna
+      path: dnas/inference-mesh/workdir/inference-mesh.dna
       modifiers:
         network_seed: ~
         properties: ~
@@ -20,7 +20,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dnas/agent-registry/workdir/agent-registry.dna
+      path: dnas/agent-registry/workdir/agent-registry.dna
       modifiers:
         network_seed: ~
         properties: ~
@@ -32,7 +32,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dnas/blackboard/workdir/blackboard.dna
+      path: dnas/blackboard/workdir/blackboard.dna
       modifiers:
         network_seed: ~
         properties: ~
