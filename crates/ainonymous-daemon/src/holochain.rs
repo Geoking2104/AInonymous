@@ -1,10 +1,23 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 use anyhow::Result;
 use serde_json::{json, Value};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use ainonymous_types::{ExecutionPlan, NodeCapabilities, NodeHeartbeat};
 use crate::DaemonConfig;
+use crate::config::HolochainBackendKind;
+use crate::conductor_client::ConductorClient;
+
+/// Plan de contrôle : bootstrap statique (hors DHT) ou conducteur Holochain réel.
+#[derive(Clone)]
+enum Backend {
+    /// Pas de conducteur : les appels de zome passent par le REST interne
+    /// (comportement testnet historique).
+    Static,
+    /// Conducteur Holochain réel via `AppWebsocket`.
+    Conductor(Arc<ConductorClient>),
+}
 
 /// Client pour le conducteur Holochain (via WebSocket app port)
 #[derive(Clone)]
@@ -14,10 +27,33 @@ pub struct HolochainClient {
     http: reqwest::Client,
     /// Pairs statiques (bootstrap testnet, plan de contrôle hors DHT)
     peers: Vec<crate::config::PeerConfig>,
+    /// Backend actif (statique ou conducteur réel)
+    backend: Backend,
 }
 
 impl HolochainClient {
     pub async fn connect(config: &DaemonConfig) -> Result<Self> {
+        // Sélection du backend. En mode conducteur, on tente la connexion ;
+        // en cas d'échec on retombe sur le bootstrap statique (démarrage non-fatal).
+        let backend = match config.holochain.backend {
+            HolochainBackendKind::Static => Backend::Static,
+            HolochainBackendKind::Conductor => {
+                match ConductorClient::connect(
+                    config.holochain.admin_port,
+                    config.holochain.app_port,
+                    &config.holochain_app_id,
+                )
+                .await
+                {
+                    Ok(c) => Backend::Conductor(Arc::new(c)),
+                    Err(e) => {
+                        warn!("Conducteur Holochain injoignable ({e}) — repli sur bootstrap statique");
+                        Backend::Static
+                    }
+                }
+            }
+        };
+
         let client = Self {
             app_port: config.daemon_port, // port du daemon qui fait l'interface avec Holochain
             app_id: config.holochain_app_id.clone(),
@@ -25,6 +61,7 @@ impl HolochainClient {
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?,
             peers: config.peers.clone(),
+            backend,
         };
         Ok(client)
     }
@@ -50,20 +87,25 @@ impl HolochainClient {
     ) -> Result<Value> {
         debug!("Zome call: {}::{}::{}", dna, zome, function);
 
-        // Dans une implémentation complète, on utiliserait holochain_client::AppWebsocket
-        // Pour le MVP : on passe par le daemon REST interne
-        let resp = self.http
-            .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
-            .json(&payload)
-            .send()
-            .await?;
+        match &self.backend {
+            // Conducteur réel : appel de zome signé via AppWebsocket.
+            Backend::Conductor(c) => c.call_zome_json(dna, zome, function, payload).await,
+            // Bootstrap statique : passe par le REST interne (comportement testnet).
+            Backend::Static => {
+                let resp = self.http
+                    .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
+                    .json(&payload)
+                    .send()
+                    .await?;
 
-        if !resp.status().is_success() {
-            let body = resp.text().await?;
-            anyhow::bail!("Zome call {}::{}::{} échouée: {}", dna, zome, function, body);
+                if !resp.status().is_success() {
+                    let body = resp.text().await?;
+                    anyhow::bail!("Zome call {}::{}::{} échouée: {}", dna, zome, function, body);
+                }
+
+                Ok(resp.json().await?)
+            }
         }
-
-        Ok(resp.json().await?)
     }
 
     /// Annoncer les capacités de ce nœud dans le DHT

@@ -4,6 +4,7 @@
 
 mod config;
 mod conductor;
+mod conductor_client;
 mod holochain;
 mod llama;
 mod router;

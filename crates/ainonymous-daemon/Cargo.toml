@@ -30,3 +30,9 @@ config      = { workspace = true }
 dirs        = { workspace = true }
 chrono      = { workspace = true }
 base64      = { workspace = true }
+
+# Intégration Holochain réelle (mode `holochain.backend = "conductor"`).
+# default-features=false : client websocket + signature en mémoire
+# (ClientAgentSigner), SANS tirer le conducteur `holochain` (wasmer/iroh).
+holochain_client     = { version = "0.8.1", default-features = false }
+holochain_zome_types = "0.6.1"

@@ -29,6 +29,48 @@ pub struct DaemonConfig {
     /// l'IP publique du nœud). Absent = adresse locale du listener (0.0.0.0:port).
     #[serde(default)]
     pub quic_advertise: Option<String>,
+    /// Intégration Holochain : bascule bootstrap statique ↔ conducteur réel.
+    #[serde(default)]
+    pub holochain: HolochainConfig,
+}
+
+/// Choix du plan de contrôle Holochain.
+///
+/// - `Static` (défaut) : bootstrap sans conducteur (config `peers`/`pipeline_stages`).
+/// - `Conductor` : conducteur Holochain réel via `holochain_client::AppWebsocket`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum HolochainBackendKind {
+    #[default]
+    Static,
+    Conductor,
+}
+
+/// Paramètres de connexion au conducteur Holochain (mode `conductor`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HolochainConfig {
+    #[serde(default)]
+    pub backend: HolochainBackendKind,
+    /// Port de l'interface admin du conducteur (émission du token d'app +
+    /// autorisation des credentials de signature des appels de zome).
+    #[serde(default = "default_admin_port")]
+    pub admin_port: u16,
+    /// Port de l'app interface du conducteur (appels de zome).
+    #[serde(default = "default_conductor_app_port")]
+    pub app_port: u16,
+}
+
+fn default_admin_port() -> u16 { 8888 }
+fn default_conductor_app_port() -> u16 { 8890 }
+
+impl Default for HolochainConfig {
+    fn default() -> Self {
+        Self {
+            backend: HolochainBackendKind::Static,
+            admin_port: default_admin_port(),
+            app_port: default_conductor_app_port(),
+        }
+    }
 }
 
 /// Un étage du pipeline pour le plan statique de testnet. Le `quic_endpoint`
@@ -160,6 +202,7 @@ impl Default for DaemonConfig {
             peers: Vec::new(),
             pipeline_stages: Vec::new(),
             quic_advertise: None,
+            holochain: HolochainConfig::default(),
         }
     }
 }
