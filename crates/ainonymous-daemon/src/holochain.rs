@@ -212,12 +212,17 @@ impl HolochainClient {
     /// Le pair génère un token, enregistre l'offre dans son listener QUIC, et
     /// retourne l'offre (endpoint + token). Remplace l'ancien zome_call
     /// auto-référent. L'intégration Holochain réelle se branchera ici plus tard.
+    ///
+    /// `requester_pubkey` (T3.2c) : clé publique ed25519 du coordinateur demandeur.
+    /// Transmise au pair pour que son listener vérifie le cert TLS client après
+    /// le handshake QUIC. `None` = repli sans pinning d'identité côté serveur.
     pub async fn negotiate_quic_session(
         &self,
         target_agent: &str,
         layer_range: Option<(u32, u32)>,
         next_agent: Option<String>,
         next_layer_range: Option<(u32, u32)>,
+        requester_pubkey: Option<[u8; 32]>,
     ) -> Result<ainonymous_quic::SessionOffer> {
         match &self.backend {
             // Négociation via le DHT : zome `request_remote_session` (call_remote).
@@ -232,6 +237,7 @@ impl HolochainClient {
                             "layer_range": layer_range,
                             "next_agent_id": next_agent.clone(),
                             "next_layer_range": next_layer_range,
+                            "requester_pubkey": requester_pubkey,
                         }),
                     )
                     .await?;
@@ -283,6 +289,7 @@ impl HolochainClient {
                         "layer_range": layer_range,
                         "next_agent_id": next_agent,
                         "next_layer_range": next_layer_range,
+                        "requester_pubkey": requester_pubkey,
                     }))
                     .send()
                     .await?;

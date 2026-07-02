@@ -75,12 +75,22 @@ struct NegotiateBody {
     next_agent_id: Option<String>,
     #[serde(default)]
     next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 du coordinateur demandeur (hex ou raw [u8;32]).
+    /// Envoyée par le coordinateur lors de la négociation pour permettre au
+    /// listener de vérifier l'identité mTLS côté serveur (T3.2).
+    /// Absente en bootstrap statique → repli sur token seul.
+    #[serde(default)]
+    requester_pubkey: Option<[u8; 32]>,
 }
 
 /// POST /mesh/session/negotiate
 /// Un pair demande à ouvrir une session QUIC entrante sur ce nœud.
-/// On génère une offre (token + endpoint), on l'enregistre dans le listener,
-/// puis on la retourne. Le pair se connectera ensuite en QUIC avec ce token.
+/// On génère une offre (token + endpoint + peer_pubkey), on l'enregistre dans
+/// le listener, puis on la retourne. Le pair se connectera ensuite en QUIC.
+///
+/// mTLS bidirectionnel (T3.2) :
+///   - `offer.peer_pubkey`   = notre clé → le client pin notre certificat
+///   - `offer.client_pubkey` = clé du demandeur → on pin son certificat
 async fn session_negotiate(
     State(s): State<DaemonState>,
     Json(body): Json<NegotiateBody>,
@@ -88,8 +98,10 @@ async fn session_negotiate(
     let mut offer = SessionOffer::new(s.quic_endpoint, body.layer_range);
     offer.next_agent_id = body.next_agent_id;
     offer.next_layer_range = body.next_layer_range;
-    // Annonce notre clé ed25519 pour que le pair vérifie le certificat mTLS.
+    // Notre propre clé : le client peut vérifier notre cert TLS.
     offer.peer_pubkey = Some(s.identity.public_key_bytes());
+    // Clé du demandeur : on vérifiera son cert TLS après le handshake.
+    offer.client_pubkey = body.requester_pubkey;
 
     s.registry.register(offer.clone());
     Json(offer)

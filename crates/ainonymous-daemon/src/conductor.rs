@@ -120,6 +120,7 @@ pub async fn handle_pipeline_session(
                     .ok_or_else(|| anyhow::anyhow!("Pas de nœud suivant dans l'offre"))?;
                 let next_offer = holochain.negotiate_quic_session(
                     next_agent, offer.next_layer_range, None, None,
+                    Some(identity.public_key_bytes()),
                 ).await.context("négociation nœud suivant")?;
                 let ep = ainonymous_quic::create_endpoint(None, identity)
                     .await.context("endpoint QUIC client")?;
@@ -244,6 +245,7 @@ pub async fn run_pipeline_inference(
         Some((first.layer_start, first.layer_end)),
         next.map(|s| s.node.clone()),
         next.map(|s| (s.layer_start, s.layer_end)),
+        Some(identity.public_key_bytes()),
     ).await.context("négociation session 1er étage")?;
     let _endpoint = ainonymous_quic::create_endpoint(None, identity)
         .await.context("endpoint QUIC coordinateur")?;
