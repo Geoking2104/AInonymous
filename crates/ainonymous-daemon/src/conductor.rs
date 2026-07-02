@@ -15,19 +15,23 @@ pub struct Conductor {
     /// Token EOS du modèle local (lu depuis pipeline_server /status au démarrage).
     /// Défaut conservateur : 1 (Gemma family). Mis à jour si pipeline_server répond.
     pub eos_token_id: i32,
+    /// Nombre de tokens brouillon pour le décodage spéculatif (T2.4).
+    /// 0 = décodage classique. Valeur issue de config.inference.speculative_k.
+    pub speculative_k: u8,
 }
 
 impl Conductor {
     pub async fn new(config: DaemonConfig) -> Result<Self> {
         let pipeline = PipelineClient::new(config.pipeline_server_port);
+        let speculative_k = config.inference.speculative_k;
 
         // Vérifier que le pipeline_server.py tourne ; récupérer l'EOS token
         let eos_token_id = match pipeline.health_check().await {
             Ok(status) => {
                 info!(
-                    "Pipeline server actif — modèle: {} couches [{}, {}[ device: {} eos={}",
+                    "Pipeline server actif — modèle: {} couches [{}, {}[ device: {} eos={} speculative_k={}",
                     status.model_id, status.layer_start, status.layer_end,
-                    status.device, status.eos_token_id
+                    status.device, status.eos_token_id, speculative_k
                 );
                 status.eos_token_id as i32
             }
@@ -37,7 +41,7 @@ impl Conductor {
             }
         };
 
-        Ok(Self { config, pipeline, eos_token_id })
+        Ok(Self { config, pipeline, eos_token_id, speculative_k })
     }
 }
 
@@ -96,25 +100,21 @@ pub async fn handle_pipeline_session(
             &request_id, &header, &raw_activations, pipeline,
         ).await?;
 
-        if output.is_last_node {
-            // Dernier nœud : produire UN token et le renvoyer en amont.
-            let token_id = output.first_token_id
-                .ok_or_else(|| anyhow::anyhow!("dernier nœud sans token généré"))?;
-            let tok = GeneratedToken {
-                token_id: token_id as u32,
-                text: output.next_token_text.clone().unwrap_or_default(),
-                logprob: None,
-                finish_reason: if token_id == EOS_TOKEN_ID {
-                    Some(FinishReason::Stop)
-                } else {
-                    None
-                },
-            };
-            send_single_token(&session, &tok).await?;
+        // Nombre de tokens attendus : 1 (normal) ou K+1 (spéculatif)
+        let token_count = if header.speculative_k > 0 {
+            header.speculative_k as usize + 1
         } else {
-            // Nœud intermédiaire : établir (une fois) la connexion vers le
-            // suivant, transmettre les activations, récupérer le token produit
-            // en bout de chaîne et le relayer en amont.
+            1
+        };
+
+        if output.is_last_node {
+            // Dernier nœud : envoyer token_count tokens en amont.
+            for tok in output.tokens.iter().take(token_count) {
+                send_single_token(&session, tok).await?;
+            }
+        } else {
+            // Nœud intermédiaire : établir (une fois) la connexion vers le suivant,
+            // transmettre les activations, récupérer token_count tokens et les relayer.
             if next_session.is_none() {
                 let next_agent = offer.next_agent_id.as_deref()
                     .ok_or_else(|| anyhow::anyhow!("Pas de nœud suivant dans l'offre"))?;
@@ -139,12 +139,15 @@ pub async fn handle_pipeline_session(
                 hidden_size: output.hidden_size as u32,
                 dtype: header.dtype,
                 compressed: false,
+                speculative_k: header.speculative_k,  // propager
             };
             let out_activations = output.hidden_states_bytes
                 .ok_or_else(|| anyhow::anyhow!("hidden_states manquants en sortie"))?;
 
-            let tok = forward_and_receive_token_on(ns, &out_header, &out_activations).await?;
-            send_single_token(&session, &tok).await?;
+            let toks = forward_and_receive_many_on(ns, &out_header, &out_activations, token_count).await?;
+            for tok in &toks {
+                send_single_token(&session, tok).await?;
+            }
         }
     }
 
@@ -167,6 +170,8 @@ pub struct CoordinatorResult {
     pub text: String,
     pub token_count: u32,
     pub node_ids: Vec<String>,
+    /// Taux d'acceptation spéculatif (None si spéculatif désactivé).
+    pub speculative_acceptance_rate: Option<f32>,
 }
 
 /// Construit un plan d'exécution PipelineSplit à partir de la config statique
@@ -211,6 +216,7 @@ pub async fn run_pipeline_inference(
     max_tokens: u32,
     identity: &ainonymous_quic::NodeIdentity,
     eos_token_id: i32,
+    speculative_k: u8,
 ) -> Result<CoordinatorResult> {
     let stages = match plan {
         ExecutionPlan::PipelineSplit { stages } => stages,
@@ -249,9 +255,13 @@ pub async fn run_pipeline_inference(
     let mut out_ids: Vec<i32> = Vec::new();
     let mut text = String::new();
 
-    // 3. Passe de prefill (prompt complet), puis boucle de decode (1 token/passe)
+    // 3. Passe de prefill (prompt complet), puis boucle de decode
     let mut tok = send_pass_and_recv(&session, &request_id, first.layer_end, &token_ids)
         .await.context("passe prefill")?;
+
+    let mut spec_proposed: u32 = 0;
+    let mut spec_accepted: u32 = 0;
+
     loop {
         out_ids.push(tok.token_id as i32);
         text.push_str(&tok.text);
@@ -261,25 +271,159 @@ pub async fn run_pipeline_inference(
             break;
         }
 
-        let last = tok.token_id as i32;
-        tok = send_pass_and_recv(&session, &request_id, first.layer_end, &[last])
-            .await.context("passe decode")?;
+        if speculative_k > 0 && out_ids.len() as u32 + speculative_k as u32 <= budget {
+            // ── Décodage spéculatif ──────────────────────────────────────────
+            // Draft : n-gram sur les tokens générés (ou répétition du dernier token)
+            let draft = make_ngram_draft(&out_ids, speculative_k as usize);
+            spec_proposed += draft.len() as u32;
+
+            let mut input = vec![tok.token_id as i32];
+            input.extend_from_slice(&draft);
+
+            let verified = send_speculative_and_recv_many(
+                &session, &request_id, first.layer_end, &input, speculative_k,
+            ).await.context("passe spéculative")?;
+
+            // Acceptation : prefix matching (greedy speculative decoding)
+            let mut stop = false;
+            for (i, v) in verified.iter().enumerate() {
+                if i >= draft.len() {
+                    // Token bonus (toute la séquence de brouillon acceptée)
+                    out_ids.push(v.token_id as i32);
+                    text.push_str(&v.text);
+                    if v.token_id as i32 == eos_token_id { stop = true; }
+                    break;
+                }
+                let d = draft[i];
+                // Le token vérifié à la position i est la prédiction pour draft[i]
+                if d == v.token_id as i32 {
+                    // Draft correct — accepté
+                    spec_accepted += 1;
+                    out_ids.push(d);
+                    // Le texte sera détokenisé en fin de génération
+                    if d == eos_token_id { stop = true; break; }
+                } else {
+                    // Rejet — on utilise le token vérifié à la place
+                    out_ids.push(v.token_id as i32);
+                    text.push_str(&v.text);
+                    if v.token_id as i32 == eos_token_id { stop = true; }
+                    break;
+                }
+                if out_ids.len() as u32 >= budget { stop = true; break; }
+            }
+
+            // Dernier token accepté connu (pour la prochaine itération)
+            tok = match out_ids.last() {
+                Some(&id) => GeneratedToken {
+                    token_id: id as u32,
+                    text: String::new(),
+                    logprob: None,
+                    finish_reason: if id == eos_token_id { Some(FinishReason::Stop) } else { None },
+                },
+                None => break,
+            };
+            if stop || out_ids.len() as u32 >= budget { break; }
+        } else {
+            // ── Décodage classique (1 token / passe) ─────────────────────────
+            let last = tok.token_id as i32;
+            tok = send_pass_and_recv(&session, &request_id, first.layer_end, &[last])
+                .await.context("passe decode")?;
+        }
     }
 
-    // Repli : si le bout de chaîne n'a pas fourni le texte, détokeniser localement
-    if text.is_empty() && !out_ids.is_empty() {
+    // Détokeniser les tokens dont le texte n'a pas été fourni (spéculatif)
+    if text.len() < out_ids.len() {
+        text = pipeline.detokenize(&out_ids).await.unwrap_or(text);
+    } else if text.is_empty() && !out_ids.is_empty() {
         text = pipeline.detokenize(&out_ids).await.unwrap_or_default();
     }
 
     // 4. Fermer la session → purge KV-cache de toute la chaîne (cascade).
     session.close();
 
-    info!("Coordinateur : génération terminée — {} tokens", out_ids.len());
+    let speculative_acceptance_rate = if spec_proposed > 0 {
+        Some(spec_accepted as f32 / spec_proposed as f32)
+    } else {
+        None
+    };
+
+    info!(
+        "Coordinateur : {} tokens{}", out_ids.len(),
+        speculative_acceptance_rate
+            .map(|r| format!(" | spéculatif acceptance={:.0}%", r * 100.0))
+            .unwrap_or_default()
+    );
     Ok(CoordinatorResult {
         text,
         token_count: out_ids.len() as u32,
         node_ids: stages.iter().map(|s| s.node.clone()).collect(),
+        speculative_acceptance_rate,
     })
+}
+
+/// Passe spéculative : envoie K+1 tokens (last + K brouillons) via QUIC,
+/// reçoit K+1 tokens vérifiés depuis le bout de chaîne.
+async fn send_speculative_and_recv_many(
+    session: &QuicSession,
+    request_id: &str,
+    layer_end: u32,
+    input_ids: &[i32],   // [last_tok, draft_1, …, draft_K]
+    speculative_k: u8,
+) -> Result<Vec<GeneratedToken>> {
+    let mut rid = [0u8; 36];
+    let rb = request_id.as_bytes();
+    rid[..rb.len().min(36)].copy_from_slice(&rb[..rb.len().min(36)]);
+
+    let header = ActivationHeader {
+        request_id: rid,
+        layer_start: 0,
+        layer_end,
+        seq_len: input_ids.len() as u32,
+        hidden_size: 0,
+        dtype: DType::F16,
+        compressed: false,
+        speculative_k,
+    };
+    ActivationTransfer::send(session, header, &token_ids_to_bytes(input_ids))
+        .await
+        .map_err(|e| anyhow::anyhow!("envoi spéculatif: {}", e))?;
+
+    let mut ts = TokenStream::receiver(session)
+        .await
+        .map_err(|e| anyhow::anyhow!("ouverture token stream (spéculatif): {}", e))?;
+
+    let mut tokens = Vec::with_capacity(speculative_k as usize + 1);
+    for _ in 0..=speculative_k {
+        match ts.recv_token().await.map_err(|e| anyhow::anyhow!("réception tok spéculatif: {}", e))? {
+            Some(tok) => tokens.push(tok),
+            None => break,
+        }
+    }
+    Ok(tokens)
+}
+
+/// Draft n-gram : prédit les K prochains tokens depuis l'historique de génération.
+/// Stratégie : bigram basé sur les dernières occurrences dans `history`.
+/// Repli : répétition du dernier token si aucun bigram connu.
+fn make_ngram_draft(history: &[i32], k: usize) -> Vec<i32> {
+    if history.is_empty() || k == 0 {
+        return vec![];
+    }
+    let mut draft = Vec::with_capacity(k);
+    let mut last = *history.last().unwrap();
+
+    for _ in 0..k {
+        // Chercher le successeur le plus récent de `last` dans l'historique
+        let successor = history
+            .windows(2)
+            .rev()
+            .find(|w| w[0] == last)
+            .map(|w| w[1])
+            .unwrap_or(last); // repli : répéter
+        draft.push(successor);
+        last = successor;
+    }
+    draft
 }
 
 /// Une passe (prefill ou decode) sur une session DÉJÀ établie : envoie les
@@ -304,6 +448,7 @@ async fn send_pass_and_recv(
         hidden_size: 0,
         dtype: DType::F16,
         compressed: false,
+        speculative_k: 0,
     };
     ActivationTransfer::send(session, header, &token_ids_to_bytes(input_ids))
         .await
@@ -336,28 +481,27 @@ struct LayerOutput {
     seq_len: usize,
     hidden_size: usize,
     is_last_node: bool,
-    first_token_id: Option<i32>,
-    next_token_text: Option<String>,
+    /// Tokens produits par ce nœud (vide si pas le dernier nœud).
+    /// 1 token en décodage normal ; K+1 tokens en passe spéculative.
+    tokens: Vec<GeneratedToken>,
 }
 
 /// Appel au pipeline_server.py pour exécuter la tranche de couches.
-/// Gère le cas prefill (premier appel) et decode (passes suivantes).
+/// Gère prefill (seq_len > 1 ET pas de speculative_k), decode (seq_len = 1),
+/// et passe spéculative (seq_len = K+1, speculative_k = K).
 async fn run_pipeline_layers_real(
     request_id: &str,
     header: &ActivationHeader,
     raw_activations: &[u8],
     pipeline: &PipelineClient,
 ) -> Result<LayerOutput> {
-    // Prefill = traitement du prompt complet (seq_len > 1) ; decode = 1 token.
-    // (Indépendant de layer_start : un nœud intermédiaire/dernier reçoit aussi
-    // un prefill avec seq_len > 1 sous forme de hidden states.)
-    let is_prefill = header.seq_len > 1;
+    let is_speculative = header.speculative_k > 0;
+    // Prefill = prompt complet SANS flag spéculatif (seq_len > 1, speculative_k = 0)
+    let is_prefill = header.seq_len > 1 && !is_speculative;
 
     if is_prefill && header.layer_start == 0 {
-        // Cas premier nœud : les raw_activations contiennent les token_ids
-        // encodés comme u32 LE (convention AInonymous)
+        // Premier nœud : raw_activations = token_ids encodés u32 LE
         let input_ids = parse_token_ids_from_activations(raw_activations);
-
         let resp = pipeline.prefill(&PrefillRequest {
             request_id: request_id.to_string(),
             input_ids: Some(input_ids),
@@ -365,13 +509,11 @@ async fn run_pipeline_layers_real(
             seq_len: header.seq_len as usize,
             hidden_size: 0,
         }).await.context("pipeline_server /prefill (premier nœud)")?;
-
         Ok(build_layer_output_from_prefill(resp))
 
     } else if is_prefill {
-        // Nœud intermédiaire : passer les hidden states
+        // Nœud intermédiaire / dernier : hidden states entrants
         let b64 = crate::pipeline_client::bytes_to_b64(raw_activations);
-
         let resp = pipeline.prefill(&PrefillRequest {
             request_id: request_id.to_string(),
             input_ids: None,
@@ -379,35 +521,40 @@ async fn run_pipeline_layers_real(
             seq_len: header.seq_len as usize,
             hidden_size: header.hidden_size as usize,
         }).await.context("pipeline_server /prefill (nœud intermédiaire)")?;
-
         Ok(build_layer_output_from_prefill(resp))
 
     } else {
-        // Phase decode : 1 token, KV-cache déjà en mémoire sur le serveur
+        // Phase decode (1 token normal ou K+1 tokens spéculatifs)
         let is_first_decode_node = header.layer_start == 0;
-
         let req = if is_first_decode_node {
+            // Premier nœud : input_ids (1 token normal, ou K+1 tokens spéculatifs)
             let token_ids = parse_token_ids_from_activations(raw_activations);
             DecodeRequest {
                 request_id: request_id.to_string(),
                 input_ids: Some(token_ids),
                 hidden_states_b64: None,
-                seq_len: 1,
+                seq_len: header.seq_len as usize,
                 hidden_size: 0,
             }
         } else {
+            // Nœud suivant : hidden states (seq_len positions)
             let b64 = crate::pipeline_client::bytes_to_b64(raw_activations);
             DecodeRequest {
                 request_id: request_id.to_string(),
                 input_ids: None,
                 hidden_states_b64: Some(b64),
-                seq_len: 1,
+                seq_len: header.seq_len as usize,
                 hidden_size: header.hidden_size as usize,
             }
         };
+        let resp = pipeline.decode(&req).await.context("pipeline_server /decode")?;
 
-        let resp = pipeline.decode(&req)
-            .await.context("pipeline_server /decode")?;
+        // Construire la liste de tokens pour le nœud final
+        let tokens = if resp.is_last_node {
+            build_token_vec(&resp)
+        } else {
+            Vec::new()
+        };
 
         Ok(LayerOutput {
             hidden_states_bytes: resp.hidden_states_b64
@@ -417,8 +564,7 @@ async fn run_pipeline_layers_real(
             seq_len: resp.seq_len,
             hidden_size: resp.hidden_size,
             is_last_node: resp.is_last_node,
-            first_token_id: resp.next_token_id,
-            next_token_text: resp.next_token_text,
+            tokens,
         })
     }
 }
@@ -426,6 +572,20 @@ async fn run_pipeline_layers_real(
 fn build_layer_output_from_prefill(
     resp: crate::pipeline_client::PrefillResponse
 ) -> LayerOutput {
+    let tokens = if resp.is_last_node {
+        if let Some(id) = resp.next_token_id {
+            vec![GeneratedToken {
+                token_id: id as u32,
+                text: resp.next_token_text.clone().unwrap_or_default(),
+                logprob: None,
+                finish_reason: None,
+            }]
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
     LayerOutput {
         hidden_states_bytes: resp.hidden_states_b64
             .as_deref()
@@ -433,8 +593,31 @@ fn build_layer_output_from_prefill(
         seq_len: resp.seq_len,
         hidden_size: resp.hidden_size,
         is_last_node: resp.is_last_node,
-        first_token_id: resp.next_token_id,
-        next_token_text: resp.next_token_text,
+        tokens,
+    }
+}
+
+/// Construit un Vec<GeneratedToken> depuis une DecodeResponse du nœud final.
+/// Prend les K+1 tokens de `next_token_ids` si disponible (spéculatif),
+/// sinon le token unique de `next_token_id`.
+fn build_token_vec(resp: &crate::pipeline_client::DecodeResponse) -> Vec<GeneratedToken> {
+    if let Some(ids) = &resp.next_token_ids {
+        // Passe spéculative : K+1 tokens
+        ids.iter().map(|&id| GeneratedToken {
+            token_id: id as u32,
+            text: String::new(), // le texte n'est décodé que pour le token final (perf)
+            logprob: None,
+            finish_reason: None,
+        }).collect()
+    } else if let Some(id) = resp.next_token_id {
+        vec![GeneratedToken {
+            token_id: id as u32,
+            text: resp.next_token_text.clone().unwrap_or_default(),
+            logprob: None,
+            finish_reason: None,
+        }]
+    } else {
+        Vec::new()
     }
 }
 
@@ -458,34 +641,38 @@ async fn send_single_token(session: &QuicSession, tok: &GeneratedToken) -> Resul
 
 // ── Transmission au nœud suivant + relais du token ───────────────────────────
 
-/// Nœud intermédiaire : transmet les activations au nœud suivant via une session
-/// DÉJÀ établie (réutilisée entre les passes), puis attend le token produit en
-/// bout de chaîne (un token par passe). Le token est relayé en amont par
-/// l'appelant.
-async fn forward_and_receive_token_on(
+/// Nœud intermédiaire : transmet les activations au nœud suivant et reçoit
+/// `token_count` tokens produits en bout de chaîne (1 normal, K+1 spéculatif).
+async fn forward_and_receive_many_on(
     next_session: &QuicSession,
     header: &ActivationHeader,
     activations: &[u8],
-) -> Result<GeneratedToken> {
-    // 1. Envoyer les activations au nœud suivant
+    token_count: usize,
+) -> Result<Vec<GeneratedToken>> {
     ActivationTransfer::send(next_session, header.clone(), activations)
         .await
         .context("Envoi activations nœud suivant")?;
 
     debug!(
-        "Activations transmises (couches [{}, {}[)",
-        header.layer_start, header.layer_end
+        "Activations transmises (couches [{}, {}[) — {} token(s) attendu(s)",
+        header.layer_start, header.layer_end, token_count
     );
 
-    // 2. Recevoir le token produit en bout de chaîne
     let mut ts = TokenStream::receiver(next_session)
         .await
-        .map_err(|e| anyhow::anyhow!("réception token du suivant: {}", e))?;
-    let tok = ts.recv_token()
-        .await
-        .map_err(|e| anyhow::anyhow!("lecture token du suivant: {}", e))?
-        .ok_or_else(|| anyhow::anyhow!("aucun token reçu du nœud suivant"))?;
-    Ok(tok)
+        .map_err(|e| anyhow::anyhow!("réception tokens du suivant: {}", e))?;
+
+    let mut tokens = Vec::with_capacity(token_count);
+    for _ in 0..token_count {
+        match ts.recv_token().await.map_err(|e| anyhow::anyhow!("lecture tok suivant: {}", e))? {
+            Some(tok) => tokens.push(tok),
+            None => break,
+        }
+    }
+    if tokens.is_empty() {
+        anyhow::bail!("aucun token reçu du nœud suivant");
+    }
+    Ok(tokens)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

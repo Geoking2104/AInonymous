@@ -144,6 +144,11 @@ pub struct InferenceConfig {
     pub flash_attention: bool,
     pub kv_cache_type: String,
     pub parallel_requests: u8,
+    /// Nombre de tokens brouillon pour le décodage spéculatif (T2.4).
+    /// 0 = désactivé (décodage classique 1 token/passe).
+    /// Valeurs typiques : 3–8 (trade-off latence réseau / acceptance rate).
+    #[serde(default)]
+    pub speculative_k: u8,
 }
 
 impl DaemonConfig {
@@ -221,6 +226,7 @@ impl Default for DaemonConfig {
                 flash_attention: true,
                 kv_cache_type: "q8_0".into(),
                 parallel_requests: 4,
+                speculative_k: 0,  // désactivé par défaut
             },
             peers: Vec::new(),
             pipeline_stages: Vec::new(),

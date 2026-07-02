@@ -96,6 +96,9 @@ class DecodeResponse(BaseModel):
     next_token_id:   Optional[int] = None
     next_token_text: Optional[str] = None
     is_last_node: bool = False
+    # Décodage spéculatif : un token par position d'entrée (K+1 positions).
+    # Rempli uniquement quand len(input_ids) > 1 sur le nœud final.
+    next_token_ids: Optional[List[int]] = None
 
 class ClearRequest(BaseModel):
     request_id: str
@@ -396,19 +399,25 @@ async def decode(req: DecodeRequest):
     is_last  = _cfg["args"].is_last_node
     past_kv  = _kv_caches[req.request_id]
 
+    # Décodage spéculatif : input_ids peut contenir K+1 tokens
+    # (last_accepted + K draft tokens) → passe vectorisée de vérification.
+    is_speculative = is_first and req.input_ids and len(req.input_ids) > 1
+    n_positions = len(req.input_ids) if is_first and req.input_ids else req.seq_len
+
     try:
         if is_first:
             if not req.input_ids:
-                raise HTTPException(400, "input_ids requis (1 token)")
-            ids = torch.tensor([req.input_ids[-1:]], dtype=torch.long, device=device)
-            h = _model.model.embed_tokens(ids)   # [1, 1, hidden]
+                raise HTTPException(400, "input_ids requis")
+            # Support multi-token (spéculatif) : embed tous les tokens d'un coup
+            ids = torch.tensor([req.input_ids], dtype=torch.long, device=device)
+            h = _model.model.embed_tokens(ids)   # [1, n_positions, hidden]
             h, new_kvs = run_layers(h, past_key_values=past_kv, use_cache=True)
         else:
             if not req.hidden_states_b64:
                 raise HTTPException(400, "hidden_states_b64 requis")
             h = b64_to_tensor(
                 req.hidden_states_b64,
-                shape=(1, 1, req.hidden_size),
+                shape=(1, req.seq_len, req.hidden_size),
                 device=device,
                 dtype=torch.bfloat16 if _cfg["args"].dtype == "bf16" else torch.float16,
             )
@@ -419,21 +428,28 @@ async def decode(req: DecodeRequest):
             _kv_caches[req.request_id][k] = v
 
         if is_last:
-            next_id, _, _ = run_last_node(h, past_kv=None, use_cache=False)
+            # Nœud final : calculer un token par position d'entrée
+            h_norm = _model.model.norm(h)                  # [1, n_pos, hidden]
+            logits = _model.lm_head(h_norm)                # [1, n_pos, vocab]
+            all_ids = logits[0, :, :].argmax(dim=-1).tolist()  # [n_pos]
+            next_id = all_ids[-1]
             next_text = _tokenizer.decode([next_id], skip_special_tokens=True)
             return DecodeResponse(
                 request_id=req.request_id,
-                seq_len=1,
+                seq_len=len(all_ids),
                 hidden_size=h.shape[2],
                 next_token_id=next_id,
                 next_token_text=next_text,
+                # Spéculatif : fournir tous les tokens de vérification
+                next_token_ids=all_ids if len(all_ids) > 1 else None,
                 is_last_node=True,
             )
         else:
+            # Nœud intermédiaire : transmettre tous les hidden states
             return DecodeResponse(
                 request_id=req.request_id,
                 hidden_states_b64=tensor_to_b64(h),
-                seq_len=1,
+                seq_len=h.shape[1],
                 hidden_size=h.shape[2],
                 is_last_node=False,
             )

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{debug, info, warn};
 
-use ainonymous_types::{ExecutionPlan, NodeCapabilities, NodeHeartbeat};
+use ainonymous_types::{ExecutionPlan, NodeHeartbeat};
 use crate::DaemonConfig;
 use crate::config::HolochainBackendKind;
 use crate::conductor_client::ConductorClient;

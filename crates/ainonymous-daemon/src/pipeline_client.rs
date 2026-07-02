@@ -52,6 +52,10 @@ pub struct DecodeResponse {
     pub next_token_id: Option<i32>,
     pub next_token_text: Option<String>,
     pub is_last_node: bool,
+    /// Décodage spéculatif : un token par position (K+1 tokens).
+    /// Présent uniquement quand len(input_ids) > 1 sur le nœud final.
+    #[serde(default)]
+    pub next_token_ids: Option<Vec<i32>>,
 }
 
 #[derive(Debug, Deserialize)]
