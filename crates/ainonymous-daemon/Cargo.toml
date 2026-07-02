@@ -36,3 +36,4 @@ base64      = { workspace = true }
 # (ClientAgentSigner), SANS tirer le conducteur `holochain` (wasmer/iroh).
 holochain_client     = { version = "0.8.1", default-features = false }
 holochain_zome_types = "0.6.1"
+holochain_types      = "0.6.1"

@@ -74,6 +74,8 @@ async fn main() -> Result<()> {
 
     // Handle partagé pour enregistrer les sessions depuis le plan de contrôle REST
     let registry = quic_listener.registry();
+    // Second handle pour le plan de contrôle DHT (signaux du conducteur).
+    let signal_registry = quic_listener.registry();
 
     // Adresse QUIC annoncée aux pairs : `quic_advertise` si défini (loopback /
     // IP publique), sinon l'adresse locale du listener.
@@ -81,6 +83,10 @@ async fn main() -> Result<()> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(quic_addr_public);
     info!("Endpoint QUIC annoncé : {}", advertise);
+
+    // En mode conducteur : écouter les signaux `QuicListenerSignal` pour
+    // enregistrer les sessions entrantes négociées via le DHT (no-op en statique).
+    holochain.listen_quic_signals(signal_registry, advertise, identity.clone()).await;
 
     // Annoncer l'adresse QUIC dans le DHT (non-fatal hors Holochain)
     if let Err(e) = holochain.update_quic_endpoint(advertise).await {

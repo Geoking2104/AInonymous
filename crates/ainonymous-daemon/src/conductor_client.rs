@@ -15,15 +15,35 @@
 //! `"integrity"` ; le vrai nom de zome dans les manifests est `"{role}-{zome}"`
 //! (ex. `inference-mesh-coordinator`). On applique ce mapping ici.
 
-use anyhow::{anyhow, Result};
-use serde_json::Value;
-use tracing::info;
+use std::net::SocketAddr;
 
+use anyhow::{anyhow, Result};
+use serde::Deserialize;
+use serde_json::Value;
+use tracing::{debug, info};
+
+use ainonymous_quic::{NodeIdentity, SessionOffer, SessionRegistry};
 use holochain_client::{
     AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, CellInfo, ClientAgentSigner,
     ExternIO, ZomeCallTarget,
 };
+use holochain_types::prelude::Signal;
 use holochain_zome_types::prelude::{FunctionName, RoleName, ZomeName};
+
+/// Nom du zome coordinateur qui émet `QuicListenerSignal`.
+const INFERENCE_COORDINATOR_ZOME: &str = "inference-mesh-coordinator";
+
+/// Copie côté daemon du signal émis par le zome `negotiate_quic_session`.
+///
+/// Seuls les champs utiles au listener sont désérialisés ; `requestor`
+/// (`AgentPubKey`, encodé en bytes) est ignoré (serde ignore les champs inconnus).
+#[derive(Debug, Deserialize)]
+struct QuicListenerSignal {
+    /// Token de session (32 octets aléatoires) — encodé en séquence côté zome.
+    session_token: Vec<u8>,
+    #[serde(default)]
+    layer_range: Option<(u32, u32)>,
+}
 
 /// Connexion vivante à un conducteur Holochain pour une app installée.
 pub struct ConductorClient {
@@ -112,5 +132,43 @@ impl ConductorClient {
 
         out.decode::<Value>()
             .map_err(|e| anyhow!("décodage réponse {role}/{zome_name}/{func}: {e}"))
+    }
+
+    /// Enregistre un handler qui, à réception d'un `QuicListenerSignal` émis par
+    /// le zome `negotiate_quic_session`, publie l'offre de session correspondante
+    /// dans le registre du listener QUIC local (moitié « entrante » de la
+    /// négociation, pendant DHT du POST REST `/mesh/session/negotiate`).
+    pub async fn listen_quic_signals(
+        &self,
+        registry: SessionRegistry,
+        advertise: SocketAddr,
+        identity: NodeIdentity,
+    ) {
+        self.app
+            .on_signal(move |sig| {
+                let Signal::App {
+                    zome_name, signal, ..
+                } = sig
+                else {
+                    return;
+                };
+                if zome_name.to_string() != INFERENCE_COORDINATOR_ZOME {
+                    return;
+                }
+                match signal.into_inner().decode::<QuicListenerSignal>() {
+                    Ok(qls) => {
+                        let mut offer = SessionOffer::new(advertise, qls.layer_range);
+                        offer.session_token = qls.session_token;
+                        offer.peer_pubkey = Some(identity.public_key_bytes());
+                        registry.register(offer);
+                        info!(
+                            "Session QUIC entrante enregistrée via signal Holochain (couches {:?})",
+                            qls.layer_range
+                        );
+                    }
+                    Err(e) => debug!("Signal ignoré (décodage QuicListenerSignal): {e}"),
+                }
+            })
+            .await;
     }
 }

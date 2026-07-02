@@ -66,6 +66,23 @@ impl HolochainClient {
         Ok(client)
     }
 
+    /// Écoute les signaux du conducteur (mode conducteur) pour enregistrer les
+    /// sessions QUIC entrantes émises par le zome `negotiate_quic_session`.
+    /// No-op en bootstrap statique (la négociation entrante passe par le REST).
+    pub async fn listen_quic_signals(
+        &self,
+        registry: ainonymous_quic::SessionRegistry,
+        advertise: SocketAddr,
+        identity: ainonymous_quic::NodeIdentity,
+    ) {
+        match &self.backend {
+            Backend::Conductor(c) => c.listen_quic_signals(registry, advertise, identity).await,
+            Backend::Static => {
+                debug!("Signaux QUIC Holochain ignorés (backend statique)");
+            }
+        }
+    }
+
     /// Résoudre l'URL du daemon REST d'un pair via la config bootstrap.
     fn peer_daemon_url(&self, agent_id: &str) -> Option<String> {
         self.peers.iter()
