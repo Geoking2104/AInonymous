@@ -43,6 +43,11 @@ struct QuicListenerSignal {
     session_token: Vec<u8>,
     #[serde(default)]
     layer_range: Option<(u32, u32)>,
+    /// Next-hop de la chaîne pipeline (propagé par le coordinateur).
+    #[serde(default)]
+    next_agent_id: Option<String>,
+    #[serde(default)]
+    next_layer_range: Option<(u32, u32)>,
 }
 
 /// Connexion vivante à un conducteur Holochain pour une app installée.
@@ -159,6 +164,8 @@ impl ConductorClient {
                     Ok(qls) => {
                         let mut offer = SessionOffer::new(advertise, qls.layer_range);
                         offer.session_token = qls.session_token;
+                        offer.next_agent_id = qls.next_agent_id;
+                        offer.next_layer_range = qls.next_layer_range;
                         offer.peer_pubkey = Some(identity.public_key_bytes());
                         registry.register(offer);
                         info!(

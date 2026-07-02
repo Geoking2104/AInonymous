@@ -55,9 +55,14 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
     hasher.update(&token);
     let token_hash = hasher.finalize().to_vec();
 
-    // Endpoint QUIC à annoncer : notre endpoint publié dans agent-registry
-    // (résolu via DHT), repli sur celui fourni par l'appelant.
-    let my_endpoint = resolve_my_quic_endpoint().unwrap_or(input.local_quic_endpoint.clone());
+    // Endpoint QUIC et clé publique ed25519 de CE nœud, résolus via agent-registry.
+    // La pubkey est incluse dans la réponse pour permettre le pinning mTLS côté demandeur.
+    let my_info = resolve_my_agent_info();
+    let my_endpoint = my_info
+        .as_ref()
+        .and_then(|i| i.quic_endpoint.clone())
+        .unwrap_or(input.local_quic_endpoint.clone());
+    let my_node_pubkey = my_info.and_then(|i| i.node_pubkey);
 
     // Émettre un signal vers le daemon local pour ouvrir le listener QUIC.
     // Le next-hop est propagé pour que le worker sache vers qui relayer.
@@ -83,7 +88,8 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
     };
     create_entry(EntryTypes::QuicSessionOffer(offer))?;
 
-    // Retourner le token en clair au demandeur (via remote call, pas le DHT)
+    // Retourner le token en clair au demandeur (via remote call, pas le DHT).
+    // Palier D : inclure la clé publique ed25519 pour le pinning mTLS côté demandeur.
     Ok(QuicSessionResult {
         quic_endpoint: my_endpoint,
         session_token: token,
@@ -91,6 +97,7 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
         layer_range: input.layer_range,
         next_agent_id: input.next_agent_id,
         next_layer_range: input.next_layer_range,
+        node_pubkey: my_node_pubkey,
     })
 }
 
@@ -148,8 +155,9 @@ pub fn request_remote_session(input: RemoteSessionInput) -> ExternResult<QuicSes
     }
 }
 
-/// Endpoint QUIC de CET agent, résolu via agent-registry (cross-DNA intra-agent).
-fn resolve_my_quic_endpoint() -> Option<String> {
+/// Informations réseau de CET agent, résolues via agent-registry (cross-DNA
+/// intra-agent) : endpoint QUIC + clé publique ed25519 pour le pinning mTLS.
+fn resolve_my_agent_info() -> Option<AgentQuicEndpoint> {
     let me = agent_info().ok()?.agent_initial_pubkey;
     let resp = call(
         CallTargetCell::OtherRole("agent-registry".into()),
@@ -160,12 +168,14 @@ fn resolve_my_quic_endpoint() -> Option<String> {
     )
     .ok()?;
     match resp {
-        ZomeCallResponse::Ok(data) => {
-            let caps: Option<AgentQuicEndpoint> = data.decode().ok()?;
-            caps.and_then(|c| c.quic_endpoint)
-        }
+        ZomeCallResponse::Ok(data) => data.decode().ok()?,
         _ => None,
     }
+}
+
+/// Endpoint QUIC de CET agent (wrapper de compatibilité).
+fn resolve_my_quic_endpoint() -> Option<String> {
+    resolve_my_agent_info()?.quic_endpoint
 }
 
 /// Publier les métriques d'inférence
@@ -330,11 +340,15 @@ pub struct RemoteSessionInput {
 }
 
 /// Vue minimale des capacités d'un agent (décodage partiel de NodeCapabilities
-/// d'agent-registry : on ne lit que l'endpoint).
+/// d'agent-registry) : endpoint QUIC + clé publique ed25519 pour le pinning mTLS.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AgentQuicEndpoint {
     #[serde(default)]
     pub quic_endpoint: Option<String>,
+    /// Clé publique ed25519 hex (palier D) — absente si le nœud n'a pas encore
+    /// migré vers `load_or_generate` ; ignorée sans paniquer (`serde(default)`).
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -347,6 +361,11 @@ pub struct QuicSessionResult {
     pub next_agent_id: Option<String>,
     #[serde(default)]
     pub next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 hex du nœud répondant (palier D).
+    /// Renseignée si le nœud a publié `node_pubkey` dans agent-registry.
+    /// Le demandeur l'utilise pour pinner le certificat mTLS lors de la connexion QUIC.
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -364,35 +383,4 @@ pub struct PlanInput {
 ///
 /// Les noms de champs (`node`, `quic_endpoint`) correspondent exactement à
 /// `ainonymous_types::ExecutionPlan` côté daemon, afin que le daemon puisse
-/// désérialiser directement la réponse ExternIO avec `serde_json::from_value`.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-pub enum ExecutionPlanOutput {
-    Solo {
-        /// AgentPubKey encodé (format "uhCAk…") du nœud cible.
-        node: String,
-        /// Endpoint QUIC du nœud, ex: "1.2.3.4:9000".
-        quic_endpoint: String,
-    },
-    PipelineSplit {
-        stages: Vec<PipelineStageOutput>,
-    },
-    ExpertShard {
-        stages: Vec<ExpertStageOutput>,
-        trunk_node: String,
-    },
-}
-
-/// Étage d'un plan pipeline — noms alignés avec `ainonymous_types::PipelineStage`.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PipelineStageOutput {
-    pub node: String,
-    pub quic_endpoint: String,
-    pub layer_start: u32,
-    pub layer_end: u32,
-    pub is_last: bool,
-}
-
-/// Étage d'un plan expert-shard — noms alignés avec `ainonymous_types::ExpertStage`.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ExpertStageOutpu
+/// d

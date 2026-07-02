@@ -18,6 +18,11 @@ pub struct NodeCapabilities {
     pub region_hint: Option<String>,
     /// Adresse QUIC publique pour le canal de données
     pub quic_endpoint: Option<SocketAddr>,
+    /// Clé publique ed25519 du nœud (hex, 64 chars) pour le pinning mTLS.
+    /// Publiée dans le DHT afin que les pairs puissent vérifier l'identité TLS
+    /// du nœud lors de la connexion QUIC (plan de données).
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -147,16 +152,4 @@ pub enum ExecutionPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineStage {
     pub node: AgentId,
-    pub quic_endpoint: SocketAddr,
-    pub layer_start: u32,
-    pub layer_end: u32,
-    pub is_last: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpertStage {
-    pub node: AgentId,
-    pub quic_endpoint: SocketAddr,
-    pub expert_ids: Vec<u32>,
-    pub has_trunk: bool,
-}
+    pub quic_endp

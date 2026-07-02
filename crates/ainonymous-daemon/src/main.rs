@@ -30,6 +30,19 @@ async fn main() -> Result<()> {
     let config = DaemonConfig::load()?;
     info!("Config chargée depuis {:?}", config.config_path());
 
+    // Palier D : charger (ou générer + persister) l'identité ed25519 du nœud
+    // avant toute autre opération. La clé publique sera annoncée dans le DHT
+    // pour permettre le pinning mTLS des sessions QUIC entrantes.
+    let identity_path = {
+        let mut p = dirs::data_local_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        p.push("ainonymous");
+        p.push("node_identity.key");
+        p
+    };
+    let identity = ainonymous_quic::NodeIdentity::load_or_generate(&identity_path)?;
+    info!("Identité ed25519 du nœud : {} (depuis {:?})", identity.public_key_hex(), identity_path);
+
     // Démarrer les sous-systèmes
     let conductor = Arc::new(conductor::Conductor::new(config.clone()).await?);
 
@@ -47,8 +60,9 @@ async fn main() -> Result<()> {
     info!("Connexion au conducteur Holochain...");
     let holochain = holochain::HolochainClient::connect(&config).await?;
 
-    // Annoncer les capacités de ce nœud dans le DHT (non-fatal hors Holochain)
-    if let Err(e) = holochain.announce_capabilities(&config).await {
+    // Annoncer les capacités de ce nœud dans le DHT, y compris la pubkey ed25519
+    // pour le pinning mTLS (palier D). Non-fatal hors Holochain.
+    if let Err(e) = holochain.announce_capabilities(&config, Some(&identity.public_key_hex())).await {
         warn!("announce_capabilities ignoré ({})", e);
     } else {
         info!("Capacités annoncées dans le mesh");
@@ -60,11 +74,6 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         heartbeat::run_heartbeat(hb_holochain, hb_config).await;
     });
-
-    // Identité ed25519 du nœud (mTLS QUIC + AgentPubKey). Éphémère pour le
-    // testnet ; à persister (lair-keystore) en production.
-    let identity = ainonymous_quic::NodeIdentity::generate();
-    info!("Identité ed25519 du nœud : {}", identity.public_key_hex());
 
     // Démarrer le listener QUIC (data plane, mTLS ed25519)
     let quic_addr = format!("0.0.0.0:{}", config.quic_port).parse()?;
@@ -114,18 +123,4 @@ async fn main() -> Result<()> {
         }).await;
     });
 
-    // Démarrer le serveur REST interne (pour le proxy + plan de contrôle pairs)
-    let app = router::build(
-        conductor.clone(),
-        holochain.clone(),
-        registry,
-        advertise,
-        identity.clone(),
-    );
-    let addr = format!("127.0.0.1:{}", config.daemon_port);
-    info!("Daemon REST interne sur http://{}", addr);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-
-    axum::serve(listener, app).await?;
-    Ok(())
-}
+    // Démarre

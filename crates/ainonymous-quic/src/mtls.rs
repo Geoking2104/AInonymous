@@ -51,6 +51,41 @@ impl NodeIdentity {
         self.signing.to_bytes()
     }
 
+    /// Charge l'identité depuis `path` (seed de 32 octets) ou en génère une
+    /// nouvelle et la persiste sur disque. Crée les répertoires parents si absent.
+    ///
+    /// Le fichier contient exactement 32 octets (la seed ed25519 brute). Aucun
+    /// chiffrement supplémentaire : la protection repose sur les permissions FS
+    /// (chmod 600 recommandé).
+    pub fn load_or_generate(path: &std::path::Path) -> Result<Self> {
+        if path.exists() {
+            let bytes = std::fs::read(path).context("lecture seed identité ed25519")?;
+            let seed: [u8; 32] = bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("seed corrompue : attendu 32 octets, obtenu {}", bytes.len()))?;
+            tracing::info!("Identité ed25519 chargée depuis {:?}", path);
+            Ok(Self::from_seed(&seed))
+        } else {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .context("création répertoire identité")?;
+            }
+            let identity = Self::generate();
+            std::fs::write(path, identity.seed_bytes())
+                .context("sauvegarde seed identité ed25519")?;
+            // Restreindre les permissions sur Unix (lecture seule par le propriétaire)
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+                    .context("chmod 600 seed identité")?;
+            }
+            tracing::info!("Nouvelle identité ed25519 générée et sauvegardée dans {:?}", path);
+            Ok(identity)
+        }
+    }
+
     /// Certificat TLS auto-signé porté par cette clé ed25519.
     pub fn tls_cert(&self) -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
         use ed25519_dalek::pkcs8::EncodePrivateKey;
@@ -152,68 +187,4 @@ impl ServerCertVerifier for PeerKeyVerifier {
 }
 
 /// Vérificateur côté SERVEUR : exige un certificat client ed25519 auto-signé
-/// valide. La liaison à un agent précis est assurée en aval par le token de
-/// session (enregistré avec le `requestor`).
-#[derive(Debug)]
-pub struct Ed25519ClientVerifier {
-    algs: WebPkiSupportedAlgorithms,
-}
-
-impl Ed25519ClientVerifier {
-    pub fn new() -> Self {
-        Self { algs: provider_algs() }
-    }
-}
-
-impl Default for Ed25519ClientVerifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ClientCertVerifier for Ed25519ClientVerifier {
-    fn offer_client_auth(&self) -> bool {
-        true
-    }
-
-    fn client_auth_mandatory(&self) -> bool {
-        true
-    }
-
-    fn root_hint_subjects(&self) -> &[DistinguishedName] {
-        &[]
-    }
-
-    fn verify_client_cert(
-        &self,
-        end_entity: &CertificateDer<'_>,
-        _intermediates: &[CertificateDer<'_>],
-        _now: UnixTime,
-    ) -> Result<ClientCertVerified, rustls::Error> {
-        // Doit être un certificat ed25519 ; possession prouvée par la signature.
-        let _ = ed25519_pubkey_from_cert(end_entity)?;
-        Ok(ClientCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls12_signature(message, cert, dss, &self.algs)
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(message, cert, dss, &self.algs)
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.algs.supported_schemes()
-    }
-}
+/// valide. La liaison à un agent p

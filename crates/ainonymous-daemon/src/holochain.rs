@@ -21,6 +21,9 @@ pub struct NodeSummary {
     pub quic_endpoint: Option<String>,
     pub region_hint: Option<String>,
     pub score: f32,
+    /// Clé publique ed25519 du nœud (hex) pour le pinning mTLS côté client QUIC.
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
 }
 
 /// Plan de contrôle : bootstrap statique (hors DHT) ou conducteur Holochain réel.
@@ -139,10 +142,17 @@ impl HolochainClient {
         }
     }
 
-    /// Annoncer les capacités de ce nœud dans le DHT
-    pub async fn announce_capabilities(&self, config: &DaemonConfig) -> Result<()> {
-        // Détecter les capacités GPU
-        let caps = detect_local_capabilities(config);
+    /// Annoncer les capacités de ce nœud dans le DHT, y compris la clé publique
+    /// ed25519 pour le pinning mTLS QUIC (palier D).
+    ///
+    /// `node_pubkey_hex` : clé publique hex de `NodeIdentity::public_key_hex()`.
+    pub async fn announce_capabilities(
+        &self,
+        config: &DaemonConfig,
+        node_pubkey_hex: Option<&str>,
+    ) -> Result<()> {
+        let mut caps = detect_local_capabilities(config);
+        caps.node_pubkey = node_pubkey_hex.map(|s| s.to_string());
 
         self.zome_call(
             "agent-registry",
@@ -151,9 +161,9 @@ impl HolochainClient {
             serde_json::to_value(&caps)?,
         ).await?;
 
-        info!("Capacités annoncées: {:.1}GB VRAM, modèles: {:?}",
+        info!("Capacités annoncées: {:.1}GB VRAM, node_pubkey: {}",
             caps.vram_gb,
-            caps.loaded_models.iter().map(|m| &m.model_id).collect::<Vec<_>>());
+            node_pubkey_hex.unwrap_or("<non fournie>"));
         Ok(())
     }
 
@@ -234,13 +244,26 @@ impl HolochainClient {
                 let token: Vec<u8> = serde_json::from_value(result["session_token"].clone())
                     .map_err(|e| anyhow::anyhow!("session_token invalide: {e}"))?;
 
+                // Palier D : pinning mTLS — le zome retourne la clé publique ed25519
+                // du nœud cible (publiée dans le DHT via announce_capabilities).
+                let peer_pubkey: Option<[u8; 32]> = result["node_pubkey"]
+                    .as_str()
+                    .and_then(|hex_str| {
+                        let bytes = hex::decode(hex_str).ok()?;
+                        bytes.try_into().ok()
+                    });
+
+                if peer_pubkey.is_some() {
+                    debug!("Pinning mTLS activé pour le pair {}", target_agent);
+                } else {
+                    warn!("node_pubkey absent dans la réponse de {} — pinning désactivé (repli possession seule)", target_agent);
+                }
+
                 let mut offer = ainonymous_quic::SessionOffer::new(endpoint, layer_range);
                 offer.session_token = token;
                 offer.next_agent_id = next_agent;
                 offer.next_layer_range = next_layer_range;
-                // Clé mTLS du pair inconnue tant que l'identité n'est pas
-                // persistée/publiée (palier D) → possession vérifiée sans pinning.
-                offer.peer_pubkey = None;
+                offer.peer_pubkey = peer_pubkey;
                 Ok(offer)
             }
             // Bootstrap statique : POST direct au daemon REST du pair.
@@ -389,27 +412,4 @@ fn detect_amd() -> Option<f32> {
         .args(["--showmeminfo", "vram", "--csv"])
         .output()
         .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let text = String::from_utf8_lossy(&out.stdout);
-    // Plus grand entier de la sortie = total VRAM en octets (heuristique).
-    let max_bytes = text
-        .split(|c: char| !c.is_ascii_digit())
-        .filter_map(|s| s.parse::<u64>().ok())
-        .max()?;
-    if max_bytes < 1_000_000 {
-        return None;
-    }
-    Some(max_bytes as f32 / 1_073_741_824.0) // octets → GiB
-}
-
-fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
-    use ainonymous_types::{ComputeBackend, GpuVendor};
-    let mut backends = vec![ComputeBackend::Cpu];
-    match vendor {
-        GpuVendor::AppleSilicon => backends.push(ComputeBackend::Metal),
-        GpuVendor::Nvidia { .. } => backends.push(ComputeBackend::Cuda),
-        GpuVendor::Amd { .. } => backends.push(ComputeBackend::Hip),
-        GpuVendor::Intel { .. } => backends.push(ComputeBackend::Vulkan),
-        GpuVendor::Cpu
+   
