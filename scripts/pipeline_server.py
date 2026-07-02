@@ -110,6 +110,10 @@ class StatusResponse(BaseModel):
     active_requests: int
     device: str
     dtype: str
+    # Token de fin de séquence du modèle (ex: 1 pour Gemma, 2 pour Llama 3).
+    # Exposé pour que le coordinateur Rust adapte sa condition d'arrêt sans
+    # le coder en dur.
+    eos_token_id: int = 1
 
 
 # ── Chargement du modèle (partiel) ────────────────────────────────────────────
@@ -302,6 +306,9 @@ app = FastAPI(title="AInonymous Pipeline Server", lifespan=lifespan)
 
 @app.get("/status", response_model=StatusResponse)
 async def status():
+    eos_id = 1  # valeur par défaut conservatrice (Gemma family)
+    if _tokenizer is not None and hasattr(_tokenizer, "eos_token_id"):
+        eos_id = int(_tokenizer.eos_token_id or 1)
     return StatusResponse(
         model_id=_cfg["args"].model,
         layer_start=_cfg["args"].layer_start,
@@ -312,6 +319,7 @@ async def status():
         active_requests=len(_kv_caches),
         device=_cfg["args"].device,
         dtype=_cfg["args"].dtype,
+        eos_token_id=eos_id,
     )
 
 

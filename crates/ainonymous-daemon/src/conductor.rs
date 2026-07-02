@@ -8,33 +8,36 @@ use ainonymous_types::ExecutionPlan;
 use crate::{DaemonConfig, holochain::HolochainClient};
 use crate::pipeline_client::{PipelineClient, PrefillRequest, DecodeRequest};
 
-/// Token de fin de séquence (Gemma 4 : <eos> = 1)
-const EOS_TOKEN_ID: i32 = 1;
-
 /// Orchestrateur central du daemon
 pub struct Conductor {
     pub config: DaemonConfig,
     pub pipeline: PipelineClient,
+    /// Token EOS du modèle local (lu depuis pipeline_server /status au démarrage).
+    /// Défaut conservateur : 1 (Gemma family). Mis à jour si pipeline_server répond.
+    pub eos_token_id: i32,
 }
 
 impl Conductor {
     pub async fn new(config: DaemonConfig) -> Result<Self> {
         let pipeline = PipelineClient::new(config.pipeline_server_port);
 
-        // Vérifier que le pipeline_server.py tourne
-        match pipeline.health_check().await {
+        // Vérifier que le pipeline_server.py tourne ; récupérer l'EOS token
+        let eos_token_id = match pipeline.health_check().await {
             Ok(status) => {
                 info!(
-                    "Pipeline server actif — modèle: {} couches [{}, {}[ device: {}",
-                    status.model_id, status.layer_start, status.layer_end, status.device
+                    "Pipeline server actif — modèle: {} couches [{}, {}[ device: {} eos={}",
+                    status.model_id, status.layer_start, status.layer_end,
+                    status.device, status.eos_token_id
                 );
+                status.eos_token_id as i32
             }
             Err(e) => {
                 warn!("Pipeline server inaccessible ({}). Démarrage en mode solo uniquement.", e);
+                1 // fallback Gemma
             }
-        }
+        };
 
-        Ok(Self { config, pipeline })
+        Ok(Self { config, pipeline, eos_token_id })
     }
 }
 
@@ -207,6 +210,7 @@ pub async fn run_pipeline_inference(
     messages: serde_json::Value,
     max_tokens: u32,
     identity: &ainonymous_quic::NodeIdentity,
+    eos_token_id: i32,
 ) -> Result<CoordinatorResult> {
     let stages = match plan {
         ExecutionPlan::PipelineSplit { stages } => stages,
@@ -252,7 +256,7 @@ pub async fn run_pipeline_inference(
         out_ids.push(tok.token_id as i32);
         text.push_str(&tok.text);
 
-        let is_eos = tok.token_id as i32 == EOS_TOKEN_ID || tok.finish_reason.is_some();
+        let is_eos = tok.token_id as i32 == eos_token_id || tok.finish_reason.is_some();
         if is_eos || out_ids.len() as u32 >= budget {
             break;
         }

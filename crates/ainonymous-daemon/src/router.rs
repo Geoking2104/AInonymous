@@ -121,7 +121,8 @@ async fn mesh_infer(
     };
 
     match crate::conductor::run_pipeline_inference(
-        &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens, &s.identity,
+        &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens,
+        &s.identity, s.conductor.eos_token_id,
     ).await {
         Ok(r) => Json(serde_json::json!({
             "content": r.text,

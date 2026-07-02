@@ -46,7 +46,12 @@ echo "▶ Modèle=$MODEL  couches=$TOTAL_LAYERS  split=$SPLIT  device=$DEVICE"
 
 # ── Génération des configs (source unique de vérité) ──────────────────────────
 common_sections() {
+  local identity_path="$1"
   cat <<EOF
+
+[holochain]
+backend       = "static"
+identity_path = "$identity_path"
 
 [network]
 quic_relay_fallback = true
@@ -77,7 +82,7 @@ holochain_conductor_url = "ws://127.0.0.1:8888"
 holochain_app_id = "ainonymous-core"
 max_concurrent_requests = 4
 quic_advertise = "127.0.0.1:$A_QUIC"
-$(common_sections)
+$(common_sections "$RUN/node-a-identity.key")
 
 [[peers]]
 agent_id = "node-a"
@@ -112,7 +117,7 @@ holochain_conductor_url = "ws://127.0.0.1:8888"
 holochain_app_id = "ainonymous-core"
 max_concurrent_requests = 4
 quic_advertise = "127.0.0.1:$B_QUIC"
-$(common_sections)
+$(common_sections "$RUN/node-b-identity.key")
 EOF
 
 # ── Nettoyage à la sortie ─────────────────────────────────────────────────────

@@ -64,7 +64,13 @@ pub struct PipelineStatus {
     pub is_last_node: bool,
     pub active_requests: usize,
     pub device: String,
+    /// Token EOS du modèle (ex: 1 pour Gemma, 2 pour Llama 3).
+    /// Fourni par pipeline_server.py /status ; fallback = 1 si absent.
+    #[serde(default = "default_eos_token_id")]
+    pub eos_token_id: u32,
 }
+
+fn default_eos_token_id() -> u32 { 1 }
 
 // ── Client ──────────────────────────────────────────────────────────────────
 
