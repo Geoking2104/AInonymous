@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{debug, info, warn};
 
@@ -8,6 +9,19 @@ use ainonymous_types::{ExecutionPlan, NodeCapabilities, NodeHeartbeat};
 use crate::DaemonConfig;
 use crate::config::HolochainBackendKind;
 use crate::conductor_client::ConductorClient;
+
+/// Vue résumée d'un nœud du mesh retournée par `agent-registry-coordinator::get_available_nodes`.
+/// Correspond à `NodeSummary` côté zome.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeSummary {
+    pub agent_id: String,
+    pub vram_gb: f32,
+    pub current_load: f32,
+    pub available_slots: u8,
+    pub quic_endpoint: Option<String>,
+    pub region_hint: Option<String>,
+    pub score: f32,
+}
 
 /// Plan de contrôle : bootstrap statique (hors DHT) ou conducteur Holochain réel.
 #[derive(Clone)]
@@ -166,8 +180,11 @@ impl HolochainClient {
         Ok(serde_json::from_value(resp)?)
     }
 
-    /// Récupérer les nœuds disponibles pour un modèle
-    pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeCapabilities>> {
+    /// Récupérer les nœuds disponibles pour un modèle (résumé DHT).
+    ///
+    /// Retourne `NodeSummary` (sous-ensemble de `NodeCapabilities`) tel que
+    /// retourné par `agent-registry-coordinator::get_available_nodes`.
+    pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
         let resp = self.zome_call(
             "agent-registry",
             "coordinator",
@@ -192,31 +209,69 @@ impl HolochainClient {
         next_agent: Option<String>,
         next_layer_range: Option<(u32, u32)>,
     ) -> Result<ainonymous_quic::SessionOffer> {
-        let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
-            anyhow::anyhow!(
-                "Pair '{}' introuvable dans la config bootstrap (peers)",
-                target_agent
-            )
-        })?;
+        match &self.backend {
+            // Négociation via le DHT : zome `request_remote_session` (call_remote).
+            Backend::Conductor(c) => {
+                let result = c
+                    .call_zome_json(
+                        "inference-mesh",
+                        "coordinator",
+                        "request_remote_session",
+                        json!({
+                            "target": target_agent,
+                            "layer_range": layer_range,
+                            "next_agent_id": next_agent.clone(),
+                            "next_layer_range": next_layer_range,
+                        }),
+                    )
+                    .await?;
 
-        debug!("Négociation session QUIC → pair {} ({})", target_agent, daemon_url);
+                let endpoint: SocketAddr = result["quic_endpoint"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("réponse de négociation sans quic_endpoint"))?
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("endpoint QUIC invalide: {e}"))?;
+                let token: Vec<u8> = serde_json::from_value(result["session_token"].clone())
+                    .map_err(|e| anyhow::anyhow!("session_token invalide: {e}"))?;
 
-        let resp = self.http
-            .post(format!("{}/mesh/session/negotiate", daemon_url))
-            .json(&json!({
-                "layer_range": layer_range,
-                "next_agent_id": next_agent,
-                "next_layer_range": next_layer_range,
-            }))
-            .send()
-            .await?;
+                let mut offer = ainonymous_quic::SessionOffer::new(endpoint, layer_range);
+                offer.session_token = token;
+                offer.next_agent_id = next_agent;
+                offer.next_layer_range = next_layer_range;
+                // Clé mTLS du pair inconnue tant que l'identité n'est pas
+                // persistée/publiée (palier D) → possession vérifiée sans pinning.
+                offer.peer_pubkey = None;
+                Ok(offer)
+            }
+            // Bootstrap statique : POST direct au daemon REST du pair.
+            Backend::Static => {
+                let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Pair '{}' introuvable dans la config bootstrap (peers)",
+                        target_agent
+                    )
+                })?;
 
-        if !resp.status().is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Négociation refusée par {}: {}", target_agent, body);
+                debug!("Négociation session QUIC → pair {} ({})", target_agent, daemon_url);
+
+                let resp = self.http
+                    .post(format!("{}/mesh/session/negotiate", daemon_url))
+                    .json(&json!({
+                        "layer_range": layer_range,
+                        "next_agent_id": next_agent,
+                        "next_layer_range": next_layer_range,
+                    }))
+                    .send()
+                    .await?;
+
+                if !resp.status().is_success() {
+                    let body = resp.text().await.unwrap_or_default();
+                    anyhow::bail!("Négociation refusée par {}: {}", target_agent, body);
+                }
+
+                Ok(resp.json::<ainonymous_quic::SessionOffer>().await?)
+            }
         }
-
-        Ok(resp.json::<ainonymous_quic::SessionOffer>().await?)
     }
 
     /// Mettre à jour l'endpoint QUIC publié dans le DHT
@@ -357,27 +412,4 @@ fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymo
         GpuVendor::Nvidia { .. } => backends.push(ComputeBackend::Cuda),
         GpuVendor::Amd { .. } => backends.push(ComputeBackend::Hip),
         GpuVendor::Intel { .. } => backends.push(ComputeBackend::Vulkan),
-        GpuVendor::CpuOnly => {}
-    }
-    backends
-}
-
-fn get_total_ram_gb() -> f32 {
-    // Lecture de /proc/meminfo sur Linux
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
-            for line in content.lines() {
-                if line.starts_with("MemTotal:") {
-                    if let Some(kb) = line.split_whitespace().nth(1) {
-                        if let Ok(kb) = kb.parse::<u64>() {
-                            return kb as f32 / 1_048_576.0;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    // Fallback
-    16.0
-}
+        GpuVendor::Cpu

@@ -55,19 +55,26 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
     hasher.update(&token);
     let token_hash = hasher.finalize().to_vec();
 
-    // Émettre un signal vers le daemon local pour ouvrir le listener QUIC
+    // Endpoint QUIC à annoncer : notre endpoint publié dans agent-registry
+    // (résolu via DHT), repli sur celui fourni par l'appelant.
+    let my_endpoint = resolve_my_quic_endpoint().unwrap_or(input.local_quic_endpoint.clone());
+
+    // Émettre un signal vers le daemon local pour ouvrir le listener QUIC.
+    // Le next-hop est propagé pour que le worker sache vers qui relayer.
     emit_signal(QuicListenerSignal {
         session_token: token.clone(),
         requestor: call_info()?.provenance,
         layer_range: input.layer_range,
         expires_in_seconds: 30,
+        next_agent_id: input.next_agent_id.clone(),
+        next_layer_range: input.next_layer_range,
     })?;
 
     // Publier l'offre de session (avec hash seulement) dans le DHT pour traçabilité
     let offer = QuicSessionOffer {
         request_id: input.request_id,
         requestor: call_info()?.provenance,
-        quic_endpoint: input.local_quic_endpoint.clone(),
+        quic_endpoint: my_endpoint.clone(),
         session_token_hash: token_hash,
         expires_at: Timestamp::from_micros(
             sys_time()?.as_micros() + 30_000_000 // +30 secondes
@@ -78,11 +85,87 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
 
     // Retourner le token en clair au demandeur (via remote call, pas le DHT)
     Ok(QuicSessionResult {
-        quic_endpoint: input.local_quic_endpoint,
+        quic_endpoint: my_endpoint,
         session_token: token,
         expires_in_seconds: 30,
         layer_range: input.layer_range,
+        next_agent_id: input.next_agent_id,
+        next_layer_range: input.next_layer_range,
     })
+}
+
+/// Callback d'init : autorise tout agent du réseau public à appeler
+/// `negotiate_quic_session` à distance (nécessaire pour la négociation DHT).
+#[hdk_extern]
+fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    let mut fns: std::collections::HashSet<GrantedFunction> = std::collections::HashSet::new();
+    fns.insert((zome_info()?.name, "negotiate_quic_session".into()));
+    create_cap_grant(CapGrantEntry {
+        tag: "mesh-remote-negotiate".into(),
+        access: CapAccess::Unrestricted,
+        functions: GrantedFunctions::Listed(fns),
+    })?;
+    Ok(InitCallbackResult::Pass)
+}
+
+/// Négociation SORTANTE via le DHT : appelle `negotiate_quic_session` sur
+/// l'agent `target` (call_remote) et relaie son offre (endpoint + token).
+/// Pendant DHT du POST REST `/mesh/session/negotiate` du bootstrap statique.
+#[hdk_extern]
+pub fn request_remote_session(input: RemoteSessionInput) -> ExternResult<QuicSessionResult> {
+    let target = AgentPubKey::try_from(input.target.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("agent cible invalide: {e:?}"))))?;
+
+    let payload = QuicNegotiateInput {
+        request_id: String::new(),
+        local_quic_endpoint: String::new(),
+        layer_range: input.layer_range,
+        expert_ids: None,
+        next_agent_id: input.next_agent_id,
+        next_layer_range: input.next_layer_range,
+    };
+
+    let resp = call_remote(
+        target,
+        "inference-mesh-coordinator",
+        "negotiate_quic_session".into(),
+        None,
+        payload,
+    )?;
+
+    match resp {
+        ZomeCallResponse::Ok(data) => data
+            .decode()
+            .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e))),
+        ZomeCallResponse::Unauthorized(..)
+        | ZomeCallResponse::CountersigningSession(..)
+        | ZomeCallResponse::AuthenticationFailed(..) => {
+            Err(wasm_error!(WasmErrorInner::Guest("call_remote non autorisé".into())))
+        }
+        ZomeCallResponse::NetworkError(e) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!("erreur réseau call_remote: {e}"))))
+        }
+    }
+}
+
+/// Endpoint QUIC de CET agent, résolu via agent-registry (cross-DNA intra-agent).
+fn resolve_my_quic_endpoint() -> Option<String> {
+    let me = agent_info().ok()?.agent_initial_pubkey;
+    let resp = call(
+        CallTargetCell::OtherRole("agent-registry".into()),
+        "agent-registry-coordinator",
+        "get_node_capabilities".into(),
+        None,
+        me,
+    )
+    .ok()?;
+    match resp {
+        ZomeCallResponse::Ok(data) => {
+            let caps: Option<AgentQuicEndpoint> = data.decode().ok()?;
+            caps.and_then(|c| c.quic_endpoint)
+        }
+        _ => None,
+    }
 }
 
 /// Publier les métriques d'inférence
@@ -93,11 +176,11 @@ pub fn publish_metrics(input: InferenceMetrics) -> ExternResult<ActionHash> {
 
 /// Calculer un plan d'exécution optimal (appel les données de l'agent-registry)
 #[hdk_extern]
-pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanResult> {
+pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanOutput> {
     // Appel cross-DNA vers agent-registry pour obtenir les nœuds disponibles
     let available_nodes = call(
         CallTargetCell::OtherRole("agent-registry".into()),
-        "coordinator",
+        "agent-registry-coordinator",
         "get_available_nodes".into(),
         None,
         input.model_id.clone(),
@@ -120,8 +203,8 @@ pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanRes
             format!("Aucun nœud disponible pour {}", input.model_id)
         )));
     } else if nodes.len() == 1 || input.force_solo {
-        ExecutionPlanResult::Solo {
-            node_agent: nodes[0].agent_id.clone(),
+        ExecutionPlanOutput::Solo {
+            node: nodes[0].agent_id.clone(),
             quic_endpoint: nodes[0].quic_endpoint.clone().unwrap_or_default(),
         }
     } else if input.model_id.contains("moe") {
@@ -158,18 +241,18 @@ pub fn get_node_metrics(agent: AgentPubKey) -> ExternResult<Vec<InferenceMetrics
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-fn build_pipeline_split_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPlanResult {
+fn build_pipeline_split_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPlanOutput {
     let total_layers = model_total_layers(model_id);
     let n = nodes.len().min(4) as u32; // max 4 nœuds pour le pipeline
     let layers_per_node = total_layers / n;
 
-    let stages: Vec<PipelineStageResult> = nodes.iter().take(n as usize)
+    let stages: Vec<PipelineStageOutput> = nodes.iter().take(n as usize)
         .enumerate()
         .map(|(i, node)| {
             let start = i as u32 * layers_per_node;
             let end = if i == n as usize - 1 { total_layers - 1 } else { start + layers_per_node - 1 };
-            PipelineStageResult {
-                node_agent: node.agent_id.clone(),
+            PipelineStageOutput {
+                node: node.agent_id.clone(),
                 quic_endpoint: node.quic_endpoint.clone().unwrap_or_default(),
                 layer_start: start,
                 layer_end: end,
@@ -178,28 +261,25 @@ fn build_pipeline_split_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPla
         })
         .collect();
 
-    ExecutionPlanResult::PipelineSplit { stages }
+    ExecutionPlanOutput::PipelineSplit { stages }
 }
 
-fn build_expert_shard_plan(nodes: &[NodeInfo], _model_id: &str) -> ExecutionPlanResult {
+fn build_expert_shard_plan(nodes: &[NodeInfo], _model_id: &str) -> ExecutionPlanOutput {
     // Pour Gemma 4-26B MoE : distribuer les experts entre les nœuds
     // Tous les nœuds portent le tronc dense ; les experts sparse sont distribués
     let trunk_node = nodes[0].agent_id.clone();
 
-    // Nœud 0 : trunk + experts 0..N/2
-    // Nœud 1 : trunk + experts N/2..N
-    // etc.
-    let stages: Vec<ExpertStageResult> = nodes.iter()
+    let stages: Vec<ExpertStageOutput> = nodes.iter()
         .enumerate()
-        .map(|(i, node)| ExpertStageResult {
-            node_agent: node.agent_id.clone(),
+        .map(|(i, node)| ExpertStageOutput {
+            node: node.agent_id.clone(),
             quic_endpoint: node.quic_endpoint.clone().unwrap_or_default(),
             expert_ids: (0..64u32).filter(|e| (*e as usize) % nodes.len() == i).collect(),
             has_trunk: true,
         })
         .collect();
 
-    ExecutionPlanResult::ExpertShard { stages, trunk_node }
+    ExecutionPlanOutput::ExpertShard { stages, trunk_node }
 }
 
 fn model_total_layers(model_id: &str) -> u32 {
@@ -231,6 +311,30 @@ pub struct QuicNegotiateInput {
     pub local_quic_endpoint: String,
     pub layer_range: Option<(u32, u32)>,
     pub expert_ids: Option<Vec<u32>>,
+    #[serde(default)]
+    pub next_agent_id: Option<String>,
+    #[serde(default)]
+    pub next_layer_range: Option<(u32, u32)>,
+}
+
+/// Entrée de la négociation SORTANTE (call_remote vers `target`).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RemoteSessionInput {
+    /// AgentPubKey cible (encodage holo_hash, ex: "uhCAk…").
+    pub target: String,
+    pub layer_range: Option<(u32, u32)>,
+    #[serde(default)]
+    pub next_agent_id: Option<String>,
+    #[serde(default)]
+    pub next_layer_range: Option<(u32, u32)>,
+}
+
+/// Vue minimale des capacités d'un agent (décodage partiel de NodeCapabilities
+/// d'agent-registry : on ne lit que l'endpoint).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AgentQuicEndpoint {
+    #[serde(default)]
+    pub quic_endpoint: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -239,60 +343,56 @@ pub struct QuicSessionResult {
     pub session_token: Vec<u8>,
     pub expires_in_seconds: u32,
     pub layer_range: Option<(u32, u32)>,
+    #[serde(default)]
+    pub next_agent_id: Option<String>,
+    #[serde(default)]
+    pub next_layer_range: Option<(u32, u32)>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlanInput {
     pub model_id: String,
+    /// Mode solo forcé (pas de pipeline). Défaut : false → routage automatique.
+    #[serde(default)]
     pub force_solo: bool,
+    /// Préférence de région (optionnel).
+    #[serde(default)]
     pub prefer_region: Option<String>,
 }
 
+/// Plan d'exécution retourné par `compute_execution_plan`.
+///
+/// Les noms de champs (`node`, `quic_endpoint`) correspondent exactement à
+/// `ainonymous_types::ExecutionPlan` côté daemon, afin que le daemon puisse
+/// désérialiser directement la réponse ExternIO avec `serde_json::from_value`.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
-pub enum ExecutionPlanResult {
+pub enum ExecutionPlanOutput {
     Solo {
-        node_agent: String,
+        /// AgentPubKey encodé (format "uhCAk…") du nœud cible.
+        node: String,
+        /// Endpoint QUIC du nœud, ex: "1.2.3.4:9000".
         quic_endpoint: String,
     },
     PipelineSplit {
-        stages: Vec<PipelineStageResult>,
+        stages: Vec<PipelineStageOutput>,
     },
     ExpertShard {
-        stages: Vec<ExpertStageResult>,
+        stages: Vec<ExpertStageOutput>,
         trunk_node: String,
     },
 }
 
+/// Étage d'un plan pipeline — noms alignés avec `ainonymous_types::PipelineStage`.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PipelineStageResult {
-    pub node_agent: String,
+pub struct PipelineStageOutput {
+    pub node: String,
     pub quic_endpoint: String,
     pub layer_start: u32,
     pub layer_end: u32,
     pub is_last: bool,
 }
 
+/// Étage d'un plan expert-shard — noms alignés avec `ainonymous_types::ExpertStage`.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExpertStageResult {
-    pub node_agent: String,
-    pub quic_endpoint: String,
-    pub expert_ids: Vec<u32>,
-    pub has_trunk: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct NodeInfo {
-    pub agent_id: String,
-    pub quic_endpoint: Option<String>,
-    pub vram_gb: f32,
-    pub current_load: f32,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QuicListenerSignal {
-    pub session_token: Vec<u8>,
-    pub requestor: AgentPubKey,
-    pub layer_range: Option<(u32, u32)>,
-    pub expires_in_seconds: u32,
-}
+pub struct ExpertStageOutpu
