@@ -58,6 +58,27 @@ pub struct HolochainConfig {
     /// Port de l'app interface du conducteur (appels de zome).
     #[serde(default = "default_conductor_app_port")]
     pub app_port: u16,
+    /// Chemin du fichier de seed ed25519 du nœud. Par défaut :
+    /// `$XDG_DATA_HOME/ainonymous/node_identity.key` (Linux/macOS)
+    /// ou `%LOCALAPPDATA%\ainonymous\node_identity.key` (Windows).
+    /// Permet de lancer plusieurs daemons sur une même machine avec des identités
+    /// distinctes (ex: testnet loopback).
+    #[serde(default)]
+    pub identity_path: Option<PathBuf>,
+    /// URL du daemon lair-keystore pour le stockage HSM de la seed (palier F).
+    ///
+    /// Format : `unix:///path/to/lair.sock` ou `ws://127.0.0.1:55000`.
+    /// Si absent ou si lair est injoignable, repli sur le keyring OS natif
+    /// (feature `secure-keyring`) puis sur le fichier `identity_path`.
+    ///
+    /// # Intégration future (palier F)
+    /// ```text
+    /// LairClient::connect(lair_url)
+    ///   .new_seed("ainonymous-quic-node-identity", secret, exportable=true)
+    ///   .get_entry(tag) → seed bytes → NodeIdentity::from_seed()
+    /// ```
+    #[serde(default)]
+    pub lair_url: Option<String>,
 }
 
 fn default_admin_port() -> u16 { 8888 }
@@ -69,6 +90,8 @@ impl Default for HolochainConfig {
             backend: HolochainBackendKind::Static,
             admin_port: default_admin_port(),
             app_port: default_conductor_app_port(),
+            identity_path: None,
+            lair_url: None,
         }
     }
 }

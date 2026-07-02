@@ -32,6 +32,12 @@ hex = { workspace = true }
 # iroh pour NAT traversal (optionnel, fallback quinn direct)
 iroh = { workspace = true, optional = true }
 
+# Keyring OS natif : stocke la seed ed25519 dans le trousseau de l'OS
+# (macOS Keychain / Windows Credential Manager / Linux libsecret) plutôt qu'en clair
+keyring = { workspace = true, optional = true }
+
 [features]
 default = ["nat-traversal"]
 nat-traversal = ["iroh"]
+# Protège la seed ed25519 via le keyring natif de l'OS.
+secure-keyring = ["keyring"]

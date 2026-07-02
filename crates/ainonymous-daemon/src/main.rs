@@ -1,4 +1,4 @@
-// Code WIP : certaines API (load_model, métriques, champs de désérialisation,
+﻿// Code WIP : certaines API (load_model, métriques, champs de désérialisation,
 // helpers Phase 2) ne sont pas encore toutes câblées. Évite le bruit de warnings.
 #![allow(dead_code)]
 
@@ -30,17 +30,29 @@ async fn main() -> Result<()> {
     let config = DaemonConfig::load()?;
     info!("Config chargée depuis {:?}", config.config_path());
 
-    // Palier D : charger (ou générer + persister) l'identité ed25519 du nœud
-    // avant toute autre opération. La clé publique sera annoncée dans le DHT
-    // pour permettre le pinning mTLS des sessions QUIC entrantes.
-    let identity_path = {
+    // Palier D+E : charger (ou générer + persister) l'identité ed25519 du nœud
+    // avant toute autre opération. Priorité :
+    //   1. Keyring OS natif (feature `secure-keyring`) — chiffrement matériel
+    //   2. Fichier `identity_path` (config ou défaut XDG)
+    // La clé publique sera annoncée dans le DHT pour le pinning mTLS (palier D).
+    let identity_path = config.holochain.identity_path.clone().unwrap_or_else(|| {
         let mut p = dirs::data_local_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("."));
         p.push("ainonymous");
         p.push("node_identity.key");
         p
-    };
-    let identity = ainonymous_quic::NodeIdentity::load_or_generate(&identity_path)?;
+    });
+
+    // load_or_generate_keyring : tente le keyring OS natif (macOS Keychain /
+    // Windows Credential Manager / Linux libsecret) et retombe sur le fichier
+    // si le keyring est indisponible. Toujours disponible car la dep ainonymous-quic
+    // est compilée avec features = ["secure-keyring"].
+    let identity = ainonymous_quic::NodeIdentity::load_or_generate_keyring(
+        "ainonymous-daemon",
+        "quic-node-identity",
+        &identity_path,
+    )?;
+
     info!("Identité ed25519 du nœud : {} (depuis {:?})", identity.public_key_hex(), identity_path);
 
     // Démarrer les sous-systèmes
@@ -123,4 +135,21 @@ async fn main() -> Result<()> {
         }).await;
     });
 
-    // Démarre
+
+    // Démarrer le serveur REST interne (pour le proxy + plan de contrôle pairs)
+    let app = router::build(
+        conductor.clone(),
+        holochain.clone(),
+        registry,
+        advertise,
+        identity.clone(),
+        config.clone(),
+        identity_path.clone(),
+    );
+    let addr = format!("127.0.0.1:{}", config.daemon_port);
+    info!("Daemon REST interne sur http://{}", addr);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+
+    axum::serve(listener, app).await?;
+    Ok(())
+}

@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use axum::{
     extract::{Path, Query, State},
@@ -7,11 +8,12 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use hex;
 use serde::Deserialize;
 use tower_http::trace::TraceLayer;
 
 use ainonymous_quic::{NodeIdentity, SessionOffer, SessionRegistry};
-use crate::{conductor::Conductor, holochain::HolochainClient};
+use crate::{conductor::Conductor, holochain::HolochainClient, DaemonConfig};
 
 #[derive(Clone)]
 struct DaemonState {
@@ -23,6 +25,10 @@ struct DaemonState {
     quic_endpoint: SocketAddr,
     /// Identité ed25519 du nœud (mTLS + AgentPubKey annoncé)
     identity: NodeIdentity,
+    /// Config du daemon (pour re-announce après rotation de clé)
+    config: DaemonConfig,
+    /// Chemin du fichier de seed ed25519 (pour rotation de clé)
+    identity_path: PathBuf,
 }
 
 pub fn build(
@@ -31,8 +37,10 @@ pub fn build(
     registry: SessionRegistry,
     quic_endpoint: SocketAddr,
     identity: NodeIdentity,
+    config: DaemonConfig,
+    identity_path: PathBuf,
 ) -> Router {
-    let state = DaemonState { conductor, holochain, registry, quic_endpoint, identity };
+    let state = DaemonState { conductor, holochain, registry, quic_endpoint, identity, config, identity_path };
 
     Router::new()
         // Endpoints pour le proxy ainonymous-proxy
@@ -51,6 +59,9 @@ pub fn build(
 
         // Endpoints internes (zome calls via daemon)
         .route("/zome/:dna/:zome/:function", post(zome_call))
+
+        // Administration du nœud (palier E)
+        .route("/daemon/rotate-identity", post(rotate_identity))
 
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -218,4 +229,47 @@ async fn zome_call(
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
+}
+
+/// POST /daemon/rotate-identity
+///
+/// Palier E — Rotation de clé ed25519 du nœud.
+/// Génère une nouvelle clé, l'écrit dans `identity_path`, et re-annonce la
+/// nouvelle clé publique dans le DHT. La connexion mTLS QUIC actuelle reste
+/// active avec l'ancienne clé jusqu'au prochain redémarrage du daemon.
+///
+/// Réponse :
+/// ```json
+/// {
+///   "old_pubkey": "<hex>",
+///   "new_pubkey": "<hex>",
+///   "restart_required": true,
+///   "dht_updated": true | false
+/// }
+/// ```
+async fn rotate_identity(State(s): State<DaemonState>) -> impl IntoResponse {
+    // Générer la nouvelle clé et écraser le fichier
+    let (new_identity, old_pubkey_bytes) = match NodeIdentity::rotate_file(&s.identity_path) {
+        Ok(pair) => pair,
+        Err(e) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("rotation échouée: {e}")})),
+        ).into_response(),
+    };
+
+    let old_pubkey_hex = hex::encode(old_pubkey_bytes);
+    let new_pubkey_hex = new_identity.public_key_hex();
+
+    // Re-annoncer dans le DHT (non-fatal)
+    let dht_updated = s.holochain
+        .reannounce_pubkey(&new_pubkey_hex, &s.config)
+        .await
+        .is_ok();
+
+    Json(serde_json::json!({
+        "old_pubkey": old_pubkey_hex,
+        "new_pubkey": new_pubkey_hex,
+        "restart_required": true,
+        "dht_updated": dht_updated,
+    })).into_response()
 }

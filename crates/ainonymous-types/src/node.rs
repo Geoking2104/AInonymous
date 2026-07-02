@@ -152,4 +152,18 @@ pub enum ExecutionPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineStage {
     pub node: AgentId,
-    pub quic_endp
+    pub quic_endpoint: SocketAddr,
+    pub layer_start: u32,
+    pub layer_end: u32,
+    pub is_last: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExpertStage {
+    pub node: AgentId,
+    pub quic_endpoint: SocketAddr,
+    /// Identifiants des experts MoE hébergés sur ce nœud
+    pub expert_ids: Vec<u32>,
+    /// Ce nœud porte aussi le tronc dense du modèle
+    pub has_trunk: bool,
+}

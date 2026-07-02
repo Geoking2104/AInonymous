@@ -297,6 +297,20 @@ impl HolochainClient {
         }
     }
 
+    /// Re-annoncer les capacités avec une nouvelle clé publique ed25519 après
+    /// rotation (palier E). L'ancienne session mTLS reste active jusqu'au
+    /// prochain redémarrage du daemon ; les nouvelles connexions QUIC utiliseront
+    /// la nouvelle identité après redémarrage.
+    pub async fn reannounce_pubkey(
+        &self,
+        new_pubkey_hex: &str,
+        config: &DaemonConfig,
+    ) -> Result<()> {
+        self.announce_capabilities(config, Some(new_pubkey_hex)).await?;
+        info!("DHT : nouvelle clé publique annoncée après rotation : {}", new_pubkey_hex);
+        Ok(())
+    }
+
     /// Mettre à jour l'endpoint QUIC publié dans le DHT
     pub async fn update_quic_endpoint(&self, addr: SocketAddr) -> Result<()> {
         self.zome_call(
@@ -359,6 +373,7 @@ fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCap
         network_bandwidth_mbps: None,
         region_hint: config.region_hint.clone(),
         quic_endpoint: None, // sera rempli après démarrage QUIC
+        node_pubkey: None,   // sera rempli via announce_capabilities(node_pubkey_hex)
     }
 }
 
@@ -412,4 +427,79 @@ fn detect_amd() -> Option<f32> {
         .args(["--showmeminfo", "vram", "--csv"])
         .output()
         .ok()?;
-   
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Format CSV: "GPU, VRAM Used (B), VRAM Total (B)\n0, <used>, <total>"
+    for line in text.lines().skip(1) {
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() >= 3 {
+            if let Ok(total_bytes) = parts[2].trim().parse::<u64>() {
+                return Some(total_bytes as f32 / (1024.0 * 1024.0 * 1024.0));
+            }
+        }
+    }
+    None
+}
+
+fn get_total_ram_gb() -> f32 {
+    // Heuristique cross-platform basée sur la mémoire virtuelle disponible
+    #[cfg(target_os = "macos")]
+    {
+        let out = std::process::Command::new("sysctl")
+            .args(["-n", "hw.memsize"])
+            .output()
+            .ok();
+        if let Some(out) = out {
+            if let Ok(s) = String::from_utf8(out.stdout) {
+                if let Ok(bytes) = s.trim().parse::<u64>() {
+                    return bytes as f32 / (1024.0 * 1024.0 * 1024.0);
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
+            for line in content.lines() {
+                if line.starts_with("MemTotal:") {
+                    let kb: u64 = line.split_whitespace().nth(1)
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0);
+                    return kb as f32 / (1024.0 * 1024.0);
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // GlobalMemoryStatusEx via wmic (sans dépendance winapi)
+        let out = std::process::Command::new("wmic")
+            .args(["computersystem", "get", "TotalPhysicalMemory", "/value"])
+            .output()
+            .ok();
+        if let Some(out) = out {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                if let Some(val) = line.strip_prefix("TotalPhysicalMemory=") {
+                    if let Ok(bytes) = val.trim().parse::<u64>() {
+                        return bytes as f32 / (1024.0 * 1024.0 * 1024.0);
+                    }
+                }
+            }
+        }
+    }
+    8.0 // fallback : 8 GiB
+}
+
+fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
+    use ainonymous_types::{ComputeBackend, GpuVendor};
+    match vendor {
+        GpuVendor::AppleSilicon => vec![ComputeBackend::Metal, ComputeBackend::Cpu],
+        GpuVendor::Nvidia { .. } => vec![ComputeBackend::Cuda, ComputeBackend::Cpu],
+        GpuVendor::Amd { .. } => vec![ComputeBackend::Hip, ComputeBackend::Cpu],
+        GpuVendor::Intel { .. } => vec![ComputeBackend::Vulkan, ComputeBackend::Cpu],
+        GpuVendor::CpuOnly => vec![ComputeBackend::Cpu],
+    }
+}

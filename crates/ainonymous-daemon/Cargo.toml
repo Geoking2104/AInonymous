@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "ainonymous-daemon"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 ainonymous-types  = { path = "../ainonymous-types" }
-ainonymous-quic   = { path = "../ainonymous-quic" }
+ainonymous-quic   = { path = "../ainonymous-quic", features = ["secure-keyring"] }
 quinn       = { workspace = true }
 
 tokio       = { workspace = true }
@@ -36,4 +36,5 @@ hex         = { workspace = true }
 # default-features=false : client websocket + signature en mémoire
 # (ClientAgentSigner), SANS tirer le conducteur `holochain` (wasmer/iroh).
 holochain_client     = { version = "0.8.1", default-features = false }
-holochain_zome_types = "0.6.
+holochain_zome_types = "0.6.2"
+holochain_types      = { version = "0.6.2", default-features = false }
