@@ -1,0 +1,27 @@
+# Config daemon — mode conducteur Holochain réel (T5.1)
+#
+# Usage : AINON_CONFIG=scripts/testnet/daemon_t51.toml ./target/debug/ainonymous-daemon
+
+daemon_port            = 18890
+quic_port              = 9010
+llama_server_port      = 8081
+pipeline_server_port   = 8182
+llama_server_bin       = "llama-server"
+models_dir             = "/tmp/models"
+holochain_conductor_url = "ws://127.0.0.1:65001"
+holochain_app_id       = "ainonymous"
+max_concurrent_requests = 4
+
+[holochain]
+backend    = "conductor"
+admin_port = 65000
+app_port   = 65001
+
+[network]
+listen_addr       = "0.0.0.0"
+discovery_timeout = 30
+
+[inference]
+backend          = "static"
+n_ctx            = 2048
+max_batch_tokens = 512
