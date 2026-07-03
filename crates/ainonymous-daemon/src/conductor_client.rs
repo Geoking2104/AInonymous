@@ -48,6 +48,10 @@ struct QuicListenerSignal {
     next_agent_id: Option<String>,
     #[serde(default)]
     next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 (32 bytes) du coordinateur demandeur.
+    /// Utilisée pour le pinning mTLS client après le handshake QUIC (T3.2).
+    #[serde(default)]
+    requester_pubkey: Option<Vec<u8>>,
 }
 
 /// Connexion vivante à un conducteur Holochain pour une app installée.
@@ -166,11 +170,17 @@ impl ConductorClient {
                         offer.session_token = qls.session_token;
                         offer.next_agent_id = qls.next_agent_id;
                         offer.next_layer_range = qls.next_layer_range;
+                        // Notre propre clé publique : le coordinateur peut pinner notre cert TLS.
                         offer.peer_pubkey = Some(identity.public_key_bytes());
+                        // Clé du coordinateur demandeur : on vérifiera son cert après le handshake QUIC.
+                        offer.client_pubkey = qls.requester_pubkey
+                            .and_then(|v| <[u8; 32]>::try_from(v).ok());
+                        let mtls_active = offer.client_pubkey.is_some();
                         registry.register(offer);
                         info!(
-                            "Session QUIC entrante enregistrée via signal Holochain (couches {:?})",
-                            qls.layer_range
+                            "Session QUIC entrante enregistrée via signal Holochain (couches {:?}, mTLS client: {})",
+                            qls.layer_range,
+                            if mtls_active { "activé" } else { "absent" }
                         );
                     }
                     Err(e) => debug!("Signal ignoré (décodage QuicListenerSignal): {e}"),

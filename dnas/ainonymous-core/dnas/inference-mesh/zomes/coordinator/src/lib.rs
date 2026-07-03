@@ -73,6 +73,7 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
         expires_in_seconds: 30,
         next_agent_id: input.next_agent_id.clone(),
         next_layer_range: input.next_layer_range,
+        requester_pubkey: input.requester_pubkey.clone(),
     })?;
 
     // Publier l'offre de session (avec hash seulement) dans le DHT pour traçabilité
@@ -130,6 +131,7 @@ pub fn request_remote_session(input: RemoteSessionInput) -> ExternResult<QuicSes
         expert_ids: None,
         next_agent_id: input.next_agent_id,
         next_layer_range: input.next_layer_range,
+        requester_pubkey: input.requester_pubkey,
     };
 
     let resp = call_remote(
@@ -315,6 +317,30 @@ pub struct SubmitRequestInput {
     pub temperature: Option<f32>,
 }
 
+/// Signal émis vers le daemon local pour déclencher l'ouverture du listener QUIC.
+/// Correspond au `QuicListenerSignal` décodé par `conductor_client.rs` côté daemon.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QuicListenerSignal {
+    /// Token de session éphémère (32 bytes) — transmis en clair au daemon.
+    pub session_token: Vec<u8>,
+    /// AgentPubKey du coordinateur demandeur (identité Holochain).
+    pub requestor: AgentPubKey,
+    /// Plage de couches assignée à ce nœud dans le pipeline.
+    #[serde(default)]
+    pub layer_range: Option<(u32, u32)>,
+    /// Durée de validité de la session (secondes).
+    pub expires_in_seconds: u32,
+    /// Prochain nœud du pipeline (propagé par le coordinateur).
+    #[serde(default)]
+    pub next_agent_id: Option<String>,
+    #[serde(default)]
+    pub next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 (32 bytes) du coordinateur demandeur.
+    /// Le listener l'utilise pour pinner le cert mTLS client après le handshake QUIC (T3.2).
+    #[serde(default)]
+    pub requester_pubkey: Option<Vec<u8>>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QuicNegotiateInput {
     pub request_id: String,
@@ -325,6 +351,9 @@ pub struct QuicNegotiateInput {
     pub next_agent_id: Option<String>,
     #[serde(default)]
     pub next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 du coordinateur (pour mTLS bidirectionnel, T3.2).
+    #[serde(default)]
+    pub requester_pubkey: Option<Vec<u8>>,
 }
 
 /// Entrée de la négociation SORTANTE (call_remote vers `target`).
@@ -337,6 +366,9 @@ pub struct RemoteSessionInput {
     pub next_agent_id: Option<String>,
     #[serde(default)]
     pub next_layer_range: Option<(u32, u32)>,
+    /// Clé publique ed25519 du coordinateur demandeur (pour mTLS bidirectionnel).
+    #[serde(default)]
+    pub requester_pubkey: Option<Vec<u8>>,
 }
 
 /// Vue minimale des capacités d'un agent (décodage partiel de NodeCapabilities
@@ -382,5 +414,50 @@ pub struct PlanInput {
 /// Plan d'exécution retourné par `compute_execution_plan`.
 ///
 /// Les noms de champs (`node`, `quic_endpoint`) correspondent exactement à
-/// `ainonymous_types::ExecutionPlan` côté daemon, afin que le daemon puisse
-/// d
+/// `ainonymous_types::ExecutionPlan` côté daemon pour permettre la désérialisation directe.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type")]
+pub enum ExecutionPlanOutput {
+    Solo {
+        node: String,
+        quic_endpoint: String,
+    },
+    PipelineSplit {
+        stages: Vec<PipelineStageOutput>,
+    },
+    ExpertShard {
+        stages: Vec<ExpertStageOutput>,
+        trunk_node: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PipelineStageOutput {
+    pub node: String,
+    pub quic_endpoint: String,
+    pub layer_start: u32,
+    pub layer_end: u32,
+    pub is_last: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExpertStageOutput {
+    pub node: String,
+    pub quic_endpoint: String,
+    pub expert_ids: Vec<u32>,
+    pub has_trunk: bool,
+}
+
+/// Vue résumée d'un nœud retournée par `agent-registry-coordinator::get_available_nodes`.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NodeInfo {
+    pub agent_id: String,
+    #[serde(default)]
+    pub quic_endpoint: Option<String>,
+    #[serde(default)]
+    pub vram_gb: f32,
+    #[serde(default)]
+    pub model_id: Option<String>,
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
+}
