@@ -132,17 +132,38 @@ async fn mesh_infer(
         },
     };
 
-    match crate::conductor::run_pipeline_inference(
-        &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens,
-        &s.identity, s.conductor.eos_token_id, s.conductor.speculative_k,
-    ).await {
-        Ok(r) => Json(serde_json::json!({
-            "content": r.text,
-            "token_count": r.token_count,
-            "node_ids": r.node_ids,
-            "execution_mode": "pipeline_split",
-            "speculative_acceptance_rate": r.speculative_acceptance_rate,
-        })).into_response(),
+    // Router selon le type de plan
+    let result = match &plan {
+        ainonymous_types::ExecutionPlan::Solo { node, .. } => {
+            let node_id = node.clone();
+            crate::conductor::run_solo_inference(
+                &s.conductor.llama,
+                &body.model_id,
+                body.messages,
+                body.max_tokens,
+                &node_id,
+            ).await
+        }
+        ainonymous_types::ExecutionPlan::PipelineSplit { .. } => {
+            crate::conductor::run_pipeline_inference(
+                &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens,
+                &s.identity, s.conductor.eos_token_id, s.conductor.speculative_k,
+            ).await
+        }
+        other => Err(anyhow::anyhow!("plan non supporté: {:?}", other)),
+    };
+
+    match result {
+        Ok(r) => {
+            let mode = if r.node_ids.len() == 1 { "solo" } else { "pipeline_split" };
+            Json(serde_json::json!({
+                "content": r.text,
+                "token_count": r.token_count,
+                "node_ids": r.node_ids,
+                "execution_mode": mode,
+                "speculative_acceptance_rate": r.speculative_acceptance_rate,
+            })).into_response()
+        }
         Err(e) => (StatusCode::BAD_GATEWAY,
             Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }

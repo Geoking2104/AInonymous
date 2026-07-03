@@ -7,11 +7,14 @@ use ainonymous_types::inference::{ActivationHeader, GeneratedToken, FinishReason
 use ainonymous_types::ExecutionPlan;
 use crate::{DaemonConfig, holochain::HolochainClient};
 use crate::pipeline_client::{PipelineClient, PrefillRequest, DecodeRequest};
+use crate::llama::LlamaClient;
 
 /// Orchestrateur central du daemon
 pub struct Conductor {
     pub config: DaemonConfig,
     pub pipeline: PipelineClient,
+    /// Client HTTP vers llama-server (inférence solo GGUF — T2.6).
+    pub llama: LlamaClient,
     /// Token EOS du modèle local (lu depuis pipeline_server /status au démarrage).
     /// Défaut conservateur : 1 (Gemma family). Mis à jour si pipeline_server répond.
     pub eos_token_id: i32,
@@ -23,6 +26,7 @@ pub struct Conductor {
 impl Conductor {
     pub async fn new(config: DaemonConfig) -> Result<Self> {
         let pipeline = PipelineClient::new(config.pipeline_server_port);
+        let llama = LlamaClient::new(config.llama_server_port);
         let speculative_k = config.inference.speculative_k;
 
         // Vérifier que le pipeline_server.py tourne ; récupérer l'EOS token
@@ -41,7 +45,7 @@ impl Conductor {
             }
         };
 
-        Ok(Self { config, pipeline, eos_token_id, speculative_k })
+        Ok(Self { config, pipeline, llama, eos_token_id, speculative_k })
     }
 }
 
@@ -175,14 +179,23 @@ pub struct CoordinatorResult {
     pub speculative_acceptance_rate: Option<f32>,
 }
 
-/// Construit un plan d'exécution PipelineSplit à partir de la config statique
-/// (testnet sans Holochain). Les endpoints QUIC sont résolus via `peers`.
-/// Retourne None si aucun `pipeline_stages` n'est défini ou si un endpoint
-/// manque/est invalide.
+/// Construit un plan d'exécution à partir de la config statique (testnet sans Holochain).
+///
+/// - Si `pipeline_stages` est non vide → `PipelineSplit` (endpoints résolus via `peers`)
+/// - Sinon → `Solo` sur ce nœud même (loopback QUIC, inférence llama-server locale)
+///
+/// Retourne `None` si un endpoint QUIC est manquant/invalide dans un plan Pipeline.
 pub fn static_plan_from_config(config: &DaemonConfig) -> Option<ExecutionPlan> {
     if config.pipeline_stages.is_empty() {
-        return None;
+        // Plan Solo : ce nœud possède le modèle entier, on utilise llama-server local.
+        let loopback: SocketAddr = format!("127.0.0.1:{}", config.quic_port).parse().ok()?;
+        let agent_id = config.peers
+            .first()
+            .map(|p| p.agent_id.clone())
+            .unwrap_or_else(|| "local".into());
+        return Some(ExecutionPlan::Solo { node: agent_id, quic_endpoint: loopback });
     }
+
     let n = config.pipeline_stages.len();
     let mut stages = Vec::with_capacity(n);
     for (i, st) in config.pipeline_stages.iter().enumerate() {
@@ -197,6 +210,47 @@ pub fn static_plan_from_config(config: &DaemonConfig) -> Option<ExecutionPlan> {
         });
     }
     Some(ExecutionPlan::PipelineSplit { stages })
+}
+
+/// Inférence solo : le modèle entier tourne sur ce nœud via llama-server (GGUF).
+///
+/// Chemin emprunté quand le plan est `ExecutionPlan::Solo` — typiquement quand
+/// la VRAM locale est suffisante pour charger le modèle sans pipeline-split.
+/// Délègue à `LlamaClient::chat_completions` (API OpenAI-compatible).
+pub async fn run_solo_inference(
+    llama: &LlamaClient,
+    model_id: &str,
+    messages: serde_json::Value,
+    max_tokens: u32,
+    node_id: &str,
+) -> Result<CoordinatorResult> {
+    info!("Inférence solo — modèle: {} max_tokens: {}", model_id, max_tokens);
+
+    if !llama.is_ready().await {
+        anyhow::bail!(
+            "llama-server inaccessible (port configuré). \
+             Vérifiez que llama-server est lancé avec le modèle {}.",
+            model_id
+        );
+    }
+
+    let result = llama
+        .chat_completions(model_id, &messages, max_tokens)
+        .await
+        .context("inférence solo llama-server")?;
+
+    info!(
+        "Solo : {} tokens générés (finish: {})",
+        result.token_count,
+        result.finish_reason.as_deref().unwrap_or("unknown")
+    );
+
+    Ok(CoordinatorResult {
+        text: result.text,
+        token_count: result.token_count,
+        node_ids: vec![node_id.to_string()],
+        speculative_acceptance_rate: None,
+    })
 }
 
 /// Coordinateur : lance une inférence pipeline-split (topologie chaîne).
