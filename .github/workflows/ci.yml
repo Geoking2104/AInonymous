@@ -39,8 +39,10 @@ jobs:
       - name: Cache Cargo (check)
         uses: Swatinem/rust-cache@v2
 
-      - name: Dépendances C (aws-lc-sys build.rs)
-        run: sudo apt-get install -y --no-install-recommends cmake clang libclang-dev
+      - name: Dépendances C (aws-lc-sys + keyring dbus)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake clang libclang-dev libdbus-1-dev pkg-config
 
       - name: cargo check --workspace
         run: cargo check --workspace
