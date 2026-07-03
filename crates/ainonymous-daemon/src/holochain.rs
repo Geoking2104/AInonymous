@@ -1,10 +1,40 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
-use ainonymous_types::{ExecutionPlan, NodeCapabilities, NodeHeartbeat};
+use ainonymous_types::{ExecutionPlan, NodeHeartbeat};
 use crate::DaemonConfig;
+use crate::config::HolochainBackendKind;
+use crate::conductor_client::ConductorClient;
+
+/// Vue résumée d'un nœud du mesh retournée par `agent-registry-coordinator::get_available_nodes`.
+/// Correspond à `NodeSummary` côté zome.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeSummary {
+    pub agent_id: String,
+    pub vram_gb: f32,
+    pub current_load: f32,
+    pub available_slots: u8,
+    pub quic_endpoint: Option<String>,
+    pub region_hint: Option<String>,
+    pub score: f32,
+    /// Clé publique ed25519 du nœud (hex) pour le pinning mTLS côté client QUIC.
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
+}
+
+/// Plan de contrôle : bootstrap statique (hors DHT) ou conducteur Holochain réel.
+#[derive(Clone)]
+enum Backend {
+    /// Pas de conducteur : les appels de zome passent par le REST interne
+    /// (comportement testnet historique).
+    Static,
+    /// Conducteur Holochain réel via `AppWebsocket`.
+    Conductor(Arc<ConductorClient>),
+}
 
 /// Client pour le conducteur Holochain (via WebSocket app port)
 #[derive(Clone)]
@@ -14,10 +44,33 @@ pub struct HolochainClient {
     http: reqwest::Client,
     /// Pairs statiques (bootstrap testnet, plan de contrôle hors DHT)
     peers: Vec<crate::config::PeerConfig>,
+    /// Backend actif (statique ou conducteur réel)
+    backend: Backend,
 }
 
 impl HolochainClient {
     pub async fn connect(config: &DaemonConfig) -> Result<Self> {
+        // Sélection du backend. En mode conducteur, on tente la connexion ;
+        // en cas d'échec on retombe sur le bootstrap statique (démarrage non-fatal).
+        let backend = match config.holochain.backend {
+            HolochainBackendKind::Static => Backend::Static,
+            HolochainBackendKind::Conductor => {
+                match ConductorClient::connect(
+                    config.holochain.admin_port,
+                    config.holochain.app_port,
+                    &config.holochain_app_id,
+                )
+                .await
+                {
+                    Ok(c) => Backend::Conductor(Arc::new(c)),
+                    Err(e) => {
+                        warn!("Conducteur Holochain injoignable ({e}) — repli sur bootstrap statique");
+                        Backend::Static
+                    }
+                }
+            }
+        };
+
         let client = Self {
             app_port: config.daemon_port, // port du daemon qui fait l'interface avec Holochain
             app_id: config.holochain_app_id.clone(),
@@ -25,8 +78,26 @@ impl HolochainClient {
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?,
             peers: config.peers.clone(),
+            backend,
         };
         Ok(client)
+    }
+
+    /// Écoute les signaux du conducteur (mode conducteur) pour enregistrer les
+    /// sessions QUIC entrantes émises par le zome `negotiate_quic_session`.
+    /// No-op en bootstrap statique (la négociation entrante passe par le REST).
+    pub async fn listen_quic_signals(
+        &self,
+        registry: ainonymous_quic::SessionRegistry,
+        advertise: SocketAddr,
+        identity: ainonymous_quic::NodeIdentity,
+    ) {
+        match &self.backend {
+            Backend::Conductor(c) => c.listen_quic_signals(registry, advertise, identity).await,
+            Backend::Static => {
+                debug!("Signaux QUIC Holochain ignorés (backend statique)");
+            }
+        }
     }
 
     /// Résoudre l'URL du daemon REST d'un pair via la config bootstrap.
@@ -50,26 +121,38 @@ impl HolochainClient {
     ) -> Result<Value> {
         debug!("Zome call: {}::{}::{}", dna, zome, function);
 
-        // Dans une implémentation complète, on utiliserait holochain_client::AppWebsocket
-        // Pour le MVP : on passe par le daemon REST interne
-        let resp = self.http
-            .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
-            .json(&payload)
-            .send()
-            .await?;
+        match &self.backend {
+            // Conducteur réel : appel de zome signé via AppWebsocket.
+            Backend::Conductor(c) => c.call_zome_json(dna, zome, function, payload).await,
+            // Bootstrap statique : passe par le REST interne (comportement testnet).
+            Backend::Static => {
+                let resp = self.http
+                    .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
+                    .json(&payload)
+                    .send()
+                    .await?;
 
-        if !resp.status().is_success() {
-            let body = resp.text().await?;
-            anyhow::bail!("Zome call {}::{}::{} échouée: {}", dna, zome, function, body);
+                if !resp.status().is_success() {
+                    let body = resp.text().await?;
+                    anyhow::bail!("Zome call {}::{}::{} échouée: {}", dna, zome, function, body);
+                }
+
+                Ok(resp.json().await?)
+            }
         }
-
-        Ok(resp.json().await?)
     }
 
-    /// Annoncer les capacités de ce nœud dans le DHT
-    pub async fn announce_capabilities(&self, config: &DaemonConfig) -> Result<()> {
-        // Détecter les capacités GPU
-        let caps = detect_local_capabilities(config);
+    /// Annoncer les capacités de ce nœud dans le DHT, y compris la clé publique
+    /// ed25519 pour le pinning mTLS QUIC (palier D).
+    ///
+    /// `node_pubkey_hex` : clé publique hex de `NodeIdentity::public_key_hex()`.
+    pub async fn announce_capabilities(
+        &self,
+        config: &DaemonConfig,
+        node_pubkey_hex: Option<&str>,
+    ) -> Result<()> {
+        let mut caps = detect_local_capabilities(config);
+        caps.node_pubkey = node_pubkey_hex.map(|s| s.to_string());
 
         self.zome_call(
             "agent-registry",
@@ -78,9 +161,9 @@ impl HolochainClient {
             serde_json::to_value(&caps)?,
         ).await?;
 
-        info!("Capacités annoncées: {:.1}GB VRAM, modèles: {:?}",
+        info!("Capacités annoncées: {:.1}GB VRAM, node_pubkey: {}",
             caps.vram_gb,
-            caps.loaded_models.iter().map(|m| &m.model_id).collect::<Vec<_>>());
+            node_pubkey_hex.unwrap_or("<non fournie>"));
         Ok(())
     }
 
@@ -107,8 +190,11 @@ impl HolochainClient {
         Ok(serde_json::from_value(resp)?)
     }
 
-    /// Récupérer les nœuds disponibles pour un modèle
-    pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeCapabilities>> {
+    /// Récupérer les nœuds disponibles pour un modèle (résumé DHT).
+    ///
+    /// Retourne `NodeSummary` (sous-ensemble de `NodeCapabilities`) tel que
+    /// retourné par `agent-registry-coordinator::get_available_nodes`.
+    pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
         let resp = self.zome_call(
             "agent-registry",
             "coordinator",
@@ -126,38 +212,110 @@ impl HolochainClient {
     /// Le pair génère un token, enregistre l'offre dans son listener QUIC, et
     /// retourne l'offre (endpoint + token). Remplace l'ancien zome_call
     /// auto-référent. L'intégration Holochain réelle se branchera ici plus tard.
+    ///
+    /// `requester_pubkey` (T3.2c) : clé publique ed25519 du coordinateur demandeur.
+    /// Transmise au pair pour que son listener vérifie le cert TLS client après
+    /// le handshake QUIC. `None` = repli sans pinning d'identité côté serveur.
     pub async fn negotiate_quic_session(
         &self,
         target_agent: &str,
         layer_range: Option<(u32, u32)>,
         next_agent: Option<String>,
         next_layer_range: Option<(u32, u32)>,
+        requester_pubkey: Option<[u8; 32]>,
     ) -> Result<ainonymous_quic::SessionOffer> {
-        let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
-            anyhow::anyhow!(
-                "Pair '{}' introuvable dans la config bootstrap (peers)",
-                target_agent
-            )
-        })?;
+        match &self.backend {
+            // Négociation via le DHT : zome `request_remote_session` (call_remote).
+            Backend::Conductor(c) => {
+                let result = c
+                    .call_zome_json(
+                        "inference-mesh",
+                        "coordinator",
+                        "request_remote_session",
+                        json!({
+                            "target": target_agent,
+                            "layer_range": layer_range,
+                            "next_agent_id": next_agent.clone(),
+                            "next_layer_range": next_layer_range,
+                            "requester_pubkey": requester_pubkey,
+                        }),
+                    )
+                    .await?;
 
-        debug!("Négociation session QUIC → pair {} ({})", target_agent, daemon_url);
+                let endpoint: SocketAddr = result["quic_endpoint"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("réponse de négociation sans quic_endpoint"))?
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("endpoint QUIC invalide: {e}"))?;
+                let token: Vec<u8> = serde_json::from_value(result["session_token"].clone())
+                    .map_err(|e| anyhow::anyhow!("session_token invalide: {e}"))?;
 
-        let resp = self.http
-            .post(format!("{}/mesh/session/negotiate", daemon_url))
-            .json(&json!({
-                "layer_range": layer_range,
-                "next_agent_id": next_agent,
-                "next_layer_range": next_layer_range,
-            }))
-            .send()
-            .await?;
+                // Palier D : pinning mTLS — le zome retourne la clé publique ed25519
+                // du nœud cible (publiée dans le DHT via announce_capabilities).
+                let peer_pubkey: Option<[u8; 32]> = result["node_pubkey"]
+                    .as_str()
+                    .and_then(|hex_str| {
+                        let bytes = hex::decode(hex_str).ok()?;
+                        bytes.try_into().ok()
+                    });
 
-        if !resp.status().is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Négociation refusée par {}: {}", target_agent, body);
+                if peer_pubkey.is_some() {
+                    debug!("Pinning mTLS activé pour le pair {}", target_agent);
+                } else {
+                    warn!("node_pubkey absent dans la réponse de {} — pinning désactivé (repli possession seule)", target_agent);
+                }
+
+                let mut offer = ainonymous_quic::SessionOffer::new(endpoint, layer_range);
+                offer.session_token = token;
+                offer.next_agent_id = next_agent;
+                offer.next_layer_range = next_layer_range;
+                offer.peer_pubkey = peer_pubkey;
+                Ok(offer)
+            }
+            // Bootstrap statique : POST direct au daemon REST du pair.
+            Backend::Static => {
+                let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Pair '{}' introuvable dans la config bootstrap (peers)",
+                        target_agent
+                    )
+                })?;
+
+                debug!("Négociation session QUIC → pair {} ({})", target_agent, daemon_url);
+
+                let resp = self.http
+                    .post(format!("{}/mesh/session/negotiate", daemon_url))
+                    .json(&json!({
+                        "layer_range": layer_range,
+                        "next_agent_id": next_agent,
+                        "next_layer_range": next_layer_range,
+                        "requester_pubkey": requester_pubkey,
+                    }))
+                    .send()
+                    .await?;
+
+                if !resp.status().is_success() {
+                    let body = resp.text().await.unwrap_or_default();
+                    anyhow::bail!("Négociation refusée par {}: {}", target_agent, body);
+                }
+
+                Ok(resp.json::<ainonymous_quic::SessionOffer>().await?)
+            }
         }
+    }
 
-        Ok(resp.json::<ainonymous_quic::SessionOffer>().await?)
+    /// Re-annoncer les capacités avec une nouvelle clé publique ed25519 après
+    /// rotation (palier E). L'ancienne session mTLS reste active jusqu'au
+    /// prochain redémarrage du daemon ; les nouvelles connexions QUIC utiliseront
+    /// la nouvelle identité après redémarrage.
+    pub async fn reannounce_pubkey(
+        &self,
+        new_pubkey_hex: &str,
+        config: &DaemonConfig,
+    ) -> Result<()> {
+        self.announce_capabilities(config, Some(new_pubkey_hex)).await?;
+        info!("DHT : nouvelle clé publique annoncée après rotation : {}", new_pubkey_hex);
+        Ok(())
     }
 
     /// Mettre à jour l'endpoint QUIC publié dans le DHT
@@ -222,6 +380,7 @@ fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCap
         network_bandwidth_mbps: None,
         region_hint: config.region_hint.clone(),
         quic_endpoint: None, // sera rempli après démarrage QUIC
+        node_pubkey: None,   // sera rempli via announce_capabilities(node_pubkey_hex)
     }
 }
 
@@ -279,46 +438,75 @@ fn detect_amd() -> Option<f32> {
         return None;
     }
     let text = String::from_utf8_lossy(&out.stdout);
-    // Plus grand entier de la sortie = total VRAM en octets (heuristique).
-    let max_bytes = text
-        .split(|c: char| !c.is_ascii_digit())
-        .filter_map(|s| s.parse::<u64>().ok())
-        .max()?;
-    if max_bytes < 1_000_000 {
-        return None;
+    // Format CSV: "GPU, VRAM Used (B), VRAM Total (B)\n0, <used>, <total>"
+    for line in text.lines().skip(1) {
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() >= 3 {
+            if let Ok(total_bytes) = parts[2].trim().parse::<u64>() {
+                return Some(total_bytes as f32 / (1024.0 * 1024.0 * 1024.0));
+            }
+        }
     }
-    Some(max_bytes as f32 / 1_073_741_824.0) // octets → GiB
-}
-
-fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
-    use ainonymous_types::{ComputeBackend, GpuVendor};
-    let mut backends = vec![ComputeBackend::Cpu];
-    match vendor {
-        GpuVendor::AppleSilicon => backends.push(ComputeBackend::Metal),
-        GpuVendor::Nvidia { .. } => backends.push(ComputeBackend::Cuda),
-        GpuVendor::Amd { .. } => backends.push(ComputeBackend::Hip),
-        GpuVendor::Intel { .. } => backends.push(ComputeBackend::Vulkan),
-        GpuVendor::CpuOnly => {}
-    }
-    backends
+    None
 }
 
 fn get_total_ram_gb() -> f32 {
-    // Lecture de /proc/meminfo sur Linux
+    // Heuristique cross-platform basée sur la mémoire virtuelle disponible
+    #[cfg(target_os = "macos")]
+    {
+        let out = std::process::Command::new("sysctl")
+            .args(["-n", "hw.memsize"])
+            .output()
+            .ok();
+        if let Some(out) = out {
+            if let Ok(s) = String::from_utf8(out.stdout) {
+                if let Ok(bytes) = s.trim().parse::<u64>() {
+                    return bytes as f32 / (1024.0 * 1024.0 * 1024.0);
+                }
+            }
+        }
+    }
     #[cfg(target_os = "linux")]
     {
         if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
             for line in content.lines() {
                 if line.starts_with("MemTotal:") {
-                    if let Some(kb) = line.split_whitespace().nth(1) {
-                        if let Ok(kb) = kb.parse::<u64>() {
-                            return kb as f32 / 1_048_576.0;
-                        }
+                    let kb: u64 = line.split_whitespace().nth(1)
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0);
+                    return kb as f32 / (1024.0 * 1024.0);
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // GlobalMemoryStatusEx via wmic (sans dépendance winapi)
+        let out = std::process::Command::new("wmic")
+            .args(["computersystem", "get", "TotalPhysicalMemory", "/value"])
+            .output()
+            .ok();
+        if let Some(out) = out {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                if let Some(val) = line.strip_prefix("TotalPhysicalMemory=") {
+                    if let Ok(bytes) = val.trim().parse::<u64>() {
+                        return bytes as f32 / (1024.0 * 1024.0 * 1024.0);
                     }
                 }
             }
         }
     }
-    // Fallback
-    16.0
+    8.0 // fallback : 8 GiB
+}
+
+fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
+    use ainonymous_types::{ComputeBackend, GpuVendor};
+    match vendor {
+        GpuVendor::AppleSilicon => vec![ComputeBackend::Metal, ComputeBackend::Cpu],
+        GpuVendor::Nvidia { .. } => vec![ComputeBackend::Cuda, ComputeBackend::Cpu],
+        GpuVendor::Amd { .. } => vec![ComputeBackend::Hip, ComputeBackend::Cpu],
+        GpuVendor::Intel { .. } => vec![ComputeBackend::Vulkan, ComputeBackend::Cpu],
+        GpuVendor::CpuOnly => vec![ComputeBackend::Cpu],
+    }
 }

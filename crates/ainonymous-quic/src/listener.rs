@@ -5,6 +5,7 @@ use std::time::SystemTime;
 use anyhow::Result;
 use tracing::{debug, info, warn};
 
+use hex;
 use crate::{QuicError, SessionOffer};
 
 /// Registre partageable des sessions en attente.
@@ -135,8 +136,43 @@ impl QuicListener {
             offer
         };
 
+        // T3.2b — vérification mTLS côté serveur : si l'offre spécifie une clé
+        // client attendue, on extrait la clé publique du certificat TLS présenté
+        // lors du handshake et on vérifie qu'elle correspond.
+        if let Some(expected_key) = offer.client_pubkey {
+            let actual_key = extract_peer_pubkey(&conn)
+                .ok_or_else(|| QuicError::ConnectFailed(
+                    "cert client absent ou non-ed25519 après handshake".into()
+                ))?;
+            if actual_key != expected_key {
+                warn!(
+                    "mTLS: clé client reçue {} ≠ attendue {} — connexion refusée",
+                    hex::encode(actual_key),
+                    hex::encode(expected_key)
+                );
+                return Err(QuicError::ConnectFailed(
+                    "clé publique client non autorisée".into()
+                ));
+            }
+            info!("mTLS client vérifié: {}", hex::encode(actual_key));
+        }
+
         info!("Session QUIC authentifiée (couches {:?})", offer.layer_range);
         handler(conn, offer).await;
         Ok(())
     }
+}
+
+/// Extrait la clé publique ed25519 (32 octets) du certificat TLS présenté par
+/// le pair lors du handshake QUIC.
+///
+/// Pour une connexion QUIC rustls, `peer_identity()` retourne
+/// `Box<Vec<CertificateDer<'static>>>`.
+fn extract_peer_pubkey(conn: &quinn::Connection) -> Option<[u8; 32]> {
+    let any_id = conn.peer_identity()?;
+    let certs = any_id
+        .downcast::<Vec<rustls::pki_types::CertificateDer<'static>>>()
+        .ok()?;
+    let cert = certs.first()?;
+    crate::mtls::ed25519_pubkey_from_cert(cert).ok()
 }

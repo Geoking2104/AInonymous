@@ -29,6 +29,71 @@ pub struct DaemonConfig {
     /// l'IP publique du nœud). Absent = adresse locale du listener (0.0.0.0:port).
     #[serde(default)]
     pub quic_advertise: Option<String>,
+    /// Intégration Holochain : bascule bootstrap statique ↔ conducteur réel.
+    #[serde(default)]
+    pub holochain: HolochainConfig,
+}
+
+/// Choix du plan de contrôle Holochain.
+///
+/// - `Static` (défaut) : bootstrap sans conducteur (config `peers`/`pipeline_stages`).
+/// - `Conductor` : conducteur Holochain réel via `holochain_client::AppWebsocket`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum HolochainBackendKind {
+    #[default]
+    Static,
+    Conductor,
+}
+
+/// Paramètres de connexion au conducteur Holochain (mode `conductor`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HolochainConfig {
+    #[serde(default)]
+    pub backend: HolochainBackendKind,
+    /// Port de l'interface admin du conducteur (émission du token d'app +
+    /// autorisation des credentials de signature des appels de zome).
+    #[serde(default = "default_admin_port")]
+    pub admin_port: u16,
+    /// Port de l'app interface du conducteur (appels de zome).
+    #[serde(default = "default_conductor_app_port")]
+    pub app_port: u16,
+    /// Chemin du fichier de seed ed25519 du nœud. Par défaut :
+    /// `$XDG_DATA_HOME/ainonymous/node_identity.key` (Linux/macOS)
+    /// ou `%LOCALAPPDATA%\ainonymous\node_identity.key` (Windows).
+    /// Permet de lancer plusieurs daemons sur une même machine avec des identités
+    /// distinctes (ex: testnet loopback).
+    #[serde(default)]
+    pub identity_path: Option<PathBuf>,
+    /// URL du daemon lair-keystore pour le stockage HSM de la seed (palier F).
+    ///
+    /// Format : `unix:///path/to/lair.sock` ou `ws://127.0.0.1:55000`.
+    /// Si absent ou si lair est injoignable, repli sur le keyring OS natif
+    /// (feature `secure-keyring`) puis sur le fichier `identity_path`.
+    ///
+    /// # Intégration future (palier F)
+    /// ```text
+    /// LairClient::connect(lair_url)
+    ///   .new_seed("ainonymous-quic-node-identity", secret, exportable=true)
+    ///   .get_entry(tag) → seed bytes → NodeIdentity::from_seed()
+    /// ```
+    #[serde(default)]
+    pub lair_url: Option<String>,
+}
+
+fn default_admin_port() -> u16 { 8888 }
+fn default_conductor_app_port() -> u16 { 8890 }
+
+impl Default for HolochainConfig {
+    fn default() -> Self {
+        Self {
+            backend: HolochainBackendKind::Static,
+            admin_port: default_admin_port(),
+            app_port: default_conductor_app_port(),
+            identity_path: None,
+            lair_url: None,
+        }
+    }
 }
 
 /// Un étage du pipeline pour le plan statique de testnet. Le `quic_endpoint`
@@ -79,6 +144,11 @@ pub struct InferenceConfig {
     pub flash_attention: bool,
     pub kv_cache_type: String,
     pub parallel_requests: u8,
+    /// Nombre de tokens brouillon pour le décodage spéculatif (T2.4).
+    /// 0 = désactivé (décodage classique 1 token/passe).
+    /// Valeurs typiques : 3–8 (trade-off latence réseau / acceptance rate).
+    #[serde(default)]
+    pub speculative_k: u8,
 }
 
 impl DaemonConfig {
@@ -156,10 +226,12 @@ impl Default for DaemonConfig {
                 flash_attention: true,
                 kv_cache_type: "q8_0".into(),
                 parallel_requests: 4,
+                speculative_k: 0,  // désactivé par défaut
             },
             peers: Vec::new(),
             pipeline_stages: Vec::new(),
             quic_advertise: None,
+            holochain: HolochainConfig::default(),
         }
     }
 }

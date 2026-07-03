@@ -40,13 +40,18 @@ mkdir -p "$BB_DIR"
 cp "$WASM_OUT/blackboard_integrity.wasm"        "$BB_DIR/blackboard-integrity.wasm"
 cp "$WASM_OUT/blackboard_coordinator.wasm"      "$BB_DIR/blackboard-coordinator.wasm"
 
-echo "==> Packager les DNAs"
-hc dna pack "$DNAS_ROOT/dnas/inference-mesh/workdir"
-hc dna pack "$DNAS_ROOT/dnas/agent-registry/workdir"
-hc dna pack "$DNAS_ROOT/dnas/blackboard/workdir"
-
-echo "==> Packager le hApp"
-hc app pack "$DNAS_ROOT"
+echo "==> Packager les DNAs + hApp"
+if command -v hc &>/dev/null; then
+    echo "    (via hc Holochain CLI)"
+    hc dna pack "$DNAS_ROOT/dnas/inference-mesh/workdir"
+    hc dna pack "$DNAS_ROOT/dnas/agent-registry/workdir"
+    hc dna pack "$DNAS_ROOT/dnas/blackboard/workdir"
+    hc app pack "$DNAS_ROOT"
+else
+    echo "    (hc absent — fallback repack-happ.py)"
+    python3 "$SCRIPT_DIR/repack-happ.py"
+fi
 
 echo ""
 echo "✓ hApp packagé : $DNAS_ROOT/ainonymous-core.happ"
+ls -lh "$DNAS_ROOT/ainonymous-core.happ"

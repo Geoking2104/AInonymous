@@ -51,6 +51,142 @@ impl NodeIdentity {
         self.signing.to_bytes()
     }
 
+    /// Charge la seed ed25519 depuis le keyring natif de l'OS (macOS Keychain,
+    /// Windows Credential Manager, Linux libsecret) et retourne l'identité.
+    ///
+    /// Si la seed est absente du keyring, en génère une nouvelle, la stocke dans
+    /// le keyring **et** dans `fallback_path` (protection double). En cas d'erreur
+    /// keyring (daemon absent, permissions), repli sur `load_or_generate(fallback_path)`.
+    ///
+    /// `service` : nom de l'application dans le keyring (ex: `"ainonymous-daemon"`).
+    /// `account` : identifiant de la clé (ex: `"quic-node-identity"`).
+    #[cfg(feature = "secure-keyring")]
+    pub fn load_or_generate_keyring(
+        service: &str,
+        account: &str,
+        fallback_path: &std::path::Path,
+    ) -> Result<Self> {
+        use keyring::Entry;
+
+        let entry = match Entry::new(service, account) {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!("Keyring non disponible ({e}) — repli sur fichier");
+                return Self::load_or_generate(fallback_path);
+            }
+        };
+
+        // Essaie de charger la seed depuis le keyring
+        match entry.get_password() {
+            Ok(hex_seed) => {
+                let bytes = hex::decode(&hex_seed)
+                    .context("seed keyring invalide (hex decode)")?;
+                let seed: [u8; 32] = bytes
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| anyhow::anyhow!("seed keyring corrompue (len={})", bytes.len()))?;
+                tracing::info!("Identité ed25519 chargée depuis le keyring OS ({}/{})", service, account);
+                Ok(Self::from_seed(&seed))
+            }
+            Err(keyring::Error::NoEntry) => {
+                // Pas encore de seed → générer, stocker dans keyring ET fichier
+                let identity = Self::generate();
+                let hex_seed = hex::encode(identity.seed_bytes());
+                if let Err(e) = entry.set_password(&hex_seed) {
+                    tracing::warn!("Impossible de sauvegarder dans le keyring ({e}) — seed en clair uniquement");
+                }
+                // Sauvegarder aussi dans le fichier de secours
+                if let Some(parent) = fallback_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                let _ = std::fs::write(fallback_path, identity.seed_bytes());
+                tracing::info!(
+                    "Nouvelle identité ed25519 générée et stockée dans le keyring OS + {:?}",
+                    fallback_path
+                );
+                Ok(identity)
+            }
+            Err(e) => {
+                tracing::warn!("Erreur keyring ({e}) — repli sur fichier");
+                Self::load_or_generate(fallback_path)
+            }
+        }
+    }
+
+    /// Génère une nouvelle identité, écrase le fichier `path`, et retourne
+    /// `(nouvelle_identité, ancienne_pubkey_32_bytes)`.
+    ///
+    /// Utile pour la rotation de clé : l'appelant re-annonce la nouvelle pubkey
+    /// dans le DHT puis redémarre le daemon (la session mTLS actuelle reste active
+    /// jusqu'au prochain redémarrage).
+    pub fn rotate_file(path: &std::path::Path) -> Result<(Self, [u8; 32])> {
+        // Charger l'ancienne clé (pour retourner l'ancienne pubkey)
+        let old_pubkey: [u8; 32] = if path.exists() {
+            let bytes = std::fs::read(path).context("lecture ancienne seed")?;
+            let seed: [u8; 32] = bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("seed existante corrompue"))?;
+            Self::from_seed(&seed).public_key_bytes()
+        } else {
+            [0u8; 32]
+        };
+
+        // Générer et persister la nouvelle clé
+        let new_identity = Self::generate();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).context("création répertoire rotation")?;
+        }
+        std::fs::write(path, new_identity.seed_bytes())
+            .context("sauvegarde nouvelle seed après rotation")?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+        }
+        tracing::info!(
+            "Rotation identité ed25519 : {} → {}",
+            hex::encode(old_pubkey),
+            new_identity.public_key_hex()
+        );
+        Ok((new_identity, old_pubkey))
+    }
+
+    /// Charge l'identité depuis `path` (seed de 32 octets) ou en génère une
+    /// nouvelle et la persiste sur disque. Crée les répertoires parents si absent.
+    ///
+    /// Le fichier contient exactement 32 octets (la seed ed25519 brute). Aucun
+    /// chiffrement supplémentaire : la protection repose sur les permissions FS
+    /// (chmod 600 recommandé).
+    pub fn load_or_generate(path: &std::path::Path) -> Result<Self> {
+        if path.exists() {
+            let bytes = std::fs::read(path).context("lecture seed identité ed25519")?;
+            let seed: [u8; 32] = bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("seed corrompue : attendu 32 octets, obtenu {}", bytes.len()))?;
+            tracing::info!("Identité ed25519 chargée depuis {:?}", path);
+            Ok(Self::from_seed(&seed))
+        } else {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .context("création répertoire identité")?;
+            }
+            let identity = Self::generate();
+            std::fs::write(path, identity.seed_bytes())
+                .context("sauvegarde seed identité ed25519")?;
+            // Restreindre les permissions sur Unix (lecture seule par le propriétaire)
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+                    .context("chmod 600 seed identité")?;
+            }
+            tracing::info!("Nouvelle identité ed25519 générée et sauvegardée dans {:?}", path);
+            Ok(identity)
+        }
+    }
+
     /// Certificat TLS auto-signé porté par cette clé ed25519.
     pub fn tls_cert(&self) -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
         use ed25519_dalek::pkcs8::EncodePrivateKey;
@@ -152,8 +288,8 @@ impl ServerCertVerifier for PeerKeyVerifier {
 }
 
 /// Vérificateur côté SERVEUR : exige un certificat client ed25519 auto-signé
-/// valide. La liaison à un agent précis est assurée en aval par le token de
-/// session (enregistré avec le `requestor`).
+/// valide. La liaison à un agent précis est gérée par le token de session
+/// (contrôle applicatif, cf. `SessionRegistry`).
 #[derive(Debug)]
 pub struct Ed25519ClientVerifier {
     algs: WebPkiSupportedAlgorithms,
@@ -165,20 +301,9 @@ impl Ed25519ClientVerifier {
     }
 }
 
-impl Default for Ed25519ClientVerifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ClientCertVerifier for Ed25519ClientVerifier {
-    fn offer_client_auth(&self) -> bool {
-        true
-    }
-
-    fn client_auth_mandatory(&self) -> bool {
-        true
-    }
+    fn offer_client_auth(&self) -> bool { true }
+    fn client_auth_mandatory(&self) -> bool { true }
 
     fn root_hint_subjects(&self) -> &[DistinguishedName] {
         &[]
@@ -190,8 +315,9 @@ impl ClientCertVerifier for Ed25519ClientVerifier {
         _intermediates: &[CertificateDer<'_>],
         _now: UnixTime,
     ) -> Result<ClientCertVerified, rustls::Error> {
-        // Doit être un certificat ed25519 ; possession prouvée par la signature.
-        let _ = ed25519_pubkey_from_cert(end_entity)?;
+        // Vérifier la présence d'une clé ed25519 valide ; le binding d'identité
+        // est délégué au token de session (`SessionRegistry`).
+        ed25519_pubkey_from_cert(end_entity)?;
         Ok(ClientCertVerified::assertion())
     }
 

@@ -96,6 +96,9 @@ class DecodeResponse(BaseModel):
     next_token_id:   Optional[int] = None
     next_token_text: Optional[str] = None
     is_last_node: bool = False
+    # Décodage spéculatif : un token par position d'entrée (K+1 positions).
+    # Rempli uniquement quand len(input_ids) > 1 sur le nœud final.
+    next_token_ids: Optional[List[int]] = None
 
 class ClearRequest(BaseModel):
     request_id: str
@@ -110,6 +113,10 @@ class StatusResponse(BaseModel):
     active_requests: int
     device: str
     dtype: str
+    # Token de fin de séquence du modèle (ex: 1 pour Gemma, 2 pour Llama 3).
+    # Exposé pour que le coordinateur Rust adapte sa condition d'arrêt sans
+    # le coder en dur.
+    eos_token_id: int = 1
 
 
 # ── Chargement du modèle (partiel) ────────────────────────────────────────────
@@ -204,24 +211,33 @@ def run_layers(
     """
     Exécute les couches [layer_start, layer_end[ du modèle sur hidden_states.
     Retourne (output_hidden_states, new_past_key_values).
+
+    Convention KV-cache : past_key_values est un dict {layer_idx: (k, v)}.
     """
     device = hidden_states.device
     batch, seq_len, _ = hidden_states.shape
 
+    # Calculer l'offset de position à partir du KV-cache existant
     if position_ids is None:
         offset = 0
-        if past_key_values is not None:
-            # Cas decode : la position commence après les tokens déjà traités
-            first_layer = _cfg["layer_start"]
-            kv_layer = past_key_values[first_layer]
-            if kv_layer is not None:
-                offset = kv_layer[0].shape[2]  # seq_len dans le cache
-        position_ids = torch.arange(offset, offset + seq_len,
-                                    dtype=torch.long, device=device).unsqueeze(0)
+        if past_key_values:
+            # Trouver la première entrée non-None pour lire la longueur du cache
+            for kv in past_key_values.values():
+                if kv is not None:
+                    # Support tenseur brut (k, v) ou objet DynamicCache
+                    if isinstance(kv, tuple) and len(kv) >= 1:
+                        offset = kv[0].shape[2]  # (batch, heads, seq, dim)
+                    break
+        position_ids = torch.arange(
+            offset, offset + seq_len, dtype=torch.long, device=device
+        ).unsqueeze(0)
 
-    if attention_mask is None:
-        total_len = position_ids[0, -1].item() + 1
-        attention_mask = torch.ones(batch, total_len, device=device)
+    # Note : on passe attention_mask=None et laisse le modèle calculer le masque
+    # causal en interne (SDPA / FlashAttention). Les modèles HuggingFace récents
+    # (Gemma 2+, Llama 3, Mistral 0.3+) gèrent correctement position_ids sans
+    # masque explicite. Passer un masque 2D ones() provoquait des erreurs de shape
+    # avec les modèles qui s'attendent à un masque 4D ou pas de masque du tout.
+    effective_mask = attention_mask  # None par défaut → masque causal auto
 
     new_kvs = {}
     h = hidden_states
@@ -232,20 +248,18 @@ def run_layers(
         if layer is None:
             continue
 
-        past_kv_i = None
-        if past_key_values is not None and i in past_key_values:
-            past_kv_i = past_key_values[i]
+        past_kv_i = past_key_values.get(i) if past_key_values else None
 
         layer_out = layer(
             hidden_states=h,
-            attention_mask=attention_mask,
+            attention_mask=effective_mask,
             position_ids=position_ids,
             past_key_value=past_kv_i,
             use_cache=use_cache,
             output_attentions=False,
         )
 
-        # Les couches Gemma retournent (hidden_states, [present_kv], ...)
+        # Les couches Gemma/Llama retournent (hidden_states, present_kv, ...)
         h = layer_out[0]
         if use_cache and len(layer_out) > 1 and layer_out[1] is not None:
             new_kvs[i] = layer_out[1]
@@ -302,6 +316,9 @@ app = FastAPI(title="AInonymous Pipeline Server", lifespan=lifespan)
 
 @app.get("/status", response_model=StatusResponse)
 async def status():
+    eos_id = 1  # valeur par défaut conservatrice (Gemma family)
+    if _tokenizer is not None and hasattr(_tokenizer, "eos_token_id"):
+        eos_id = int(_tokenizer.eos_token_id or 1)
     return StatusResponse(
         model_id=_cfg["args"].model,
         layer_start=_cfg["args"].layer_start,
@@ -312,6 +329,7 @@ async def status():
         active_requests=len(_kv_caches),
         device=_cfg["args"].device,
         dtype=_cfg["args"].dtype,
+        eos_token_id=eos_id,
     )
 
 
@@ -348,7 +366,12 @@ async def prefill(req: PrefillRequest):
         _kv_caches[req.request_id] = kvs
 
         if is_last:
-            next_id, _, _ = run_last_node(h, past_kv=None, use_cache=False)
+            # IMPORTANT : ne pas rappeler run_layers ici — h est déjà sorti des
+            # couches de notre tranche. On applique directement norm + lm_head.
+            with torch.inference_mode():
+                h_norm = _model.model.norm(h)
+                logits = _model.lm_head(h_norm)       # [1, seq_len, vocab]
+                next_id = int(logits[0, -1, :].argmax().item())
             next_text = _tokenizer.decode([next_id], skip_special_tokens=True)
             return PrefillResponse(
                 request_id=req.request_id,
@@ -388,19 +411,25 @@ async def decode(req: DecodeRequest):
     is_last  = _cfg["args"].is_last_node
     past_kv  = _kv_caches[req.request_id]
 
+    # Décodage spéculatif : input_ids peut contenir K+1 tokens
+    # (last_accepted + K draft tokens) → passe vectorisée de vérification.
+    is_speculative = is_first and req.input_ids and len(req.input_ids) > 1
+    n_positions = len(req.input_ids) if is_first and req.input_ids else req.seq_len
+
     try:
         if is_first:
             if not req.input_ids:
-                raise HTTPException(400, "input_ids requis (1 token)")
-            ids = torch.tensor([req.input_ids[-1:]], dtype=torch.long, device=device)
-            h = _model.model.embed_tokens(ids)   # [1, 1, hidden]
+                raise HTTPException(400, "input_ids requis")
+            # Support multi-token (spéculatif) : embed tous les tokens d'un coup
+            ids = torch.tensor([req.input_ids], dtype=torch.long, device=device)
+            h = _model.model.embed_tokens(ids)   # [1, n_positions, hidden]
             h, new_kvs = run_layers(h, past_key_values=past_kv, use_cache=True)
         else:
             if not req.hidden_states_b64:
                 raise HTTPException(400, "hidden_states_b64 requis")
             h = b64_to_tensor(
                 req.hidden_states_b64,
-                shape=(1, 1, req.hidden_size),
+                shape=(1, req.seq_len, req.hidden_size),
                 device=device,
                 dtype=torch.bfloat16 if _cfg["args"].dtype == "bf16" else torch.float16,
             )
@@ -411,21 +440,31 @@ async def decode(req: DecodeRequest):
             _kv_caches[req.request_id][k] = v
 
         if is_last:
-            next_id, _, _ = run_last_node(h, past_kv=None, use_cache=False)
+            # Nœud final : norm + lm_head, un logit par position d'entrée.
+            # On s'assure d'être en inference_mode (run_layers y est déjà, mais
+            # le chemin norm/lm_head est hors du décorateur de run_layers).
+            with torch.inference_mode():
+                h_norm = _model.model.norm(h)              # [1, n_pos, hidden]
+                logits = _model.lm_head(h_norm)            # [1, n_pos, vocab]
+                all_ids = logits[0, :, :].argmax(dim=-1).tolist()  # [n_pos]
+            next_id = all_ids[-1]
             next_text = _tokenizer.decode([next_id], skip_special_tokens=True)
             return DecodeResponse(
                 request_id=req.request_id,
-                seq_len=1,
+                seq_len=len(all_ids),
                 hidden_size=h.shape[2],
                 next_token_id=next_id,
                 next_token_text=next_text,
+                # Spéculatif : fournir tous les tokens de vérification
+                next_token_ids=all_ids if len(all_ids) > 1 else None,
                 is_last_node=True,
             )
         else:
+            # Nœud intermédiaire : transmettre tous les hidden states
             return DecodeResponse(
                 request_id=req.request_id,
                 hidden_states_b64=tensor_to_b64(h),
-                seq_len=1,
+                seq_len=h.shape[1],
                 hidden_size=h.shape[2],
                 is_last_node=False,
             )

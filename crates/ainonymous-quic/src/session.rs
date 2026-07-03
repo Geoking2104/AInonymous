@@ -19,10 +19,17 @@ pub struct SessionOffer {
     pub next_agent_id: Option<String>,
     /// Tranche de couches du nœud suivant
     pub next_layer_range: Option<(u32, u32)>,
-    /// Clé publique ed25519 (32 octets) attendue du pair, pour la vérification
-    /// mTLS côté client. None = pas encore fournie (repli sans liaison d'identité).
+    /// Clé publique ed25519 (32 octets) attendue du SERVEUR, pour le pinning
+    /// mTLS côté client. None = repli sans pinning d'identité.
     #[serde(default)]
     pub peer_pubkey: Option<[u8; 32]>,
+    /// Clé publique ed25519 (32 octets) attendue du CLIENT (coordinateur ou
+    /// nœud intermédiaire). Fournie lors de la négociation ; utilisée par le
+    /// listener QUIC pour vérifier côté serveur que le cert TLS client correspond
+    /// à l'agent identifié dans le plan de contrôle.
+    /// None = accepter tout cert ed25519 valide (repli testnet/bootstrap statique).
+    #[serde(default)]
+    pub client_pubkey: Option<[u8; 32]>,
 }
 
 impl SessionOffer {
@@ -41,6 +48,7 @@ impl SessionOffer {
             next_agent_id: None,
             next_layer_range: None,
             peer_pubkey: None,
+            client_pubkey: None,
         }
     }
 

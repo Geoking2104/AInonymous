@@ -123,6 +123,17 @@ pub struct InferenceMetrics {
 }
 
 /// Header binaire pour le transfert d'activations via QUIC
+///
+/// Layout (64 bytes) :
+///   0-35  request_id  [u8; 36]
+///  36-39  layer_start  u32 LE
+///  40-43  layer_end    u32 LE
+///  44-47  seq_len      u32 LE
+///  48-51  hidden_size  u32 LE
+///    52   dtype        u8
+///    53   compressed   bool (0/1)
+///    54   speculative_k u8  — 0 = décodage normal ; K > 0 = K tokens brouillon
+///  55-63  (réservé / padding)
 #[derive(Debug, Clone)]
 pub struct ActivationHeader {
     pub request_id: [u8; 36],  // UUID string
@@ -132,6 +143,10 @@ pub struct ActivationHeader {
     pub hidden_size: u32,
     pub dtype: DType,
     pub compressed: bool,
+    /// Nombre de tokens brouillon (spéculatif). 0 = mode normal (1 token/passe).
+    /// Quand speculative_k > 0, seq_len = speculative_k + 1 :
+    /// [last_accepted, draft_1, …, draft_K].
+    pub speculative_k: u8,
 }
 
 impl ActivationHeader {
@@ -146,6 +161,7 @@ impl ActivationHeader {
         buf[48..52].copy_from_slice(&self.hidden_size.to_le_bytes());
         buf[52] = self.dtype as u8;
         buf[53] = self.compressed as u8;
+        buf[54] = self.speculative_k;
         buf
     }
 
@@ -160,6 +176,7 @@ impl ActivationHeader {
             hidden_size: u32::from_le_bytes(buf[48..52].try_into().unwrap()),
             dtype: DType::from(buf[52]),
             compressed: buf[53] != 0,
+            speculative_k: buf[54],
         }
     }
 

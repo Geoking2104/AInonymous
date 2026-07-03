@@ -1,9 +1,186 @@
 use std::process::{Child, Stdio};
 use std::sync::{Arc, Mutex};
-use anyhow::Result;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::DaemonConfig;
+
+// ── Client HTTP vers llama-server (API OpenAI-compatible) ─────────────────────
+
+/// Client léger vers un processus `llama-server` local.
+/// Utilise l'API OpenAI-compatible `/v1/chat/completions`.
+#[derive(Clone)]
+pub struct LlamaClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+// Structs de sérialisation pour l'API llama-server (/v1/chat/completions)
+#[derive(Serialize)]
+struct ChatCompletionRequest<'a> {
+    model: &'a str,
+    messages: &'a serde_json::Value,
+    max_tokens: u32,
+    stream: bool,
+    temperature: f32,
+}
+
+#[derive(Deserialize)]
+struct ChatCompletionResponse {
+    choices: Vec<Choice>,
+    usage: Option<Usage>,
+}
+
+#[derive(Deserialize)]
+struct Choice {
+    message: ChoiceMessage,
+    finish_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ChoiceMessage {
+    content: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Usage {
+    completion_tokens: u32,
+}
+
+/// Résultat d'une inférence solo via llama-server.
+pub struct SoloResult {
+    pub text: String,
+    pub token_count: u32,
+    pub finish_reason: Option<String>,
+}
+
+impl LlamaClient {
+    pub fn new(port: u16) -> Self {
+        Self {
+            base_url: format!("http://127.0.0.1:{}", port),
+            http: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .expect("reqwest client"),
+        }
+    }
+
+    /// Vérifie que llama-server répond sur `/health`.
+    pub async fn is_ready(&self) -> bool {
+        self.http
+            .get(format!("{}/health", self.base_url))
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
+    }
+
+    /// Inférence chat via `/v1/chat/completions` (non-streaming).
+    ///
+    /// `messages` : tableau JSON OpenAI `[{"role":"user","content":"..."}]`.
+    /// `model_id`  : transféré dans le champ `model` (llama-server l'ignore mais
+    ///               certains clients en ont besoin).
+    pub async fn chat_completions(
+        &self,
+        model_id: &str,
+        messages: &serde_json::Value,
+        max_tokens: u32,
+    ) -> Result<SoloResult> {
+        let max_tokens = if max_tokens == 0 { 512 } else { max_tokens };
+
+        let req = ChatCompletionRequest {
+            model: model_id,
+            messages,
+            max_tokens,
+            stream: false,
+            temperature: 0.7,
+        };
+
+        let resp = self.http
+            .post(format!("{}/v1/chat/completions", self.base_url))
+            .json(&req)
+            .send()
+            .await
+            .context("llama-server /v1/chat/completions")?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("llama-server erreur {}: {}", status, body);
+        }
+
+        let completion: ChatCompletionResponse = resp
+            .json()
+            .await
+            .context("décodage réponse llama-server")?;
+
+        let choice = completion.choices.into_iter().next()
+            .ok_or_else(|| anyhow::anyhow!("llama-server: réponse vide (0 choices)"))?;
+
+        let text = choice.message.content.unwrap_or_default();
+        let token_count = completion.usage
+            .map(|u| u.completion_tokens)
+            .unwrap_or(text.split_whitespace().count() as u32); // fallback heuristique
+
+        Ok(SoloResult { text, token_count, finish_reason: choice.finish_reason })
+    }
+}
+
+// ── Détection GPU (n_gpu_layers auto) ─────────────────────────────────────────
+
+/// Retourne le nombre de couches à déléguer au GPU pour llama-server.
+///
+/// - `override_layers != -1` → valeur explicite depuis la config, retournée telle quelle.
+/// - NVIDIA (nvidia-smi trouvé)  → `-1` (llama.cpp charge tout sur le GPU).
+/// - AMD ROCm (rocm-smi trouvé) → `-1`.
+/// - Apple Silicon (macOS)       → `-1` (mémoire unifiée = tout sur Metal).
+/// - CPU seul                    → `0`.
+pub fn detect_gpu_layers(override_layers: i32) -> i32 {
+    if override_layers != -1 {
+        return override_layers;
+    }
+
+    // NVIDIA via nvidia-smi
+    if let Ok(out) = std::process::Command::new("nvidia-smi")
+        .args(["--query-gpu=name", "--format=csv,noheader"])
+        .output()
+    {
+        if out.status.success() && !out.stdout.is_empty() {
+            let name = String::from_utf8_lossy(&out.stdout);
+            info!("GPU NVIDIA détecté : {} — n_gpu_layers=-1 (auto)", name.trim());
+            return -1;
+        }
+    }
+
+    // AMD via rocm-smi
+    if let Ok(out) = std::process::Command::new("rocm-smi")
+        .args(["--showproductname"])
+        .output()
+    {
+        if out.status.success() && !out.stdout.is_empty() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let name = text.lines().nth(1).unwrap_or("AMD GPU").trim().to_string();
+            info!("GPU AMD détecté : {} — n_gpu_layers=-1 (auto)", name);
+            return -1;
+        }
+    }
+
+    // Apple Metal (macOS uniquement — mémoire unifiée, tout sur GPU)
+    #[cfg(target_os = "macos")]
+    {
+        info!("Apple Metal disponible — n_gpu_layers=-1 (auto)");
+        return -1;
+    }
+
+    #[allow(unreachable_code)]
+    {
+        info!("Aucun GPU détecté — inférence CPU (n_gpu_layers=0)");
+        0
+    }
+}
+
+// ── Gestionnaire du processus llama-server ─────────────────────────────────────
 
 /// Gestionnaire du processus llama-server
 pub struct LlamaManager {
@@ -34,12 +211,13 @@ impl LlamaManager {
             warn!("Modèle {:?} non trouvé, llama-server démarré sans modèle", model_path);
         }
 
+        let ngl = detect_gpu_layers(self.config.inference.n_gpu_layers);
         let mut cmd = std::process::Command::new(&self.config.llama_server_bin);
         cmd.args([
             "--host", "127.0.0.1",
             "--port", &self.config.llama_server_port.to_string(),
             "--ctx-size", &self.config.inference.context_size.to_string(),
-            "--n-gpu-layers", &self.config.inference.n_gpu_layers.to_string(),
+            "--n-gpu-layers", &ngl.to_string(),
             "--parallel", &self.config.inference.parallel_requests.to_string(),
             "--cache-type-k", &self.config.inference.kv_cache_type,
             "--cache-type-v", &self.config.inference.kv_cache_type,
@@ -96,13 +274,14 @@ impl LlamaManager {
         // Redémarrer avec le nouveau modèle et les couches appropriées
         let model_path = self.config.models_dir.join(format!("{}.gguf", model_id));
 
+        let ngl = detect_gpu_layers(self.config.inference.n_gpu_layers);
         let mut cmd = std::process::Command::new(&self.config.llama_server_bin);
         cmd.args([
             "--host", "127.0.0.1",
             "--port", &self.config.llama_server_port.to_string(),
             "--model", model_path.to_str().unwrap(),
             "--ctx-size", &self.config.inference.context_size.to_string(),
-            "--n-gpu-layers", &self.config.inference.n_gpu_layers.to_string(),
+            "--n-gpu-layers", &ngl.to_string(),
             "--parallel", &self.config.inference.parallel_requests.to_string(),
             "--flash-attn",
         ]);
