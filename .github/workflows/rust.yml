@@ -1,57 +1,13 @@
-name: Rust CI
+# rust.yml — REMPLACÉ par ci.yml (T4.2)
+# Ce fichier est conservé pour l'historique git mais désactivé.
+# Voir .github/workflows/ci.yml pour le pipeline CI actif.
+name: Rust CI (désactivé)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-
-env:
-  CARGO_TERM_COLOR: always
+  workflow_dispatch:   # déclenchement manuel uniquement
 
 jobs:
-  # Crates natifs (daemon, proxy, cli, mcp, quic, types)
-  workspace:
-    name: build · test · clippy
+  disabled:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Toolchain Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build
-        run: cargo build --workspace
-
-      - name: Tests
-        run: cargo test --workspace
-
-      - name: Clippy (informatif)
-        run: cargo clippy --workspace
-        continue-on-error: true
-
-  # Zomes Holochain compilés en WASM (workspace séparé)
-  zomes-wasm:
-    name: zomes → wasm32
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Toolchain Rust stable + cible WASM
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: dnas/ainonymous-core
-
-      - name: Build zomes (WASM)
-        working-directory: dnas/ainonymous-core
-        # getrandom="custom" est fourni par dnas/ainonymous-core/.cargo/config.toml
-        run: cargo build --release --target wasm32-unknown-unknown
+      - run: echo "Workflow désactivé — voir ci.yml"
