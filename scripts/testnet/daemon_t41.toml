@@ -1,0 +1,35 @@
+# Config de test pour smoke_test_t41.sh
+# Utilise des ports hors-collision et le backend statique (pas de conducteur Holochain).
+# Référencé via : AINON_CONFIG=scripts/testnet/daemon_t41.toml
+
+daemon_port             = 18889
+quic_port               = 0          # port éphémère
+llama_server_port       = 18080
+pipeline_server_port    = 19340
+llama_server_bin        = "llama-server"
+models_dir              = "/tmp/ainon_t41_models"
+holochain_conductor_url = "ws://127.0.0.1:18888"
+holochain_app_id        = "ainonymous-test"
+region_hint             = "loopback"
+max_concurrent_requests = 2
+
+[network]
+quic_relay_fallback           = false
+activation_compression        = "none"
+compression_threshold_gbps    = 1.0
+max_activation_size_mb        = 64
+max_concurrent_quic_sessions  = 2
+
+[inference]
+default_model     = "test-model"
+context_size      = 256
+n_gpu_layers      = 0
+flash_attention   = false
+kv_cache_type     = "f32"
+parallel_requests = 1
+speculative_k     = 0
+
+[holochain]
+backend    = "static"
+admin_port = 18888
+app_port   = 18890
