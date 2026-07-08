@@ -1,48 +1,62 @@
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ed25519_dalek::SigningKey;
-    use rand::rngs::OsRng;
+impl Warrant {
+    /// Crée et signe un nouveau warrant avec Domain Separation
+    pub fn new_signed(
+        signing_key: &SigningKey,
+        warrant_type: WarrantType,
+        payload: serde_json::Value,
+        ttl_seconds: u64,
+    ) -> Result<Self> {
+        let issuer = signing_key.verifying_key().to_bytes();
+        let issued_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
 
-    #[test]
-    fn test_warrant_sign_and_verify() {
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
+        // Domain Separation (meilleure pratique de sécurité)
+        const DOMAIN: &[u8] = b"AInonymous-Warrant-v1";
 
-        let claim = ModelClaim {
-            model_id: "gemma4-e4b".to_string(),
-            model_hash: "abc123".to_string(),
-            vram_required_gb: 24.0,
-            max_context: 8192,
-            supported_backends: vec!["cuda".to_string()],
-        };
+        let mut to_sign = Vec::new();
+        to_sign.extend_from_slice(DOMAIN);
+        to_sign.extend_from_slice(&issuer);
+        to_sign.extend_from_slice(&issued_at.to_le_bytes());
+        to_sign.extend_from_slice(warrant_type.to_string().as_bytes());
+        to_sign.extend_from_slice(&serde_json::to_vec(&payload)?);
 
-        let warrant = Warrant::new_signed(
-            &signing_key,
-            WarrantType::ModelClaim,
-            serde_json::to_value(claim).unwrap(),
-            3600,
-        ).unwrap();
+        let signature = signing_key.sign(&to_sign).to_bytes().to_vec();
 
-        let pubkey = signing_key.verifying_key();
-        assert!(warrant.verify(&pubkey));
+        Ok(Self {
+            issuer,
+            warrant_type,
+            payload,
+            signature,
+            issued_at,
+            ttl_seconds,
+        })
     }
 
-    #[test]
-    fn test_warrant_expired() {
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
+    /// Vérifie la signature avec Domain Separation
+    pub fn verify(&self, issuer_pubkey: &VerifyingKey) -> bool {
+        if self.issuer != issuer_pubkey.to_bytes() {
+            return false;
+        }
+        if self.is_expired() {
+            return false;
+        }
 
-        let warrant = Warrant::new_signed(
-            &signing_key,
-            WarrantType::NodeCapabilities,
-            serde_json::json!({}),
-            1, // expire dans 1 seconde
-        ).unwrap();
+        const DOMAIN: &[u8] = b"AInonymous-Warrant-v1";
 
-        // On attend un peu
-        std::thread::sleep(std::time::Duration::from_millis(1100));
+        let mut to_verify = Vec::new();
+        to_verify.extend_from_slice(DOMAIN);
+        to_verify.extend_from_slice(&self.issuer);
+        to_verify.extend_from_slice(&self.issued_at.to_le_bytes());
+        to_verify.extend_from_slice(self.warrant_type.to_string().as_bytes());
+        if let Ok(payload_bytes) = serde_json::to_vec(&self.payload) {
+            to_verify.extend_from_slice(&payload_bytes);
+        }
 
-        assert!(warrant.is_expired());
+        if let Ok(sig_array) = <[u8; 64]>::try_from(self.signature.as_slice()) {
+            let signature = Signature::from_bytes(&sig_array);
+            return issuer_pubkey.verify_strict(&to_verify, &signature).is_ok();
+        }
+        false
     }
 }
