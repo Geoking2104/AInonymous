@@ -1,57 +1,43 @@
-impl HolochainClient {
-    /// Appelle une fonction de zome avec une meilleure gestion d'erreur
-    pub async fn zome_call(
+    /// Émet un ModelClaim de façon sûre (non-fatale)
+    pub async fn try_emit_model_claim(
         &self,
-        dna: &str,
-        zome: &str,
-        function: &str,
-        payload: Value,
-    ) -> Result<Value> {
-        debug!("Zome call: {}::{}::{}", dna, zome, function);
+        model_id: &str,
+        model_hash: &str,
+        identity: &ainonymous_quic::NodeIdentity,
+    ) -> Result<()> {
+        let caps = detect_local_capabilities_from_config(&self.config);
 
-        match &self.backend {
-            Backend::Conductor(c) => {
-                c.call_zome_json(dna, zome, function, payload)
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!("Holochain zome call failed [{}::{}::{}]: {}", dna, zome, function, e)
-                    })
-            }
-            Backend::Static => {
-                let resp = self
-                    .http
-                    .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
-                    .json(&payload)
-                    .send()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Static zome call HTTP error: {}", e))?;
+        let claim = ModelClaim {
+            model_id: model_id.to_string(),
+            model_hash: model_hash.to_string(),
+            vram_required_gb: caps.vram_gb,
+            max_context: 8192,
+            supported_backends: caps.compute_backends.iter().map(|b| format!("{:?}", b)).collect(),
+        };
 
-                if !resp.status().is_success() {
-                    let body = resp.text().await.unwrap_or_default();
-                    anyhow::bail!("Static zome call failed [{}::{}::{}]: HTTP {} - {}", 
-                        dna, zome, function, resp.status(), body);
-                }
+        let warrant = Warrant::new_signed(
+            &identity.signing_key,
+            WarrantType::ModelClaim,
+            serde_json::to_value(claim)?,
+            86400 * 90,
+        )?;
 
-                resp.json::<Value>()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to parse static zome response: {}", e))
-            }
-        }
+        self.try_emit_warrant(&warrant).await
     }
 
-    /// Émet un warrant de façon non-fatale (ne fait pas crash le daemon si le zome n'existe pas encore)
-    pub async fn try_emit_warrant(&self, warrant: &Warrant) -> Result<()> {
-        match self.emit_warrant_with_cleanup(warrant).await {
-            Ok(_) => {
-                info!("Warrant émis avec succès: {:?}", warrant.warrant_type);
-                Ok(())
-            }
-            Err(e) => {
-                warn!("Impossible d'émettre le warrant ({:?}): {}. Le zome 'warrants' est peut-être pas encore intégré.", 
-                      warrant.warrant_type, e);
-                // On ne fait pas crash le daemon
-                Ok(())
-            }
-        }
+    /// Émet NodeCapabilities de façon sûre (non-fatale)
+    pub async fn try_emit_node_capabilities(
+        &self,
+        identity: &ainonymous_quic::NodeIdentity,
+    ) -> Result<()> {
+        let caps = detect_local_capabilities_from_config(&self.config);
+
+        let warrant = Warrant::new_signed(
+            &identity.signing_key,
+            WarrantType::NodeCapabilities,
+            serde_json::to_value(&caps)?,
+            86400 * 30,
+        )?;
+
+        self.try_emit_warrant(&warrant).await
     }
-}
