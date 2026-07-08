@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AInonymous - Dashboard Scoring D3.js</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0a0a0f; color: #f0eff8; margin: 0; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #7c6deb; }
+    .chart-container { background: #12121a; border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid #2a2a3a; }
+    .node-card { background: #1a1a28; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+    .bar { transition: fill 0.2s; }
+    .bar:hover { fill: #5dd8a8 !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Dashboard Scoring des Nœuds (D3.js)</h1>
+  <p>Visualisation détaillée et interactive des facteurs de scoring</p>
+
+  <div class="chart-container">
+    <h3>Breakdown des scores par facteur</h3>
+    <svg id="grouped-bars" width="1100" height="420"></svg>
+  </div>
+
+  <div class="chart-container">
+    <h3>Classement des nœuds</h3>
+    <div id="ranking"></div>
+  </div>
+</div>
+
+<script>
+const nodes = [
+  { id: "node-paris",     vram: 24, load: 0.25, slots: 5 },
+  { id: "node-frankfurt", vram: 20, load: 0.35, slots: 6 },
+  { id: "node-nyc",       vram: 32, load: 0.55, slots: 4 },
+  { id: "node-tokyo",     vram: 18, load: 0.15, slots: 7 },
+  { id: "node-singapore", vram: 22, load: 0.40, slots: 5 },
+];
+
+let weights = { vram: 35, load: 25, slots: 15, geo: 15 };
+
+function calculateBreakdown(node) {
+  const vramS = Math.min(node.vram / 24, 1) * weights.vram;
+  const loadS = (1 - Math.min(Math.max(node.load, 0), 1)) * weights.load;
+  const slotsS = Math.min(node.slots / 8, 1) * weights.slots;
+  const geoS = weights.geo * 0.6; // simulation
+
+  return {
+    id: node.id,
+    vram: Math.round(vramS),
+    load: Math.round(loadS),
+    slots: Math.round(slotsS),
+    geo: Math.round(geoS),
+    total: Math.round(vramS + loadS + slotsS + geoS)
+  };
+}
+
+function drawGroupedBars() {
+  const svg = d3.select("#grouped-bars");
+  svg.selectAll("*").remove();
+
+  const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+  const width = 1040 - margin.left - margin.right;
+  const height = 360 - margin.top - margin.bottom;
+
+  const data = nodes.map(calculateBreakdown);
+
+  const keys = ["vram", "load", "slots", "geo"];
+  const color = d3.scaleOrdinal().domain(keys).range(["#7c6deb", "#5dd8a8", "#f4d35e", "#eb6d7c"]);
+
+  const x0 = d3.scaleBand().domain(data.map(d => d.id)).rangeRound([0, width]).paddingInner(0.2);
+  const x1 = d3.scaleBand().domain(keys).rangeRound([0, x0.bandwidth()]).padding(0.05);
+  const y = d3.scaleLinear().domain([0, 50]).range([height, 0]);
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  g.append("g")
+    .selectAll("g")
+    .data(data)
+    .enter().append("g")
+    .attr("transform", d => `translate(${x0(d.id)},0)`)
+    .selectAll("rect")
+    .data(d => keys.map(key => ({ key, value: d[key] })))
+    .enter().append("rect")
+    .attr("x", d => x1(d.key))
+    .attr("y", d => y(d.value))
+    .attr("width", x1.bandwidth())
+    .attr("height", d => height - y(d.value))
+    .attr("fill", d => color(d.key));
+
+  // Axes
+  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x0));
+  g.append("g").call(d3.axisLeft(y));
+
+  // Legend
+  const legend = svg.append("g").attr("transform", `translate(80, 20)`);
+  keys.forEach((key, i) => {
+    legend.append("rect").attr("x", i * 140).attr("width", 18).attr("height", 18).attr("fill", color(key));
+    legend.append("text").attr("x", i * 140 + 24).attr("y", 14).text(key).attr("fill", "#f0eff8").attr("font-size", "13px");
+  });
+}
+
+function drawRanking() {
+  const container = d3.select("#ranking");
+  container.html("");
+
+  const data = nodes.map(calculateBreakdown).sort((a, b) => b.total - a.total);
+
+  data.forEach((d, i) => {
+    const div = container.append("div").attr("class", "node-card");
+    div.html(`
+      <strong style="font-size:18px">#${i+1} ${d.id}</strong> — Score total: <strong style="color:#5dd8a8;font-size:20px">${d.total}</strong><br>
+      <small>VRAM: ${d.vram} | Load: ${d.load} | Slots: ${d.slots} | Géo: ${d.geo}</small>
+    `);
+  });
+}
+
+function updateAll() {
+  weights.vram = +document.getElementById("vram").value || 35;
+  weights.load = +document.getElementById("load").value || 25;
+  weights.slots = +document.getElementById("slots").value || 15;
+  weights.geo = +document.getElementById("geo").value || 15;
+
+  drawGroupedBars();
+  drawRanking();
+}
+
+// Initialisation
+window.onload = function() {
+  // Sliders
+  ['vram','load','slots','geo'].forEach(id => {
+    const el = document.createElement("input");
+    el.type = "range";
+    el.id = id;
+    el.min = 0;
+    el.max = 50;
+    el.value = weights[id];
+    el.style.width = "180px";
+    el.oninput = updateAll;
+
+    const label = document.createElement("span");
+    label.innerHTML = ` ${id.toUpperCase()}: <span id="${id}Val">${weights[id]}</span>% &nbsp;&nbsp;`;
+
+    const container = document.createElement("div");
+    container.style.marginBottom = "8px";
+    container.appendChild(label);
+    container.appendChild(el);
+    document.querySelector(".container").appendChild(container);
+  });
+
+  updateAll();
+};
+</script>
+</body>
+</html>
