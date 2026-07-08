@@ -1,82 +1,54 @@
-# Palier F — Intégration Holochain réelle + Membrane Proofs
+# Palier F — Intégration Holochain réelle + Membrane Proofs + Warrants
 
-**Statut** : En cours (juillet 2026)
+**Statut** : Membrane Proofs + Warrants de base implémentés (juillet 2026)
 
-## Objectif
+## 1. Membrane Proofs (terminé)
 
-Passer du mode "bootstrap statique" (testnet) à une intégration réelle avec un conducteur Holochain :
+- `MembraneProofConfig` (Base64 ou File)
+- Injection automatique via `call_zome_with_proof`
+- Support d’installation d’app avec preuve (`install_app_with_membrane_proof`)
 
-- Appels de zome signés via `AppWebsocket`
-- Membrane Proofs / PrivateNetworkProof pour les réseaux privés et consortiums
-- Support d’installation d’apps avec preuve
-- Préparation aux Warrants (Palier F avancé)
+## 2. Warrants (implémenté - version de base)
 
-## 1. Membrane Proofs (implémenté)
+### Types
 
-### Configuration
+- `Warrant`
+- `WarrantType` (ModelClaim, NodeCapabilities, ExecutionProof, Custom)
+- `ModelClaim`
 
-```toml
-[holochain]
-backend = "conductor"
-admin_port = 8888
-app_port = 8890
-
-[holochain.membrane_proof]
-Base64 = "<base64-encoded-proof>"
-# ou
-# File = { path = "/chemin/vers/private-network-proof.bin" }
-```
-
-### Utilisation automatique
-
-Le daemon injecte automatiquement la `membrane_proof` dans les payloads des zome calls stratégiques via :
+### API Holochain
 
 ```rust
-client.call_zome_with_proof("inference-mesh", "coordinator", "some_function", payload).await?
+// Émettre un warrant
+holochain.emit_warrant(&warrant).await?;
+
+// Vérifier
+let valid = holochain.verify_warrant(&warrant).await?;
+
+// Récupérer les warrants d’un agent
+let warrants = holochain.get_warrants_for_agent(agent_id).await?;
 ```
 
-### Installation d’une happ avec Membrane Proof
+### Enforcement basique
 
 ```rust
-let mut admin = AdminWebsocket::connect(...).await?;
-
-conductor_client
-    .install_app_with_membrane_proof(
-        &mut admin,
-        "ainonymous-private",
-        Path::new("./ainonymous.happ"),
-        Some(membrane_proof_bytes),
-    )
-    .await?;
-```
-
-## 2. Backend Holochain réel
-
-Le daemon supporte deux modes :
-
-| Mode       | Description                              | Quand l’utiliser                  |
-|------------|------------------------------------------|-----------------------------------|
-| `Static`   | Bootstrap via `peers` + REST             | Testnet rapide, développement     |
-| `Conductor`| Vrai conducteur Holochain + DHT          | Réseaux privés, production        |
-
-Activation :
-
-```toml
-[holochain]
-backend = "conductor"
+// Avant d’assigner des couches à un nœud
+if validate_node_warrants(&holochain, &agent_id, Some("gemma4-e4b")).await? {
+    // assigner le travail
+}
 ```
 
 ## 3. Prochaines étapes
 
-- [ ] Utilisation systématique de `call_zome_with_proof` sur les fonctions critiques
-- [ ] Warrants enforcement (Palier F avancé)
-- [ ] Tests d’intégration avec un vrai conducteur
-- [ ] Documentation d’exemples de consortiums privés
+- Rendre l’enforcement plus strict dans le scheduler
+- Ajouter la signature réelle des warrants (ed25519)
+- Intégrer les warrants dans `negotiate_quic_session` et le pipeline
+- Tests + documentation d’exemples de consortiums
 
-## Fichiers modifiés
+## Fichiers clés
 
-- `config.rs` → `MembraneProofConfig`
-- `conductor_client.rs` → `call_zome_with_proof` + `install_app_with_membrane_proof`
-- `holochain.rs` → propagation de la preuve
+- `ainonymous-types/src/warrants.rs`
+- `holochain.rs` → `emit_warrant`, `verify_warrant`, `validate_node_warrants`
+- `conductor_client.rs` → Membrane Proofs
 
 Voir aussi : `ROADMAP.md`
