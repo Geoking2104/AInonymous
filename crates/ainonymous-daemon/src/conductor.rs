@@ -1,49 +1,35 @@
-/// Construit un plan d'exécution dynamiquement via découverte P2P Holochain.
-pub async fn build_dynamic_pipeline_plan(
+pub async fn run_pipeline_inference(
     holochain: &HolochainClient,
+    pipeline: &PipelineClient,
+    plan: &ExecutionPlan,
+    messages: serde_json::Value,
+    max_tokens: u32,
+    identity: &ainonymous_quic::NodeIdentity,
+    eos_token_id: i32,
+    speculative_k: u8,
     model_id: &str,
-) -> Result<ExecutionPlan> {
-    // Découverte P2P des nœuds disponibles
-    let discovered = holochain.discover_nodes_p2p(model_id).await?;
+) -> Result<CoordinatorResult> {
+    let mut effective_plan = plan.clone();
 
-    if discovered.is_empty() {
-        anyhow::bail!("Aucun nœud découvert via Holochain P2P pour le modèle {}", model_id);
-    }
-
-    // Filtrage : on ne garde que les nœuds qui ont des warrants valides
-    let mut valid_nodes = Vec::new();
-    for node in discovered {
-        if validate_node_warrants(holochain, &node.agent_id, Some(model_id)).await? {
-            valid_nodes.push(node);
+    // Si le plan est vide ou Solo, on tente une découverte P2P dynamique
+    if matches!(plan, ExecutionPlan::Solo { .. }) || matches!(plan, ExecutionPlan::PipelineSplit { stages } if stages.is_empty()) {
+        if let Ok(dynamic_plan) = build_dynamic_pipeline_plan(holochain, model_id).await {
+            info!("Utilisation d'un plan pipeline découvert dynamiquement via Holochain P2P");
+            effective_plan = dynamic_plan;
         }
     }
 
-    if valid_nodes.is_empty() {
-        anyhow::bail!("Aucun nœud avec warrants valides trouvé pour {}", model_id);
-    }
+    let stages = match &effective_plan {
+        ExecutionPlan::PipelineSplit { stages } => stages,
+        other => anyhow::bail!("run_pipeline_inference: plan non supporté ({:?})", other),
+    };
 
-    // Construction d'un plan simple (pour l'instant on prend les 2-3 premiers nœuds valides)
-    let mut stages = Vec::new();
-    let num_stages = valid_nodes.len().min(3); // max 3 étages pour l'instant
-
-    for (i, node) in valid_nodes.iter().take(num_stages).enumerate() {
-        if let Some(ep) = &node.quic_endpoint {
-            if let Ok(addr) = ep.parse::<SocketAddr>() {
-                stages.push(ainonymous_types::PipelineStage {
-                    node: node.agent_id.clone(),
-                    quic_endpoint: addr,
-                    layer_start: (i * 6) as u32,      // découpage simple
-                    layer_end: ((i + 1) * 6) as u32,
-                    is_last: i == num_stages - 1,
-                });
-            }
+    // Validation des warrants (comme avant)
+    for stage in stages {
+        if !validate_node_warrants(holochain, &stage.node, Some(model_id)).await? {
+            anyhow::bail!("Warrant validation failed for node {}", stage.node);
         }
     }
 
-    if stages.is_empty() {
-        anyhow::bail!("Impossible de construire un plan pipeline à partir des nœuds découverts");
-    }
-
-    info!("Plan pipeline dynamique construit avec {} nœuds P2P", stages.len());
-    Ok(ExecutionPlan::PipelineSplit { stages })
+    // ... reste de la fonction (négociation P2P, etc.)
 }
