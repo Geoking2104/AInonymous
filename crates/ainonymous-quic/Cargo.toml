@@ -36,6 +36,9 @@ iroh = { workspace = true, optional = true }
 # (macOS Keychain / Windows Credential Manager / Linux libsecret) plutôt qu'en clair
 keyring = { workspace = true, optional = true }
 
+[dev-dependencies]
+tempfile = "3"
+
 [features]
 default = ["nat-traversal"]
 nat-traversal = ["iroh"]
