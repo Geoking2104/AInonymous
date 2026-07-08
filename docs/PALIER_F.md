@@ -1,117 +1,71 @@
-# Palier F — Intégration Holochain réelle + Membrane Proofs + Warrants
+# Palier F — Intégration Holochain + Membrane Proofs + Warrants
 
-**Statut** : Membrane Proofs + Warrants de base implémentés (juillet 2026)
+**Statut** : Largement implémenté (juillet 2026)
 
-## Objectif du Palier F
+## Résumé
 
-Passer d’un mode testnet statique (bootstrap via `peers`) à une intégration réelle avec un conducteur Holochain, incluant :
+Palier F a pour objectif de passer d’un mode testnet statique à une intégration réelle avec Holochain, incluant :
 
-- Appels de zome signés
-- Membrane Proofs pour les réseaux privés / consortiums
+- Membrane Proofs pour les réseaux privés
 - Warrants (attestations signées) pour la sécurité du mesh
+- Découverte et négociation P2P via le DHT
+- Scoring intelligent des nœuds (avec composante géographique)
 
----
+## 1. Membrane Proofs
 
-## 1. Membrane Proofs (implémenté)
+- `MembraneProofConfig` (Base64 ou File)
+- `call_zome_with_proof` (injection automatique)
+- `install_app_with_membrane_proof`
+- Support des consortiums privés
 
-### Configuration
-
-```toml
-[holochain]
-backend = "conductor"
-admin_port = 8888
-app_port = 8890
-
-[holochain.membrane_proof]
-Base64 = "<base64-encoded-membrane-proof>"
-# ou
-# File = { path = "/chemin/vers/proof.bin" }
-```
-
-### Fonctionnalités
-
-- `call_zome_with_proof()` : injection automatique de la preuve dans les payloads
-- `install_app_with_membrane_proof()` : installation d’une `.happ` avec preuve (consortiums privés)
-
----
-
-## 2. Warrants (implémenté - version de base)
+## 2. Warrants
 
 ### Types
+- `Warrant`
+- `WarrantType` (ModelClaim, NodeCapabilities, ExecutionProof, Custom)
+- `ModelClaim`
 
-```rust
-pub struct Warrant {
-    pub issuer: [u8; 32],
-    pub warrant_type: WarrantType,
-    pub payload: Value,
-    pub signature: Vec<u8>,
-    pub issued_at: u64,
-    pub ttl_seconds: u64,
-}
+### Fonctionnalités implémentées
+- `emit_warrant` / `emit_warrant_with_cleanup`
+- `verify_warrant` (vérification Ed25519 + Domain Separation)
+- `get_warrants` / `get_warrants_by_type`
+- `validate_node_warrants` (validation stricte dans le scheduler)
+- Signature sécurisée avec `zeroize` + Domain Separation (Ed25519ctx)
 
-pub enum WarrantType {
-    ModelClaim,
-    NodeCapabilities,
-    ExecutionProof,
-    Custom(String),
-}
+### Zome dédié
+- `zomes/warrants/` (integrity + coordinator)
+- Validation on-chain renforcée
+- Liens `AgentToWarrants`
 
-pub struct ModelClaim { ... }
-```
+## 3. Découverte et Scoring P2P
 
-### API
+- `discover_nodes_p2p` + cache
+- `discover_nodes_p2p_optimized` (filtrage + scoring)
+- Scoring intelligent :
+  - VRAM (35%)
+  - Charge (25%)
+  - Slots disponibles (15%)
+  - Proximité géographique via Haversine (10-15%)
+- `build_dynamic_pipeline_plan`
 
-```rust
-// Émettre
-holochain.emit_warrant(&warrant).await?;
+## 4. Sécurité
 
-// Vérifier
-let valid = holochain.verify_warrant(&warrant).await?;
+- Gestion sécurisée des clés privées (`zeroize`)
+- Domain Separation sur les signatures Ed25519
+- Validation stricte des warrants (signature + expiration + issuer)
+- Émission non-fatale (`try_emit_*`)
 
-// Récupérer
-let warrants = holochain.get_warrants_for_agent(agent_id).await?;
+## Fichiers principaux modifiés
 
-// Enforcement basique avant d’assigner du travail
-if validate_node_warrants(&holochain, &agent_id, Some("gemma4")).await? {
-    // assigner le pipeline
-}
-```
-
-### État actuel
-
-- Types et API de base présents
-- Enforcement simple implémenté
-- Signature cryptographique réelle et zome `warrants` → à compléter
-
----
-
-## 3. Configuration recommandée (mode réel)
-
-```toml
-[holochain]
-backend = "conductor"
-admin_port = 8888
-app_port = 8890
-membrane_proof = { Base64 = "..." }   # optionnel pour réseaux privés
-```
-
----
-
-## Fichiers modifiés
-
-- `crates/ainonymous-types/src/warrants.rs`
-- `crates/ainonymous-daemon/src/config.rs`
-- `crates/ainonymous-daemon/src/conductor_client.rs`
 - `crates/ainonymous-daemon/src/holochain.rs`
-- `docs/PALIER_F.md`
+- `crates/ainonymous-daemon/src/conductor.rs`
+- `crates/ainonymous-daemon/src/router.rs`
+- `crates/ainonymous-types/src/warrants.rs`
+- `zomes/warrants/`
+- `docs/PALIER_F.md` + `docs/NODE_SCORING.md`
 
----
+## Statut global
 
-## Prochaines étapes
+Palier F est considéré comme **largement terminé**. Les fondations (Warrants, Membrane Proofs, scoring, zome) sont en place et fonctionnelles.
 
-- Rendre l’enforcement des warrants plus strict dans le scheduler
-- Implémenter la signature réelle des warrants
-- Ajouter un zome dédié `warrants`
-- Tests d’intégration
-
-Voir aussi : `ROADMAP.md`
+Prochain palier : **Palier G** (llama.cpp + inférence réelle).
