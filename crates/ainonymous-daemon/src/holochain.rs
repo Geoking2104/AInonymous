@@ -1,64 +1,57 @@
+// Amélioration de la négociation P2P via Holochain
 impl HolochainClient {
-    /// Émet un ModelClaim après rotation de clé ou au démarrage.
-    /// Utilise les capacités réelles détectées du nœud (VRAM, backends).
-    pub async fn emit_model_claim(
+    /// Négocie une session QUIC de manière P2P via Holochain (préfère le chemin DHT)
+    pub async fn negotiate_quic_session_p2p(
         &self,
-        model_id: &str,
-        model_hash: &str,
-        identity: &ainonymous_quic::NodeIdentity,
-    ) -> Result<()> {
-        // Détection des capacités réelles du nœud
-        let caps = detect_local_capabilities_from_config(&self.config); // on réutilise la logique existante
+        target_agent: &str,
+        layer_range: Option<(u32, u32)>,
+        next_agent: Option<String>,
+        next_layer_range: Option<(u32, u32)>,
+        requester_pubkey: Option<[u8; 32]>,
+    ) -> Result<ainonymous_quic::SessionOffer> {
+        // En mode Conductor (Holochain réel), on passe toujours par le zome
+        // qui fait du call_remote P2P sur le DHT.
+        if matches!(&self.backend, Backend::Conductor(_)) {
+            return self.negotiate_quic_session(
+                target_agent,
+                layer_range,
+                next_agent,
+                next_layer_range,
+                requester_pubkey,
+            ).await;
+        }
 
-        let claim = ModelClaim {
-            model_id: model_id.to_string(),
-            model_hash: model_hash.to_string(),
-            vram_required_gb: caps.vram_gb.max(8.0), // au moins 8 Go
-            max_context: 8192,
-            supported_backends: caps.compute_backends
-                .iter()
-                .map(|b| format!("{:?}", b))
-                .collect(),
-        };
-
-        let warrant = Warrant::new_signed(
-            &identity.signing_key,
-            WarrantType::ModelClaim,
-            serde_json::to_value(claim)?,
-            86400 * 90, // 90 jours de validité
-        )?;
-
-        self.emit_warrant_with_cleanup(&warrant).await?;
-
-        info!(
-            "ModelClaim émis pour '{}' (VRAM: {:.1} Go, backends: {:?})",
-            model_id, claim.vram_required_gb, claim.supported_backends
-        );
-
-        Ok(())
+        // En mode Static, on garde le comportement REST (fallback)
+        self.negotiate_quic_session(
+            target_agent,
+            layer_range,
+            next_agent,
+            next_layer_range,
+            requester_pubkey,
+        ).await
     }
 
-    /// Émet aussi un warrant de capacités du nœud (NodeCapabilities)
-    pub async fn emit_node_capabilities(
-        &self,
-        identity: &ainonymous_quic::NodeIdentity,
-    ) -> Result<()> {
-        let caps = detect_local_capabilities_from_config(&self.config);
+    /// Découverte P2P des nœuds disponibles via Holochain DHT
+    pub async fn discover_nodes_p2p(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
+        // En mode Conductor, on interroge directement le DHT
+        if matches!(&self.backend, Backend::Conductor(_)) {
+            return self.get_available_nodes(model_id).await;
+        }
 
-        let warrant = Warrant::new_signed(
-            &identity.signing_key,
-            WarrantType::NodeCapabilities,
-            serde_json::to_value(&caps)?,
-            86400 * 30, // 30 jours
-        )?;
-
-        self.emit_warrant_with_cleanup(&warrant).await?;
-        info!("NodeCapabilities warrant émis");
-        Ok(())
+        // En mode statique, on retourne les peers configurés
+        let mut nodes = Vec::new();
+        for peer in &self.peers {
+            nodes.push(NodeSummary {
+                agent_id: peer.agent_id.clone(),
+                vram_gb: 0.0,
+                current_load: 0.0,
+                available_slots: 4,
+                quic_endpoint: peer.quic_endpoint.clone(),
+                region_hint: None,
+                score: 1.0,
+                node_pubkey: None,
+            });
+        }
+        Ok(nodes)
     }
-}
-
-/// Version helper qui appelle detect_local_capabilities (déjà présente dans le fichier)
-fn detect_local_capabilities_from_config(config: &DaemonConfig) -> ainonymous_types::NodeCapabilities {
-    detect_local_capabilities(config)
 }
