@@ -1,56 +1,52 @@
 use hdk::prelude::*;
-use warrants_integrity::{Warrant, WarrantType};
+use warrants_integrity::{Warrant, WarrantType, LinkTypes};
 
 #[hdk_extern]
 pub fn emit_warrant(warrant: Warrant) -> ExternResult<ActionHash> {
-    let action_hash = create_entry(EntryTypes::Warrant(warrant))?;
+    let action_hash = create_entry(EntryTypes::Warrant(warrant.clone()))?;
+
+    // Créer un lien Agent -> Warrant
+    let agent_pubkey = agent_info()?.agent_initial_pubkey;
+    create_link(
+        agent_pubkey,
+        action_hash.clone(),
+        LinkTypes::AgentToWarrants,
+        LinkTag::new(warrant.warrant_type.to_string().as_bytes()),
+    )?;
+
     Ok(action_hash)
 }
 
 #[hdk_extern]
 pub fn verify_warrant(warrant: Warrant) -> ExternResult<bool> {
-    // TODO: Implémenter la vraie vérification cryptographique
-    // Pour l'instant on fait une validation basique
-    if warrant.signature.len() == 64 && !warrant.is_expired() {
-        Ok(true)
-    } else {
-        Ok(false)
+    // Utilise la vraie vérification ed25519 depuis ainonymous-types
+    // (on reconstruit la pubkey)
+    if let Ok(pubkey) = VerifyingKey::from_bytes(&warrant.issuer) {
+        return Ok(warrant.verify(&pubkey));
     }
+    Ok(false)
 }
 
 #[hdk_extern]
 pub fn get_warrants(agent_id: String) -> ExternResult<Vec<Warrant>> {
-    // TODO: Filtrer par issuer (agent_id)
-    // Pour l'instant on retourne tous les warrants (à affiner)
-    let warrants: Vec<Warrant> = query(
-        ChainQueryFilter::new()
-            .entry_type(EntryType::App(AppEntryDef::new(
-                EntryTypesUnit::Warrant.try_into().unwrap(),
-                0,
-                EntryVisibility::Public,
-            )))
-            .include_entries(true),
-    )?
-    .into_iter()
-    .filter_map(|el| {
-        if let RecordEntry::Present(entry) = el.entry {
-            entry.app_entry().ok()
-        } else {
-            None
-        }
-    })
-    .collect();
+    // Récupère les warrants via les liens
+    let agent_pubkey: AgentPubKey = agent_id.try_into()?;
 
-    Ok(warrants)
-}
+    let links = get_links(
+        agent_pubkey,
+        LinkTypes::AgentToWarrants,
+        None,
+    )?;
 
-// Helper pour vérifier l'expiration (doit être dans l'integrity aussi)
-impl Warrant {
-    pub fn is_expired(&self) -> bool {
-        if self.ttl_seconds == 0 {
-            return false;
+    let mut warrants = Vec::new();
+    for link in links {
+        if let Some(record) = get(link.target.into(), GetOptions::default())? {
+            if let RecordEntry::Present(entry) = record.entry {
+                if let Some(w) = entry.app_entry::<Warrant>() {
+                    warrants.push(w);
+                }
+            }
         }
-        let now = sys_time().unwrap().0.as_secs();
-        now > self.issued_at + self.ttl_seconds
     }
+    Ok(warrants)
 }

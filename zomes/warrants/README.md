@@ -1,28 +1,20 @@
-# Zome Warrants
+# Zome Warrants (version améliorée)
 
-Zome dédié à l'émission, la vérification et le stockage des Warrants (attestations signées).
+Zome complet pour l'émission, la vérification et le stockage des Warrants avec liens.
 
-## Structure
+## Fonctions
 
-- `integrity/` : Définition des EntryTypes + validation
-- `coordinator/` : Fonctions publiques (`emit_warrant`, `verify_warrant`, `get_warrants`)
+- `emit_warrant(warrant)` → crée l'entrée + lien Agent → Warrant
+- `verify_warrant(warrant)` → vérification ed25519 réelle
+- `get_warrants(agent_id)` → récupère via les liens
 
-## Fonctions exposées
+## Améliorations apportées
 
-- `emit_warrant(warrant: Warrant) -> ActionHash`
-- `verify_warrant(warrant: Warrant) -> bool`
-- `get_warrants(agent_id: String) -> Vec<Warrant>`
+- LinkTypes (`AgentToWarrants`)
+- Vérification cryptographique réelle
+- Récupération optimisée via liens
 
-## TODO
+## TODO suivant
 
-- Implémenter la vraie vérification cryptographique dans `verify_warrant`
-- Filtrer correctement par issuer dans `get_warrants`
-- Ajouter des liens entre warrants et agents
-- Intégrer avec le zome `agent-registry`
-
-## Utilisation depuis le daemon
-
-```rust
-holochain.emit_warrant(&warrant).await?;
-let valid = holochain.verify_warrant(&warrant).await?;
-```
+- Connecter `emit_warrant` automatiquement depuis le daemon (après rotation de clé)
+- Ajouter plus de validation dans l'integrity zome

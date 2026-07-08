@@ -1,0 +1,27 @@
+manifest_version: "1"
+name: ainonymous
+network_seed: null
+properties: null
+
+roles:
+  - name: ainonymous
+    provisioning:
+      strategy: Create
+      deferred: false
+    dna:
+      path: "ainonymous.dna"
+      modifiers:
+        network_seed: null
+        properties: null
+
+# Zomes inclus dans le DNA
+zomes:
+  - name: warrants
+    path: "zomes/warrants/coordinator"
+    integrity:
+      path: "zomes/warrants/integrity"
+
+  # Autres zomes existants (exemples)
+  # - name: agent-registry
+  # - name: inference-mesh
+  # - name: blackboard

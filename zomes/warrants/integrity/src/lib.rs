@@ -1,7 +1,6 @@
 use hdi::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// Warrant entry type
 #[hdk_entry_helper]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Warrant {
@@ -29,19 +28,20 @@ pub enum EntryTypes {
     Warrant(Warrant),
 }
 
-/// Validation des warrants
+/// Link types pour relier les warrants aux agents
+#[hdk_link_types]
+pub enum LinkTypes {
+    AgentToWarrants,
+}
+
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         Op::StoreEntry(store_entry) => {
             if let EntryTypes::Warrant(warrant) = store_entry.action.app_entry() {
-                // Vérification basique de la signature
                 if warrant.signature.len() != 64 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        "Invalid signature length".to_string(),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid("Invalid signature length".to_string()));
                 }
-                // TODO: Vérifier que l'issuer est bien un agent connu du réseau
                 Ok(ValidateCallbackResult::Valid)
             } else {
                 Ok(ValidateCallbackResult::Valid)
