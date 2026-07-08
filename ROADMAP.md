@@ -1,49 +1,43 @@
 # AInonymous — Roadmap & Paliers
 
 ## Statut actuel (juillet 2026)
-- Core Rust crates compilables et testés (mtls_handshake OK)
-- Testnet 2 nœuds fonctionnel en mock (pipeline-split)
-- HybridNode scheduler + SD-WAN policy
-- DNA Holochain (zomes integrity + coordinator)
-- Site marketing multi-langue + Enterprise + Défense
 
-## Paliers de développement
+**Palier E — Keyring OS natif + Rotation ed25519** : ✅ **Finalisé et testé**
 
-### Palier E — Keyring & Rotation d'identité (en cours / presque prêt)
-- NodeIdentity::load_or_generate_keyring (macOS Keychain / Windows Credential Manager / libsecret)
-- Rotation de clé ed25519 via POST /daemon/rotate-identity
-- Re-annonce DHT automatique
-- Feature `secure-keyring` dans ainonymous-quic
+- `NodeIdentity::load_or_generate_keyring` (keyring OS + fallback fichier)
+- `NodeIdentity::rotate` et `rotate_file`
+- Endpoint REST `POST /daemon/rotate-identity`
+- Ré-annonce automatique dans le DHT
+- Tests unitaires ajoutés (`tempfile`)
+
+Voir : `docs/PALIER_E.md`
+
+---
+
+## Paliers futurs
 
 ### Palier F — Intégration Holochain réelle
-- Remplacer le bootstrap statique par AppWebsocket réel
-- Appels zome signés depuis le daemon
-- Membrane Proofs + PrivateNetworkProof pour consortiums
-- Warrants enforcement dans le scheduler
+- Remplacer bootstrap statique par `AppWebsocket` réel
+- Appels zome signés
+- Membrane Proofs + PrivateNetworkProof
 
 ### Palier G — Moteur d'inférence réel (llama.cpp)
-- Intégration llama.cpp (GGUF loading + pipeline-splitting)
-- Détection GPU réelle (NVIDIA via nvml, AMD via rocm, Apple Metal)
-- KV-cache management + speculative decoding
-- Support MoE (Qwen3.6) et dense (Gemma 4 31B)
+- Intégration llama.cpp GGUF
+- Détection GPU réelle (NVIDIA/AMD/Apple)
+- Pipeline-splitting + speculative decoding
 
-### Palier H — mTLS QUIC strict + Sécurité renforcée
-- PeerKeyVerifier ed25519 complet (plus de skip-verify)
-- Vérification NodeAttestation avant connexion
-- ModelClaim + SHA-256 GGUF validation par pairs
-- Exclusion automatique via warrants DHT
+### Palier H — mTLS QUIC strict
+- `PeerKeyVerifier` ed25519 complet
+- Vérification `NodeAttestation` avant connexion
 
 ### Palier I — Observabilité & Dashboard
-- Prometheus metrics complets (ainonymous_* + hybridnode_*)
-- Simple web dashboard (ou intégration Grafana)
-- Logs structurés + OpenTelemetry traces optionnelles
-- Health checks + SLA monitoring SD-WAN
+- Prometheus + métriques complètes
+- Dashboard simple ou Grafana
 
 ### Palier J — Testnet public & Go-to-market
-- Testnet public multi-régions
-- Seed funding materials (pitch deck, traction metrics)
-- Documentation utilisateur finale
-- Premier utilisateurs pilotes (entreprises + défense)
+- Testnet multi-régions
+- Seed funding prep
+- Premiers pilotes entreprises/défense
 
-## Objectif court terme
-Atteindre Palier G + H d'ici fin août 2026 pour pouvoir démontrer une inférence distribuée réelle avec un vrai modèle GGUF sur 2-3 nœuds physiques.
+## Objectif
+Atteindre Palier G+H d'ici fin août 2026 pour démontrer une inférence distribuée réelle.
