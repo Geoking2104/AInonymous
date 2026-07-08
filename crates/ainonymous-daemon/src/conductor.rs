@@ -1,11 +1,17 @@
-pub async fn build_dynamic_pipeline_plan(
-    holochain: &HolochainClient,
-    model_id: &str,
-) -> Result<ExecutionPlan> {
-    // Utilise la version optimisée (cache + scoring)
-    let discovered = holochain
-        .discover_nodes_p2p_optimized(model_id, Some(8.0), None)
-        .await?;
+/// Un étage du pipeline distribué
+#[derive(Debug, Clone)]
+pub struct PipelineStage {
+    pub node: String,
+    pub quic_endpoint: SocketAddr,
+    pub layer_start: u32,
+    pub layer_end: u32,
+    pub is_last: bool,
+    /// Plage de couches assignée à ce nœud (pour llama.cpp / pipeline réel)
+    pub layer_range: Option<(u32, u32)>,
+}
 
-    // ... reste de la fonction (filtrage warrants + construction du plan)
+impl PipelineStage {
+    pub fn layer_range(&self) -> (u32, u32) {
+        self.layer_range.unwrap_or((self.layer_start, self.layer_end))
+    }
 }
