@@ -1,99 +1,41 @@
-use hdk::prelude::*;
-use warrants_integrity::{Warrant, WarrantType, LinkTypes};
-
-#[hdk_extern]
-pub fn emit_warrant(warrant: Warrant) -> ExternResult<ActionHash> {
-    let action_hash = create_entry(EntryTypes::Warrant(warrant.clone()))?;
-
-    let agent_pubkey = agent_info()?.agent_initial_pubkey;
-
-    // On tag le lien avec le type de warrant pour éviter les conflits et permettre les requêtes ciblées
-    let tag = LinkTag::new(warrant.warrant_type.to_string().as_bytes());
-
-    create_link(
-        agent_pubkey,
-        action_hash.clone(),
-        LinkTypes::AgentToWarrants,
-        tag,
-    )?;
-
-    Ok(action_hash)
-}
-
-/// Émet un warrant en supprimant d'abord les anciens du même type (gestion des conflits)
-pub fn emit_warrant_with_cleanup(warrant: Warrant) -> ExternResult<ActionHash> {
-    let agent_pubkey = agent_info()?.agent_initial_pubkey;
-    let tag = LinkTag::new(warrant.warrant_type.to_string().as_bytes());
-
-    // Supprime les anciens liens du même type (rotation de warrant)
-    let existing_links = get_links(
-        agent_pubkey.clone(),
-        LinkTypes::AgentToWarrants,
-        Some(tag.clone()),
-    )?;
-
-    for link in existing_links {
-        delete_link(link.create_link_hash)?;
-    }
-
-    // Crée le nouveau warrant + lien
-    let action_hash = create_entry(EntryTypes::Warrant(warrant.clone()))?;
-    create_link(agent_pubkey, action_hash.clone(), LinkTypes::AgentToWarrants, tag)?;
-
-    Ok(action_hash)
-}
+use ed25519_dalek::{Signature, VerifyingKey};
 
 #[hdk_extern]
 pub fn verify_warrant(warrant: Warrant) -> ExternResult<bool> {
-    if let Ok(pubkey) = VerifyingKey::from_bytes(&warrant.issuer) {
-        return Ok(warrant.verify(&pubkey));
+    // Vérification basique
+    if warrant.signature.len() != 64 {
+        return Ok(false);
     }
-    Ok(false)
-}
 
-#[hdk_extern]
-pub fn get_warrants(agent_id: String) -> ExternResult<Vec<Warrant>> {
-    let agent_pubkey: AgentPubKey = agent_id.try_into()?;
-
-    let links = get_links(
-        agent_pubkey,
-        LinkTypes::AgentToWarrants,
-        None,
-    )?;
-
-    let mut warrants = Vec::new();
-    for link in links {
-        if let Some(record) = get(link.target.into(), GetOptions::default())? {
-            if let RecordEntry::Present(entry) = record.entry {
-                if let Some(w) = entry.app_entry::<Warrant>() {
-                    warrants.push(w);
-                }
-            }
-        }
+    if warrant.is_expired() {
+        return Ok(false);
     }
-    Ok(warrants)
-}
 
-#[hdk_extern]
-pub fn get_warrants_by_type(agent_id: String, warrant_type: WarrantType) -> ExternResult<Vec<Warrant>> {
-    let agent_pubkey: AgentPubKey = agent_id.try_into()?;
-    let tag = LinkTag::new(warrant_type.to_string().as_bytes());
+    // Vérification cryptographique Ed25519
+    let pubkey = match VerifyingKey::from_bytes(&warrant.issuer) {
+        Ok(pk) => pk,
+        Err(_) => return Ok(false),
+    };
 
-    let links = get_links(
-        agent_pubkey,
-        LinkTypes::AgentToWarrants,
-        Some(tag),
-    )?;
+    let sig_array: [u8; 64] = match warrant.signature.try_into() {
+        Ok(arr) => arr,
+        Err(_) => return Ok(false),
+    };
 
-    let mut warrants = Vec::new();
-    for link in links {
-        if let Some(record) = get(link.target.into(), GetOptions::default())? {
-            if let RecordEntry::Present(entry) = record.entry {
-                if let Some(w) = entry.app_entry::<Warrant>() {
-                    warrants.push(w);
-                }
-            }
-        }
+    let signature = Signature::from_bytes(&sig_array);
+
+    // Reconstruire les données signées (doit matcher exactement new_signed)
+    let mut message = Vec::new();
+    message.extend_from_slice(&warrant.issuer);
+    message.extend_from_slice(&warrant.issued_at.to_le_bytes());
+    message.extend_from_slice(warrant.warrant_type.to_string().as_bytes());
+
+    if let Ok(payload_bytes) = serde_json::to_vec(&warrant.payload) {
+        message.extend_from_slice(&payload_bytes);
     }
-    Ok(warrants)
+
+    match pubkey.verify_strict(&message, &signature) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
