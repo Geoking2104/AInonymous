@@ -1,17 +1,26 @@
-    // Reconstruire exactement le message signé (avec Domain Separation)
-    const DOMAIN: &[u8] = b"AInonymous-Warrant-v1";
+#[hdk_extern]
+pub fn get_warrants_by_type(
+    agent_id: String,
+    warrant_type: WarrantType,
+) -> ExternResult<Vec<Warrant>> {
+    let agent_pubkey: AgentPubKey = agent_id.try_into()?;
+    let tag = LinkTag::new(warrant_type.to_string().as_bytes());
 
-    let mut message = Vec::new();
-    message.extend_from_slice(DOMAIN);
-    message.extend_from_slice(&warrant.issuer);
-    message.extend_from_slice(&warrant.issued_at.to_le_bytes());
-    message.extend_from_slice(warrant.warrant_type.to_string().as_bytes());
+    let links = get_links(
+        agent_pubkey,
+        LinkTypes::AgentToWarrants,
+        Some(tag),
+    )?;
 
-    if let Ok(payload_bytes) = serde_json::to_vec(&warrant.payload) {
-        message.extend_from_slice(&payload_bytes);
+    let mut warrants = Vec::new();
+    for link in links {
+        if let Some(record) = get(link.target.into(), GetOptions::default())? {
+            if let RecordEntry::Present(entry) = record.entry {
+                if let Some(w) = entry.app_entry::<Warrant>() {
+                    warrants.push(w);
+                }
+            }
+        }
     }
-
-    match pubkey.verify_strict(&message, &signature) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    Ok(warrants)
+}
