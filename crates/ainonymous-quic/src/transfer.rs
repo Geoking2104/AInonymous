@@ -1,8 +1,8 @@
-/// Quantization symétrique dynamique INT8 d'un tenseur f32.
-/// Retourne (données_quantisées, scale).
-pub fn quantize_f32_to_i8(data: &[f32]) -> (Vec<i8>, f32) {
+/// Quantization asymétrique dynamique en UINT8 (0-255).
+/// Retourne (données_quantisées_u8, scale, zero_point).
+pub fn quantize_f32_to_u8_asymmetric(data: &[f32]) -> (Vec<u8>, f32, u8) {
     if data.is_empty() {
-        return (vec![], 1.0);
+        return (vec![], 1.0, 0);
     }
 
     let mut min_val = f32::MAX;
@@ -13,21 +13,28 @@ pub fn quantize_f32_to_i8(data: &[f32]) -> (Vec<i8>, f32) {
         if v > max_val { max_val = v; }
     }
 
-    let abs_max = min_val.abs().max(max_val.abs());
-    let scale = if abs_max > 0.0 { abs_max / 127.0 } else { 1.0 };
+    if (max_val - min_val).abs() < 1e-8 {
+        // Tenseur presque constant
+        return (vec![128u8; data.len()], 1.0, 128);
+    }
 
-    let quantized: Vec<i8> = data
+    let scale = (max_val - min_val) / 255.0;
+    let zero_point = ((-min_val) / scale).round().clamp(0.0, 255.0) as u8;
+
+    let quantized: Vec<u8> = data
         .iter()
         .map(|&v| {
-            let q = (v / scale).round().clamp(-127.0, 127.0) as i8;
+            let q = ((v / scale) + zero_point as f32).round().clamp(0.0, 255.0) as u8;
             q
         })
         .collect();
 
-    (quantized, scale)
+    (quantized, scale, zero_point)
 }
 
-/// Déquantization INT8 → f32
-pub fn dequantize_i8_to_f32(data: &[i8], scale: f32) -> Vec<f32> {
-    data.iter().map(|&q| q as f32 * scale).collect()
+/// Déquantization UINT8 asymétrique → f32
+pub fn dequantize_u8_to_f32(data: &[u8], scale: f32, zero_point: u8) -> Vec<f32> {
+    data.iter()
+        .map(|&q| (q as f32 - zero_point as f32) * scale)
+        .collect()
 }
