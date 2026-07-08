@@ -1,21 +1,17 @@
-pub async fn handle_pipeline_session(
-    conn: quinn::Connection,
-    offer: SessionOffer,
-    holochain: &HolochainClient,
-    pipeline: &PipelineClient,
-    identity: &ainonymous_quic::NodeIdentity,
-) -> Result<()> {
-    let layer_range = offer.layer_range.unwrap_or((0, 0));
+// Dans run_pipeline_inference, remplacer la négociation par la version P2P
+let offer = holochain.negotiate_quic_session_p2p(
+    &first.node,
+    Some((first.layer_start, first.layer_end)),
+    next.map(|s| s.node.clone()),
+    next.map(|s| (s.layer_start, s.layer_end)),
+    Some(identity.public_key_bytes()),
+).await.context("négociation session 1er étage (P2P)")?;
 
-    // === Palier F : Validation côté worker ===
-    // On vérifie que ce nœud a bien un warrant valide pour les couches demandées.
-    // Note: on utilise un model_id générique pour l'instant.
-    if !validate_node_warrants(holochain, "local", None).await? {
-        warn!("Worker refused pipeline session: missing valid warrants");
-        anyhow::bail!("This node does not have valid warrants to participate in the mesh");
-    }
-
-    info!("Session pipeline entrante validée par warrants — couches [{}, {}[", layer_range.0, layer_range.1);
-
-    // ... reste de la fonction handle_pipeline_session inchangé
-}
+// Plus loin dans la boucle, pour les nœuds suivants :
+let next_offer = holochain.negotiate_quic_session_p2p(
+    next_agent,
+    offer.next_layer_range,
+    None,
+    None,
+    Some(identity.public_key_bytes()),
+).await.context("négociation nœud suivant (P2P)")?;
