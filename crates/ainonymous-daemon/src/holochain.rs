@@ -1,57 +1,69 @@
-// Amélioration de la négociation P2P via Holochain
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
+
+// Cache simple pour la découverte DHT
+static NODE_DISCOVERY_CACHE: once_cell::sync::Lazy<RwLock<HashMap<String, (Vec<NodeSummary>, Instant)>>> =
+    once_cell::sync::Lazy::new(|| RwLock::new(HashMap::new()));
+
+const DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(30); // 30 secondes de cache
+
 impl HolochainClient {
-    /// Négocie une session QUIC de manière P2P via Holochain (préfère le chemin DHT)
-    pub async fn negotiate_quic_session_p2p(
-        &self,
-        target_agent: &str,
-        layer_range: Option<(u32, u32)>,
-        next_agent: Option<String>,
-        next_layer_range: Option<(u32, u32)>,
-        requester_pubkey: Option<[u8; 32]>,
-    ) -> Result<ainonymous_quic::SessionOffer> {
-        // En mode Conductor (Holochain réel), on passe toujours par le zome
-        // qui fait du call_remote P2P sur le DHT.
-        if matches!(&self.backend, Backend::Conductor(_)) {
-            return self.negotiate_quic_session(
-                target_agent,
-                layer_range,
-                next_agent,
-                next_layer_range,
-                requester_pubkey,
-            ).await;
+    /// Version optimisée avec cache de la découverte P2P
+    pub async fn discover_nodes_p2p_cached(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
+        let cache_key = model_id.to_string();
+
+        // Vérifier le cache
+        {
+            let cache = NODE_DISCOVERY_CACHE.read().await;
+            if let Some((nodes, timestamp)) = cache.get(&cache_key) {
+                if timestamp.elapsed() < DISCOVERY_CACHE_TTL {
+                    debug!("Utilisation du cache de découverte DHT pour {}", model_id);
+                    return Ok(nodes.clone());
+                }
+            }
         }
 
-        // En mode Static, on garde le comportement REST (fallback)
-        self.negotiate_quic_session(
-            target_agent,
-            layer_range,
-            next_agent,
-            next_layer_range,
-            requester_pubkey,
-        ).await
+        // Requête réelle sur le DHT
+        let nodes = self.get_available_nodes(model_id).await?;
+
+        // Mise à jour du cache
+        {
+            let mut cache = NODE_DISCOVERY_CACHE.write().await;
+            cache.insert(cache_key, (nodes.clone(), Instant::now()));
+        }
+
+        Ok(nodes)
     }
 
-    /// Découverte P2P des nœuds disponibles via Holochain DHT
-    pub async fn discover_nodes_p2p(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
-        // En mode Conductor, on interroge directement le DHT
-        if matches!(&self.backend, Backend::Conductor(_)) {
-            return self.get_available_nodes(model_id).await;
+    /// Découverte optimisée avec scoring et filtrage
+    pub async fn discover_nodes_p2p_optimized(
+        &self,
+        model_id: &str,
+        min_vram_gb: Option<f32>,
+        preferred_region: Option<&str>,
+    ) -> Result<Vec<NodeSummary>> {
+        let mut nodes = self.discover_nodes_p2p_cached(model_id).await?;
+
+        // Filtrage
+        if let Some(min_vram) = min_vram_gb {
+            nodes.retain(|n| n.vram_gb >= min_vram);
         }
 
-        // En mode statique, on retourne les peers configurés
-        let mut nodes = Vec::new();
-        for peer in &self.peers {
-            nodes.push(NodeSummary {
-                agent_id: peer.agent_id.clone(),
-                vram_gb: 0.0,
-                current_load: 0.0,
-                available_slots: 4,
-                quic_endpoint: peer.quic_endpoint.clone(),
-                region_hint: None,
-                score: 1.0,
-                node_pubkey: None,
+        if let Some(region) = preferred_region {
+            nodes.retain(|n| {
+                n.region_hint.as_deref() == Some(region) || n.region_hint.is_none()
             });
         }
+
+        // Scoring : on privilégie les nœuds avec peu de charge et beaucoup de VRAM
+        nodes.sort_by(|a, b| {
+            let score_a = (a.vram_gb * 2.0) - (a.current_load * 10.0);
+            let score_b = (b.vram_gb * 2.0) - (b.current_load * 10.0);
+            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         Ok(nodes)
     }
 }
