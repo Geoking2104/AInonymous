@@ -1,31 +1,53 @@
-# Zome Warrants - Gestion des conflits de liens
+# Zome Warrants — Documentation
 
-## Problème résolu
+Zome dédié à la gestion des **Warrants** (attestations signées par les nœuds).
 
-Lorsqu'un nœud émet plusieurs warrants du même type (ex: rotation de clé ou mise à jour de ModelClaim), on peut avoir des liens dupliqués ou des conflits.
+## Fonctionnalités
 
-## Solutions implémentées
+| Fonction                    | Description                                      | Sécurité                          |
+|-----------------------------|--------------------------------------------------|-----------------------------------|
+| `emit_warrant`              | Émet un warrant                                  | Basique                           |
+| `emit_warrant_with_cleanup` | Émet un warrant en supprimant les anciens du même type | Recommandé (rotation)        |
+| `verify_warrant`            | Vérifie un warrant (Ed25519 + Domain Separation) | Fort (Ed25519ctx)                 |
+| `get_warrants`              | Récupère tous les warrants d'un agent            | -                                 |
+| `get_warrants_by_type`      | Récupère les warrants d'un type précis           | Efficace grâce aux liens          |
 
-### 1. `emit_warrant` (classique)
-Crée un nouveau lien à chaque appel. Simple mais peut créer des doublons.
+## Sécurité
 
-### 2. `emit_warrant_with_cleanup` (recommandé)
-- Supprime d'abord tous les anciens liens du **même type** de warrant
-- Puis crée le nouveau
-- Évite les conflits et les doublons
+- **Domain Separation** : `AInonymous-Warrant-v1`
+- **Validation on-chain** : L'issuer doit correspondre à l'agent créateur
+- **Signature Ed25519** avec contexte
+- **Vérification d'expiration**
 
-### 3. Requêtes ciblées
-- `get_warrants(agent_id)` → tous les warrants
-- `get_warrants_by_type(agent_id, WarrantType)` → seulement un type précis (ex: seulement les ModelClaim)
-
-## Recommandation
-
-Utiliser `emit_warrant_with_cleanup` quand on veut remplacer un warrant existant (rotation de clé, mise à jour de capacités, etc.).
-
-## Exemple d'utilisation depuis le daemon
+## Utilisation depuis le daemon
 
 ```rust
-// Rotation de clé → on veut remplacer l'ancien warrant
-let new_warrant = Warrant::new_signed(...);
-holochain.emit_warrant_with_cleanup(new_warrant).await?;
+// Émission sûre (non-fatale)
+holochain.try_emit_model_claim("gemma4-e4b", hash, &identity).await?;
+
+// Vérification
+let valid = holochain.verify_warrant(&warrant).await?;
+
+// Récupération ciblée
+let model_claims = holochain
+    .call_zome_with_proof("warrants", "coordinator", "get_warrants_by_type", json!({ 
+        "agent_id": agent, 
+        "warrant_type": "model_claim" 
+    }))
+    .await?;
 ```
+
+## Structure
+
+- `integrity/` : Définition des EntryTypes + règles de validation
+- `coordinator/` : Fonctions publiques + logique métier
+
+## Bonnes pratiques
+
+- Utiliser `emit_warrant_with_cleanup` lors d'une rotation de clé
+- Toujours vérifier les warrants avant d'assigner du travail (`validate_node_warrants`)
+- Préférer `get_warrants_by_type` pour les requêtes ciblées
+
+## Statut
+
+Zome fonctionnel et sécurisé. Intégré au daemon via `HolochainClient`.
