@@ -3,83 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AInonymous - Carte Géographique des Nœuds (Leaflet)</title>
+  <title>AInonymous - Carte des Nœuds avec Cercles d'Influence</title>
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { font-family: system-ui, sans-serif; background: #0a0a0f; color: #f0eff8; margin: 0; padding: 20px; }
-    #map { height: 600px; border-radius: 12px; border: 1px solid #2a2a3a; }
-    .node-popup { font-size: 13px; line-height: 1.4; }
-    .controls { background: #12121a; padding: 20px; border-radius: 12px; margin-bottom: 20px; max-width: 900px; }
-    h1 { color: #7c6deb; }
+    #map { height: 620px; border-radius: 12px; border: 1px solid #2a2a3a; }
+    .node-popup { font-size: 13px; line-height: 1.5; }
+    .controls { background: #12121a; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    h1 { color: #7c6deb; margin-bottom: 8px; }
   </style>
 </head>
 <body>
 
 <div style="max-width: 1100px; margin: 0 auto;">
-  <h1>🌍 Carte Géographique des Nœuds</h1>
-  <p>Visualisation interactive avec Leaflet + scoring géographique</p>
+  <h1>🌍 Carte des Nœuds + Cercles d'Influence</h1>
+  <p>Visualisation Leaflet avec scoring géographique et zones d'influence</p>
 
   <div class="controls">
-    <strong>Poids du scoring :</strong><br>
-    VRAM: <input type="range" id="vram" min="0" max="50" value="35" oninput="updateMap()"> <span id="vramVal">35</span>% &nbsp;&nbsp;
-    Load: <input type="range" id="load" min="0" max="40" value="25" oninput="updateMap()"> <span id="loadVal">25</span>% &nbsp;&nbsp;
-    Slots: <input type="range" id="slots" min="0" max="30" value="15" oninput="updateMap()"> <span id="slotsVal">15</span>% &nbsp;&nbsp;
-    Géo: <input type="range" id="geo" min="0" max="25" value="15" oninput="updateMap()"> <span id="geoVal">15</span>%
+    <strong>Poids du scoring</strong><br>
+    VRAM <input type="range" id="vram" min="0" max="50" value="35" oninput="updateVisualization()"> <span id="vramVal">35</span>% &nbsp;
+    Load <input type="range" id="load" min="0" max="40" value="25" oninput="updateVisualization()"> <span id="loadVal">25</span>% &nbsp;
+    Slots <input type="range" id="slots" min="0" max="30" value="15" oninput="updateVisualization()"> <span id="slotsVal">15</span>% &nbsp;
+    <strong>Géo</strong> <input type="range" id="geo" min="0" max="25" value="15" oninput="updateVisualization()"> <span id="geoVal">15</span>%
     <br><br>
-    <button onclick="resetToDefault()" style="padding: 8px 16px; background: #5dd8a8; color: #0a0a0f; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-      Réinitialiser les poids
+    <button onclick="resetWeights()" style="background:#5dd8a8;color:#0a0a0f;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;">
+      Réinitialiser
     </button>
   </div>
 
   <div id="map"></div>
-
-  <p style="margin-top: 15px; color: #8887a0; font-size: 13px;">
-    Les marqueurs sont colorés selon leur score. Clique sur un marqueur pour voir le détail du scoring.
-  </p>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Données des nœuds (avec coordonnées réelles)
 let nodes = [
-  { id: "node-paris",     vram: 24, load: 0.25, slots: 5, lat: 48.8566, lon: 2.3522, region: "EU" },
-  { id: "node-frankfurt", vram: 20, load: 0.35, slots: 6, lat: 50.1109, lon: 8.6821, region: "EU" },
-  { id: "node-nyc",       vram: 32, load: 0.55, slots: 4, lat: 40.7128, lon: -74.0060, region: "US" },
-  { id: "node-tokyo",     vram: 18, load: 0.15, slots: 7, lat: 35.6895, lon: 139.6917, region: "AS" },
-  { id: "node-singapore", vram: 22, load: 0.40, slots: 5, lat: 1.3521, lon: 103.8198, region: "AS" },
+  { id: "node-paris",     vram: 24, load: 0.25, slots: 5, lat: 48.8566, lon: 2.3522 },
+  { id: "node-frankfurt", vram: 20, load: 0.35, slots: 6, lat: 50.1109, lon: 8.6821 },
+  { id: "node-nyc",       vram: 32, load: 0.55, slots: 4, lat: 40.7128, lon: -74.0060 },
+  { id: "node-tokyo",     vram: 18, load: 0.15, slots: 7, lat: 35.6895, lon: 139.6917 },
+  { id: "node-singapore", vram: 22, load: 0.40, slots: 5, lat: 1.3521, lon: 103.8198 },
 ];
 
-let map;
-let markers = [];
+let map, markers = [], circles = [];
 let weights = { vram: 35, load: 25, slots: 15, geo: 15 };
-const referencePoint = { lat: 48.8566, lon: 2.3522 }; // Paris
+const refLat = 48.8566, refLon = 2.3522;
 
 function calculateScore(node) {
-  const vramScore = Math.min(node.vram / 24, 1) * weights.vram;
-  const loadScore = (1 - Math.min(Math.max(node.load, 0), 1)) * weights.load;
-  const slotsScore = Math.min(node.slots / 8, 1) * weights.slots;
+  const vramS = Math.min(node.vram / 24, 1) * weights.vram;
+  const loadS = (1 - Math.min(Math.max(node.load, 0), 1)) * weights.load;
+  const slotsS = Math.min(node.slots / 8, 1) * weights.slots;
 
-  // Score géographique (distance Haversine simplifiée)
-  const distance = Math.sqrt(
-    Math.pow(node.lat - referencePoint.lat, 2) + 
-    Math.pow(node.lon - referencePoint.lon, 2)
-  ) * 80;
-  const geoScore = Math.max(0, weights.geo * (1 - Math.min(distance / 120, 1)));
+  const dist = Math.hypot(node.lat - refLat, node.lon - refLon) * 85;
+  const geoS = Math.max(0, weights.geo * (1 - Math.min(dist / 130, 1)));
 
-  return Math.round(vramScore + loadScore + slotsScore + geoScore);
+  return Math.round(vramS + loadS + slotsS + geoS);
 }
 
 function getColor(score) {
-  if (score >= 75) return "#22c55e"; // vert
-  if (score >= 55) return "#eab308"; // jaune
-  return "#ef4444"; // rouge
+  if (score >= 75) return "#22c55e";
+  if (score >= 55) return "#eab308";
+  return "#ef4444";
 }
 
-function updateMap() {
-  // Mettre à jour les valeurs des sliders
+function updateVisualization() {
   weights.vram = +document.getElementById("vram").value;
   weights.load = +document.getElementById("load").value;
   weights.slots = +document.getElementById("slots").value;
@@ -90,87 +77,107 @@ function updateMap() {
   document.getElementById("slotsVal").textContent = weights.slots;
   document.getElementById("geoVal").textContent = weights.geo;
 
-  // Mettre à jour les marqueurs
-  markers.forEach(marker => {
+  // Mettre à jour marqueurs + cercles
+  markers.forEach((marker, i) => {
     const node = marker.nodeData;
     const score = calculateScore(node);
     const color = getColor(score);
 
+    // Mettre à jour l'icône du marqueur
     marker.setIcon(L.divIcon({
-      className: 'custom-marker',
-      html: `<div style="background:${color}; width:18px; height:18px; border-radius:50%; border:2px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.5);"></div>`,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9]
+      className: "custom-marker",
+      html: `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(0,0,0,0.6);"></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
     }));
 
+    // Mettre à jour le popup
     marker.getPopup().setContent(`
-      <div class="node-popup">
+      <div style="min-width:160px">
         <strong>${node.id}</strong><br>
-        Score: <strong>${score}</strong><br>
-        VRAM: ${node.vram} GB<br>
-        Load: ${(node.load * 100).toFixed(0)}%<br>
-        Slots: ${node.slots}<br>
-        Région: ${node.region}
+        <strong>Score: ${score}</strong><br>
+        VRAM: ${node.vram} GB &nbsp;|&nbsp; Load: ${(node.load*100).toFixed(0)}%<br>
+        Slots disponibles: ${node.slots}
       </div>
     `);
+
+    // Mettre à jour le cercle d'influence
+    if (circles[i]) {
+      const radius = Math.max(80, score * 4); // rayon proportionnel au score
+      circles[i].setRadius(radius);
+      circles[i].setStyle({ color: color, fillColor: color });
+    }
   });
 }
 
 function initMap() {
-  map = L.map('map').setView([30, 10], 2);
+  map = L.map('map').setView([25, 20], 2);
 
+  // OpenStreetMap tiles (améliorées)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    className: 'map-tiles'
   }).addTo(map);
 
-  nodes.forEach(node => {
+  nodes.forEach((node, index) => {
     const score = calculateScore(node);
     const color = getColor(score);
 
+    // Marqueur
     const marker = L.marker([node.lat, node.lon], {
       icon: L.divIcon({
-        className: 'custom-marker',
-        html: `<div style="background:${color}; width:18px; height:18px; border-radius:50%; border:2px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.5);"></div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9]
+        className: "custom-marker",
+        html: `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(0,0,0,0.6);"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
       })
     }).addTo(map);
 
     marker.bindPopup(`
-      <div class="node-popup">
+      <div style="min-width:160px">
         <strong>${node.id}</strong><br>
-        Score: <strong>${score}</strong><br>
-        VRAM: ${node.vram} GB<br>
-        Load: ${(node.load * 100).toFixed(0)}%<br>
-        Slots: ${node.slots}<br>
-        Région: ${node.region}
+        <strong>Score: ${score}</strong><br>
+        VRAM: ${node.vram} GB &nbsp;|&nbsp; Load: ${(node.load*100).toFixed(0)}%<br>
+        Slots disponibles: ${node.slots}
       </div>
     `);
 
     marker.nodeData = node;
     markers.push(marker);
+
+    // Cercle d'influence (rayon basé sur le score)
+    const radius = Math.max(80, score * 4);
+    const circle = L.circle([node.lat, node.lon], {
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.15,
+      radius: radius
+    }).addTo(map);
+
+    circles.push(circle);
   });
 
-  // Initialiser les sliders
-  ['vram', 'load', 'slots', 'geo'].forEach(id => {
-    const el = document.getElementById(id);
-    document.getElementById(id + 'Val').textContent = el.value;
-    el.oninput = updateMap;
+  // Initialiser sliders
+  ['vram','load','slots','geo'].forEach(id => {
+    const slider = document.getElementById(id);
+    document.getElementById(id + 'Val').textContent = slider.value;
+    slider.oninput = updateVisualization;
   });
 }
 
-function resetToDefault() {
+function updateVisualization() {
+  updateVisualization(); // réutilise la même fonction
+}
+
+function resetWeights() {
   document.getElementById("vram").value = 35;
   document.getElementById("load").value = 25;
   document.getElementById("slots").value = 15;
   document.getElementById("geo").value = 15;
-  updateMap();
+  updateVisualization();
 }
 
-// Initialisation
-window.onload = function() {
-  initMap();
-};
+window.onload = initMap;
 </script>
 </body>
 </html>
