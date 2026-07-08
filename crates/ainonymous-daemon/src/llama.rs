@@ -1,38 +1,16 @@
-        let mut ngl = detect_gpu_layers(self.config.inference.n_gpu_layers);
-        let is_gpu = ngl != 0;
-
-        // === Ajustement automatique de n_gpu_layers si VRAM insuffisante ===
-        let model_size_gb = 13.0; // TODO: taille réelle du modèle
-        let mut estimated_vram = estimate_vram_simple(
-            model_size_gb,
-            self.config.inference.context_size,
-            ngl,
-        ) / 1024.0;
-
-        let caps = detect_local_capabilities_from_config(&self.config);
-        let available_vram = caps.vram_gb.max(4.0); // minimum raisonnable
-
-        let safety_margin = 0.85;
-
-        while estimated_vram > available_vram * safety_margin && ngl > 0 {
-            let previous = ngl;
-            ngl = (ngl as f32 * 0.75) as i32; // réduction de 25%
-            if ngl < 0 {
-                ngl = 0;
-            }
-
-            estimated_vram = estimate_vram_simple(
-                model_size_gb,
-                self.config.inference.context_size,
-                ngl,
-            ) / 1024.0;
-
-            info!("Auto-réduction n_gpu_layers: {} → {} (VRAM estimée: {:.1} Go)", previous, ngl, estimated_vram);
+/// Retourne la taille réelle d'un fichier GGUF en Go.
+/// Retourne une valeur par défaut (13.0) si le fichier n'existe pas ou est illisible.
+pub fn get_model_size_gb(model_path: &std::path::Path) -> f32 {
+    match std::fs::metadata(model_path) {
+        Ok(metadata) => {
+            let size_bytes = metadata.len() as f32;
+            let size_gb = size_bytes / (1024.0 * 1024.0 * 1024.0);
+            debug!("Taille du modèle {:?} : {:.2} Go", model_path, size_gb);
+            size_gb
         }
-
-        if estimated_vram > available_vram * safety_margin {
-            warn!(
-                "Même avec n_gpu_layers={}, VRAM estimée insuffisante ({:.1} Go / {:.1} Go). Lancement en mode prudent.",
-                ngl, estimated_vram, available_vram
-            );
+        Err(e) => {
+            warn!("Impossible de lire la taille du modèle {:?}: {}. Utilisation de la valeur par défaut (13 Go).", model_path, e);
+            13.0
         }
+    }
+}
