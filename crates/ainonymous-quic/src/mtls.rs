@@ -68,7 +68,6 @@ impl NodeIdentity {
         Ok((old_pub, new_pub))
     }
 
-    /// Méthode utilisée par le endpoint /daemon/rotate-identity
     pub fn rotate_file(identity_path: &PathBuf) -> Result<(Self, [u8; 32])> {
         let old_bytes = if identity_path.exists() {
             fs::read(identity_path)?.try_into().map_err(|_| anyhow::anyhow!("invalid key length"))?
@@ -102,5 +101,48 @@ impl NodeIdentity {
         let cert_der = cert.serialize_der()?;
         let key_der = cert.serialize_private_key_der();
         Ok((cert_der.into(), key_der.into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_load_or_generate_creates_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test_identity.key");
+
+        let id1 = NodeIdentity::load_or_generate_keyring("test-service", "test-user", &path).unwrap();
+        assert!(path.exists());
+
+        let id2 = NodeIdentity::load_or_generate_keyring("test-service", "test-user", &path).unwrap();
+        assert_eq!(id1.public_key_hex(), id2.public_key_hex());
+    }
+
+    #[test]
+    fn test_rotate_file_changes_key() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("rotate_test.key");
+
+        let id1 = NodeIdentity::load_or_generate_keyring("test-service", "test-user", &path).unwrap();
+        let old_pub = id1.public_key_bytes();
+
+        let (id2, returned_old) = NodeIdentity::rotate_file(&path).unwrap();
+
+        assert_ne!(old_pub, id2.public_key_bytes());
+        assert_eq!(old_pub, returned_old);
+    }
+
+    #[test]
+    fn test_rotate_returns_different_keys() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("rotate2.key");
+
+        let _ = NodeIdentity::load_or_generate_keyring("test-service", "test-user", &path).unwrap();
+        let (old_pub, new_pub) = NodeIdentity::rotate("test-service", "test-user", &path).unwrap();
+
+        assert_ne!(old_pub.to_bytes(), new_pub.to_bytes());
     }
 }
