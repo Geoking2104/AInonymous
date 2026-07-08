@@ -1,2 +1,2 @@
 [dependencies]
-zeroize = { version = "1.8", features = ["zeroize_derive"] }
+wide = "0.7"

@@ -1,40 +1,64 @@
-/// Quantization asymétrique dynamique en UINT8 (0-255).
-/// Retourne (données_quantisées_u8, scale, zero_point).
-pub fn quantize_f32_to_u8_asymmetric(data: &[f32]) -> (Vec<u8>, f32, u8) {
+use wide::f32x8;
+
+/// Version SIMD (f32x8) de la quantization symétrique INT8.
+/// Plus rapide sur les CPUs supportant AVX2.
+pub fn quantize_f32_to_i8(data: &[f32]) -> (Vec<i8>, f32) {
     if data.is_empty() {
-        return (vec![], 1.0, 0);
+        return (vec![], 1.0);
     }
 
+    // Trouver min/max avec SIMD quand possible
     let mut min_val = f32::MAX;
     let mut max_val = f32::MIN;
 
-    for &v in data {
+    let mut i = 0;
+    while i + 8 <= data.len() {
+        let v = f32x8::from(&data[i..i + 8]);
+        min_val = min_val.min(v.reduce_min());
+        max_val = max_val.max(v.reduce_max());
+        i += 8;
+    }
+
+    // Reste scalaire
+    for &v in &data[i..] {
         if v < min_val { min_val = v; }
         if v > max_val { max_val = v; }
     }
 
-    if (max_val - min_val).abs() < 1e-8 {
-        // Tenseur presque constant
-        return (vec![128u8; data.len()], 1.0, 128);
+    let abs_max = min_val.abs().max(max_val.abs());
+    if abs_max < 1e-8 {
+        return (vec![0i8; data.len()], 1.0);
     }
 
-    let scale = (max_val - min_val) / 255.0;
-    let zero_point = ((-min_val) / scale).round().clamp(0.0, 255.0) as u8;
+    let scale = abs_max / 127.0;
+    let inv_scale = 1.0 / scale;
 
-    let quantized: Vec<u8> = data
-        .iter()
-        .map(|&v| {
-            let q = ((v / scale) + zero_point as f32).round().clamp(0.0, 255.0) as u8;
-            q
-        })
-        .collect();
+    let mut quantized = Vec::with_capacity(data.len());
 
-    (quantized, scale, zero_point)
+    // Partie SIMD
+    i = 0;
+    while i + 8 <= data.len() {
+        let v = f32x8::from(&data[i..i + 8]);
+        let scaled = v * f32x8::splat(inv_scale);
+        let clamped = scaled.max(f32x8::splat(-127.0)).min(f32x8::splat(127.0));
+        let rounded = clamped.round();
+
+        for j in 0..8 {
+            quantized.push(rounded.as_array_ref()[j] as i8);
+        }
+        i += 8;
+    }
+
+    // Reste scalaire
+    for &v in &data[i..] {
+        let q = (v * inv_scale).round().clamp(-127.0, 127.0) as i8;
+        quantized.push(q);
+    }
+
+    (quantized, scale)
 }
 
-/// Déquantization UINT8 asymétrique → f32
-pub fn dequantize_u8_to_f32(data: &[u8], scale: f32, zero_point: u8) -> Vec<f32> {
-    data.iter()
-        .map(|&q| (q as f32 - zero_point as f32) * scale)
-        .collect()
+/// Déquantization INT8 → f32 (version scalaire, suffisamment rapide)
+pub fn dequantize_i8_to_f32(data: &[i8], scale: f32) -> Vec<f32> {
+    data.iter().map(|&q| q as f32 * scale).collect()
 }
