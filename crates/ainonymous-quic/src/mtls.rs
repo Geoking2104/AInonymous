@@ -12,93 +12,89 @@ pub struct NodeIdentity {
 }
 
 impl NodeIdentity {
-    /// Charge ou génère une identité ed25519.
-    /// Priorité :
-    /// 1. Keyring OS natif (si feature activée et disponible)
-    /// 2. Fichier sur disque (identity_path)
     pub fn load_or_generate_keyring(
         service: &str,
         username: &str,
         identity_path: &PathBuf,
     ) -> Result<Self> {
-        // Essayer le keyring OS d'abord
         if let Ok(entry) = Entry::new(service, username) {
             if let Ok(secret) = entry.get_secret() {
                 if secret.len() == 32 {
                     let signing_key = SigningKey::from_bytes(&secret.try_into().unwrap());
-                    return Ok(Self {
-                        signing_key,
-                        verifying_key: signing_key.verifying_key(),
-                    });
+                    return Ok(Self { signing_key, verifying_key: signing_key.verifying_key() });
                 }
             }
-
-            // Générer et stocker dans le keyring
             let mut csprng = OsRng;
             let signing_key = SigningKey::generate(&mut csprng);
             if entry.set_secret(&signing_key.to_bytes()).is_ok() {
-                return Ok(Self {
-                    signing_key,
-                    verifying_key: signing_key.verifying_key(),
-                });
+                return Ok(Self { signing_key, verifying_key: signing_key.verifying_key() });
             }
         }
 
-        // Fallback fichier
         if identity_path.exists() {
             let bytes = fs::read(identity_path)?;
             if bytes.len() == 32 {
                 let signing_key = SigningKey::from_bytes(&bytes.try_into().unwrap());
-                return Ok(Self {
-                    signing_key,
-                    verifying_key: signing_key.verifying_key(),
-                });
+                return Ok(Self { signing_key, verifying_key: signing_key.verifying_key() });
             }
         }
 
-        // Générer et sauvegarder dans le fichier
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
-        if let Some(parent) = identity_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
+        if let Some(parent) = identity_path.parent() { let _ = fs::create_dir_all(parent); }
         fs::write(identity_path, signing_key.to_bytes())?;
 
-        Ok(Self {
-            signing_key,
-            verifying_key: signing_key.verifying_key(),
-        })
+        Ok(Self { signing_key, verifying_key: signing_key.verifying_key() })
     }
 
-    /// Rotation complète de la clé (keyring + fallback fichier)
     pub fn rotate(
         service: &str,
         username: &str,
         identity_path: &PathBuf,
     ) -> Result<(VerifyingKey, VerifyingKey)> {
-        let old_identity = Self::load_or_generate_keyring(service, username, identity_path)?;
-        let old_pubkey = old_identity.verifying_key;
+        let old = Self::load_or_generate_keyring(service, username, identity_path)?;
+        let old_pub = old.verifying_key;
 
-        // Générer nouvelle clé
         let mut csprng = OsRng;
-        let new_signing_key = SigningKey::generate(&mut csprng);
-        let new_pubkey = new_signing_key.verifying_key();
+        let new_signing = SigningKey::generate(&mut csprng);
+        let new_pub = new_signing.verifying_key();
 
-        // Essayer keyring
         if let Ok(entry) = Entry::new(service, username) {
-            if entry.set_secret(&new_signing_key.to_bytes()).is_ok() {
-                return Ok((old_pubkey, new_pubkey));
+            if entry.set_secret(&new_signing.to_bytes()).is_ok() {
+                return Ok((old_pub, new_pub));
             }
         }
+        fs::write(identity_path, new_signing.to_bytes())?;
+        Ok((old_pub, new_pub))
+    }
 
-        // Fallback fichier
+    /// Méthode utilisée par le endpoint /daemon/rotate-identity
+    pub fn rotate_file(identity_path: &PathBuf) -> Result<(Self, [u8; 32])> {
+        let old_bytes = if identity_path.exists() {
+            fs::read(identity_path)?.try_into().map_err(|_| anyhow::anyhow!("invalid key length"))?
+        } else {
+            [0u8; 32]
+        };
+
+        let mut csprng = OsRng;
+        let new_signing_key = SigningKey::generate(&mut csprng);
+        if let Some(parent) = identity_path.parent() { let _ = fs::create_dir_all(parent); }
         fs::write(identity_path, new_signing_key.to_bytes())?;
 
-        Ok((old_pubkey, new_pubkey))
+        let new_identity = Self {
+            signing_key: new_signing_key,
+            verifying_key: new_signing_key.verifying_key(),
+        };
+
+        Ok((new_identity, old_bytes))
     }
 
     pub fn public_key_hex(&self) -> String {
         hex::encode(self.verifying_key.to_bytes())
+    }
+
+    pub fn public_key_bytes(&self) -> [u8; 32] {
+        self.verifying_key.to_bytes()
     }
 
     pub fn tls_cert(&self) -> Result<(rustls::pki_types::CertificateDer<'static>, rustls::pki_types::PrivateKeyDer<'static>)> {
