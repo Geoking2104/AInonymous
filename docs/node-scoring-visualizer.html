@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AInonymous - Visualiseur de Scoring des Nœuds</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0a0a0f; color: #f0eff8; margin: 0; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #7c6deb; }
+    .viz-container { display: flex; gap: 30px; flex-wrap: wrap; }
+    .chart { background: #12121a; border-radius: 12px; padding: 20px; border: 1px solid #2a2a3a; }
+    .node { cursor: pointer; transition: all 0.2s; }
+    .node:hover { stroke: #5dd8a8; stroke-width: 3; }
+    .controls { background: #12121a; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    input[type="range"] { width: 200px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🔬 Visualiseur de Scoring des Nœuds</h1>
+  <p>Simulation interactive du système de scoring AInonymous (avec composante géographique)</p>
+
+  <div class="controls">
+    <h3>Paramètres de scoring</h3>
+    <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+      <div>VRAM: <input type="range" id="vramWeight" min="0" max="50" value="35"> <span id="vramVal">35</span>%</div>
+      <div>Load: <input type="range" id="loadWeight" min="0" max="40" value="25"> <span id="loadVal">25</span>%</div>
+      <div>Slots: <input type="range" id="slotsWeight" min="0" max="30" value="15"> <span id="slotsVal">15</span>%</div>
+      <div>Géo: <input type="range" id="geoWeight" min="0" max="25" value="15"> <span id="geoVal">15</span>%</div>
+    </div>
+    <button onclick="updateScores()" style="margin-top: 15px; padding: 8px 16px; background: #7c6deb; color: white; border: none; border-radius: 6px; cursor: pointer;">Recalculer les scores</button>
+  </div>
+
+  <div class="viz-container">
+    <!-- Carte simplifiée des nœuds -->
+    <div class="chart">
+      <h3>Carte des nœuds (simulation)</h3>
+      <svg id="map" width="500" height="300"></svg>
+    </div>
+
+    <!-- Barres de scoring -->
+    <div class="chart">
+      <h3>Scores détaillés</h3>
+      <svg id="bars" width="500" height="300"></svg>
+    </div>
+  </div>
+
+  <p style="margin-top: 30px; color: #8887a0; font-size: 14px;">
+    Les nœuds verts ont un bon score. La taille représente le score global. La couleur de bordure indique la proximité géographique.
+  </p>
+</div>
+
+<script>
+// Données de démonstration
+let nodes = [
+  { id: "node-eu1", vram: 24, load: 0.2, slots: 6, lat: 48.8, lon: 2.3, region: "EU" },
+  { id: "node-us1", vram: 32, load: 0.6, slots: 3, lat: 40.7, lon: -74.0, region: "US" },
+  { id: "node-as1", vram: 16, load: 0.1, slots: 7, lat: 35.7, lon: 139.7, region: "AS" },
+  { id: "node-eu2", vram: 20, load: 0.4, slots: 5, lat: 51.5, lon: -0.1, region: "EU" },
+];
+
+let weights = { vram: 35, load: 25, slots: 15, geo: 15 };
+
+const referenceLat = 48.8; // Paris
+
+const svgMap = d3.select("#map");
+const svgBars = d3.select("#bars");
+
+function calculateScore(node) {
+  const vramScore = Math.min(node.vram / 24, 1) * weights.vram;
+  const loadScore = (1 - Math.min(Math.max(node.load, 0), 1)) * weights.load;
+  const slotsScore = Math.min(node.slots / 8, 1) * weights.slots;
+
+  // Score géo simple (distance depuis Paris)
+  const distance = Math.sqrt(Math.pow(node.lat - referenceLat, 2) + Math.pow(node.lon + 2.3, 2)) * 50;
+  const geoScore = Math.max(0, weights.geo * (1 - Math.min(distance / 150, 1)));
+
+  return vramScore + loadScore + slotsScore + geoScore;
+}
+
+function updateScores() {
+  weights.vram = +document.getElementById("vramWeight").value;
+  weights.load = +document.getElementById("loadWeight").value;
+  weights.slots = +document.getElementById("slotsWeight").value;
+  weights.geo = +document.getElementById("geoWeight").value;
+
+  document.getElementById("vramVal").textContent = weights.vram;
+  document.getElementById("loadVal").textContent = weights.load;
+  document.getElementById("slotsVal").textContent = weights.slots;
+  document.getElementById("geoVal").textContent = weights.geo;
+
+  renderMap();
+  renderBars();
+}
+
+function renderMap() {
+  svgMap.selectAll("*").remove();
+
+  const g = svgMap.append("g");
+
+  // Fond simplifié
+  g.append("rect").attr("width", 500).attr("height", 300).attr("fill", "#1a1a28");
+
+  nodes.forEach((node, i) => {
+    const score = calculateScore(node);
+    const x = 80 + (node.lon + 180) * 1.1;
+    const y = 80 + (90 - node.lat) * 1.4;
+
+    const color = score > 70 ? "#5dd8a8" : score > 50 ? "#f4d35e" : "#eb6d7c";
+
+    g.append("circle")
+      .attr("cx", x)
+      .attr("cy", y)
+      .attr("r", 8 + score / 12)
+      .attr("fill", color)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1.5)
+      .attr("class", "node")
+      .on("mouseover", function() {
+        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 3);
+      })
+      .on("mouseout", function() {
+        d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1.5);
+      });
+
+    g.append("text")
+      .attr("x", x)
+      .attr("y", y + 22)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#f0eff8")
+      .attr("font-size", "11px")
+      .text(node.id);
+  });
+}
+
+function renderBars() {
+  svgBars.selectAll("*").remove();
+
+  const margin = {top: 20, right: 20, bottom: 30, left: 60};
+  const width = 440 - margin.left - margin.right;
+  const height = 260 - margin.top - margin.bottom;
+
+  const g = svgBars.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const scoredNodes = nodes.map(n => ({...n, score: calculateScore(n)})).sort((a,b) => b.score - a.score);
+
+  const x = d3.scaleBand().domain(scoredNodes.map(d => d.id)).range([0, width]).padding(0.3);
+  const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
+
+  g.selectAll(".bar")
+    .data(scoredNodes)
+    .enter().append("rect")
+    .attr("class", "bar")
+    .attr("x", d => x(d.id))
+    .attr("y", d => y(d.score))
+    .attr("width", x.bandwidth())
+    .attr("height", d => height - y(d.score))
+    .attr("fill", d => d.score > 70 ? "#5dd8a8" : d.score > 50 ? "#f4d35e" : "#eb6d7c");
+
+  g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x));
+  g.append("g").call(d3.axisLeft(y));
+}
+
+// Initialisation
+window.onload = function() {
+  // Initialiser les sliders
+  ["vramWeight", "loadWeight", "slotsWeight", "geoWeight"].forEach(id => {
+    const slider = document.getElementById(id);
+    slider.oninput = () => {
+      document.getElementById(id.replace("Weight", "Val")).textContent = slider.value;
+    };
+  });
+
+  renderMap();
+  renderBars();
+};
+</script>
+</body>
+</html>
