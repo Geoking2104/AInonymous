@@ -2,42 +2,41 @@
 
 ## Statut actuel (juillet 2026)
 
-**Palier E — Keyring OS natif + Rotation ed25519** : ✅ **Finalisé et testé**
+### Palier E — Keyring OS natif + Rotation ed25519
+**Statut** : ✅ Finalisé et testé
 
-- `NodeIdentity::load_or_generate_keyring` (keyring OS + fallback fichier)
-- `NodeIdentity::rotate` et `rotate_file`
-- Endpoint REST `POST /daemon/rotate-identity`
-- Ré-annonce automatique dans le DHT
-- Tests unitaires ajoutés (`tempfile`)
+### Palier F — Intégration Holochain réelle + Membrane Proofs + Warrants
+**Statut** : Membrane Proofs + Warrants de base implémentés
 
-Voir : `docs/PALIER_E.md`
+- `MembraneProofConfig` + injection automatique
+- `call_zome_with_proof` et `install_app_with_membrane_proof`
+- Types `Warrant` + `ModelClaim`
+- `emit_warrant`, `verify_warrant`, `get_warrants_for_agent`
+- `validate_node_warrants` (enforcement basique)
+
+Voir `docs/PALIER_F.md` pour les détails.
 
 ---
 
-## Paliers futurs
-
-### Palier F — Intégration Holochain réelle
-- Remplacer bootstrap statique par `AppWebsocket` réel
-- Appels zome signés
-- Membrane Proofs + PrivateNetworkProof
+## Paliers suivants
 
 ### Palier G — Moteur d'inférence réel (llama.cpp)
-- Intégration llama.cpp GGUF
-- Détection GPU réelle (NVIDIA/AMD/Apple)
-- Pipeline-splitting + speculative decoding
+- Intégration llama.cpp + GGUF
+- Détection GPU réelle (NVIDIA/AMD/Apple Metal)
+- Pipeline splitting + speculative decoding
 
-### Palier H — mTLS QUIC strict
-- `PeerKeyVerifier` ed25519 complet
-- Vérification `NodeAttestation` avant connexion
+### Palier H — mTLS QUIC strict + PeerKeyVerifier
+- Vérification complète des certificats ed25519
+- NodeAttestation avant connexion
 
 ### Palier I — Observabilité & Dashboard
-- Prometheus + métriques complètes
-- Dashboard simple ou Grafana
+- Prometheus metrics
+- Dashboard simple
 
 ### Palier J — Testnet public & Go-to-market
 - Testnet multi-régions
-- Seed funding prep
-- Premiers pilotes entreprises/défense
+- Seed funding
+- Premiers pilotes
 
 ## Objectif
-Atteindre Palier G+H d'ici fin août 2026 pour démontrer une inférence distribuée réelle.
+Atteindre Palier G + H d'ici fin août 2026.
