@@ -1,70 +1,57 @@
-/// Validation stricte des warrants d'un nœud (Palier F)
-pub async fn validate_node_warrants(
-    holochain: &HolochainClient,
-    agent_id: &str,
-    required_model: Option<&str>,
-) -> Result<bool> {
-    let warrants = match holochain.get_warrants_for_agent(agent_id).await {
-        Ok(w) => w,
-        Err(e) => {
-            warn!("Impossible de récupérer les warrants de {}: {}", agent_id, e);
-            return Ok(false);
-        }
-    };
+impl HolochainClient {
+    /// Appelle une fonction de zome avec une meilleure gestion d'erreur
+    pub async fn zome_call(
+        &self,
+        dna: &str,
+        zome: &str,
+        function: &str,
+        payload: Value,
+    ) -> Result<Value> {
+        debug!("Zome call: {}::{}::{}", dna, zome, function);
 
-    if warrants.is_empty() {
-        warn!("Aucun warrant trouvé pour le nœud {}", agent_id);
-        return Ok(false);
-    }
+        match &self.backend {
+            Backend::Conductor(c) => {
+                c.call_zome_json(dna, zome, function, payload)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!("Holochain zome call failed [{}::{}::{}]: {}", dna, zome, function, e)
+                    })
+            }
+            Backend::Static => {
+                let resp = self
+                    .http
+                    .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
+                    .json(&payload)
+                    .send()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Static zome call HTTP error: {}", e))?;
 
-    let mut has_valid_model_claim = false;
-    let mut has_valid_capabilities = false;
-
-    for warrant in &warrants {
-        // Vérifier expiration
-        if warrant.is_expired() {
-            continue;
-        }
-
-        // Vérifier signature (si on a la pubkey de l'émetteur)
-        // Note: on suppose que l'issuer est l'agent lui-même
-        let pubkey = match VerifyingKey::from_bytes(&warrant.issuer) {
-            Ok(pk) => pk,
-            Err(_) => continue,
-        };
-
-        if !warrant.verify(&pubkey) {
-            warn!("Warrant invalide (signature) pour {}", agent_id);
-            continue;
-        }
-
-        match warrant.warrant_type {
-            WarrantType::ModelClaim => {
-                if let Ok(claim) = serde_json::from_value::<ModelClaim>(warrant.payload.clone()) {
-                    if let Some(required) = required_model {
-                        if claim.model_id == required {
-                            has_valid_model_claim = true;
-                        }
-                    } else {
-                        has_valid_model_claim = true;
-                    }
+                if !resp.status().is_success() {
+                    let body = resp.text().await.unwrap_or_default();
+                    anyhow::bail!("Static zome call failed [{}::{}::{}]: HTTP {} - {}", 
+                        dna, zome, function, resp.status(), body);
                 }
+
+                resp.json::<Value>()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to parse static zome response: {}", e))
             }
-            WarrantType::NodeCapabilities => {
-                has_valid_capabilities = true;
-            }
-            _ => {}
         }
     }
 
-    let is_valid = has_valid_model_claim && has_valid_capabilities;
-
-    if !is_valid {
-        warn!(
-            "Validation warrants échouée pour {} | ModelClaim: {} | Capabilities: {}",
-            agent_id, has_valid_model_claim, has_valid_capabilities
-        );
+    /// Émet un warrant de façon non-fatale (ne fait pas crash le daemon si le zome n'existe pas encore)
+    pub async fn try_emit_warrant(&self, warrant: &Warrant) -> Result<()> {
+        match self.emit_warrant_with_cleanup(warrant).await {
+            Ok(_) => {
+                info!("Warrant émis avec succès: {:?}", warrant.warrant_type);
+                Ok(())
+            }
+            Err(e) => {
+                warn!("Impossible d'émettre le warrant ({:?}): {}. Le zome 'warrants' est peut-être pas encore intégré.", 
+                      warrant.warrant_type, e);
+                // On ne fait pas crash le daemon
+                Ok(())
+            }
+        }
     }
-
-    Ok(is_valid)
 }
