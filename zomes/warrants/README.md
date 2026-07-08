@@ -1,20 +1,31 @@
-# Zome Warrants (version améliorée)
+# Zome Warrants - Gestion des conflits de liens
 
-Zome complet pour l'émission, la vérification et le stockage des Warrants avec liens.
+## Problème résolu
 
-## Fonctions
+Lorsqu'un nœud émet plusieurs warrants du même type (ex: rotation de clé ou mise à jour de ModelClaim), on peut avoir des liens dupliqués ou des conflits.
 
-- `emit_warrant(warrant)` → crée l'entrée + lien Agent → Warrant
-- `verify_warrant(warrant)` → vérification ed25519 réelle
-- `get_warrants(agent_id)` → récupère via les liens
+## Solutions implémentées
 
-## Améliorations apportées
+### 1. `emit_warrant` (classique)
+Crée un nouveau lien à chaque appel. Simple mais peut créer des doublons.
 
-- LinkTypes (`AgentToWarrants`)
-- Vérification cryptographique réelle
-- Récupération optimisée via liens
+### 2. `emit_warrant_with_cleanup` (recommandé)
+- Supprime d'abord tous les anciens liens du **même type** de warrant
+- Puis crée le nouveau
+- Évite les conflits et les doublons
 
-## TODO suivant
+### 3. Requêtes ciblées
+- `get_warrants(agent_id)` → tous les warrants
+- `get_warrants_by_type(agent_id, WarrantType)` → seulement un type précis (ex: seulement les ModelClaim)
 
-- Connecter `emit_warrant` automatiquement depuis le daemon (après rotation de clé)
-- Ajouter plus de validation dans l'integrity zome
+## Recommandation
+
+Utiliser `emit_warrant_with_cleanup` quand on veut remplacer un warrant existant (rotation de clé, mise à jour de capacités, etc.).
+
+## Exemple d'utilisation depuis le daemon
+
+```rust
+// Rotation de clé → on veut remplacer l'ancien warrant
+let new_warrant = Warrant::new_signed(...);
+holochain.emit_warrant_with_cleanup(new_warrant).await?;
+```
