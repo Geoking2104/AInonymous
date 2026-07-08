@@ -3,24 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AInonymous - Carte des Nœuds avec Cercles d'Influence</title>
+  <title>AInonymous - Carte des Nœuds + Cercles d'Influence</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { font-family: system-ui, sans-serif; background: #0a0a0f; color: #f0eff8; margin: 0; padding: 20px; }
     #map { height: 620px; border-radius: 12px; border: 1px solid #2a2a3a; }
-    .node-popup { font-size: 13px; line-height: 1.5; }
     .controls { background: #12121a; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-    h1 { color: #7c6deb; margin-bottom: 8px; }
+    h1 { color: #7c6deb; }
+    .leaflet-popup-content-wrapper { background: #1a1a28; color: #f0eff8; }
   </style>
 </head>
 <body>
 
 <div style="max-width: 1100px; margin: 0 auto;">
   <h1>🌍 Carte des Nœuds + Cercles d'Influence</h1>
-  <p>Visualisation Leaflet avec scoring géographique et zones d'influence</p>
+  <p>Gestion des superpositions et conflits visuels</p>
 
   <div class="controls">
+    <label><input type="checkbox" id="showCircles" checked onchange="toggleCircles()"> Afficher les cercles d'influence</label>
+    <br><br>
+
     <strong>Poids du scoring</strong><br>
     VRAM <input type="range" id="vram" min="0" max="50" value="35" oninput="updateVisualization()"> <span id="vramVal">35</span>% &nbsp;
     Load <input type="range" id="load" min="0" max="40" value="25" oninput="updateVisualization()"> <span id="loadVal">25</span>% &nbsp;
@@ -28,7 +31,7 @@
     <strong>Géo</strong> <input type="range" id="geo" min="0" max="25" value="15" oninput="updateVisualization()"> <span id="geoVal">15</span>%
     <br><br>
     <button onclick="resetWeights()" style="background:#5dd8a8;color:#0a0a0f;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;">
-      Réinitialiser
+      Réinitialiser les poids
     </button>
   </div>
 
@@ -48,6 +51,7 @@ let nodes = [
 let map, markers = [], circles = [];
 let weights = { vram: 35, load: 25, slots: 15, geo: 15 };
 const refLat = 48.8566, refLon = 2.3522;
+let circlesVisible = true;
 
 function calculateScore(node) {
   const vramS = Math.min(node.vram / 24, 1) * weights.vram;
@@ -77,13 +81,11 @@ function updateVisualization() {
   document.getElementById("slotsVal").textContent = weights.slots;
   document.getElementById("geoVal").textContent = weights.geo;
 
-  // Mettre à jour marqueurs + cercles
   markers.forEach((marker, i) => {
     const node = marker.nodeData;
     const score = calculateScore(node);
     const color = getColor(score);
 
-    // Mettre à jour l'icône du marqueur
     marker.setIcon(L.divIcon({
       className: "custom-marker",
       html: `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(0,0,0,0.6);"></div>`,
@@ -91,7 +93,6 @@ function updateVisualization() {
       iconAnchor: [10, 10]
     }));
 
-    // Mettre à jour le popup
     marker.getPopup().setContent(`
       <div style="min-width:160px">
         <strong>${node.id}</strong><br>
@@ -101,11 +102,21 @@ function updateVisualization() {
       </div>
     `);
 
-    // Mettre à jour le cercle d'influence
     if (circles[i]) {
-      const radius = Math.max(80, score * 4); // rayon proportionnel au score
+      const radius = Math.max(60, score * 3.8);
       circles[i].setRadius(radius);
-      circles[i].setStyle({ color: color, fillColor: color });
+      circles[i].setStyle({ color: color, fillColor: color, fillOpacity: 0.12 });
+    }
+  });
+}
+
+function toggleCircles() {
+  circlesVisible = document.getElementById("showCircles").checked;
+  circles.forEach(circle => {
+    if (circlesVisible) {
+      circle.addTo(map);
+    } else {
+      circle.remove();
     }
   });
 }
@@ -113,17 +124,14 @@ function updateVisualization() {
 function initMap() {
   map = L.map('map').setView([25, 20], 2);
 
-  // OpenStreetMap tiles (améliorées)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    className: 'map-tiles'
+    attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
   nodes.forEach((node, index) => {
     const score = calculateScore(node);
     const color = getColor(score);
 
-    // Marqueur
     const marker = L.marker([node.lat, node.lon], {
       icon: L.divIcon({
         className: "custom-marker",
@@ -142,22 +150,34 @@ function initMap() {
       </div>
     `);
 
+    // Hover → bring marker and circle to front
+    marker.on('mouseover', function () {
+      marker.bringToFront();
+      if (circles[index]) circles[index].bringToFront();
+    });
+
     marker.nodeData = node;
     markers.push(marker);
 
-    // Cercle d'influence (rayon basé sur le score)
-    const radius = Math.max(80, score * 4);
+    // Cercle d'influence
+    const radius = Math.max(60, score * 3.8);
     const circle = L.circle([node.lat, node.lon], {
       color: color,
       fillColor: color,
-      fillOpacity: 0.15,
-      radius: radius
+      fillOpacity: 0.12,
+      weight: 1.5
     }).addTo(map);
+
+    // Hover sur le cercle aussi
+    circle.on('mouseover', function () {
+      circle.bringToFront();
+      marker.bringToFront();
+    });
 
     circles.push(circle);
   });
 
-  // Initialiser sliders
+  // Sliders
   ['vram','load','slots','geo'].forEach(id => {
     const slider = document.getElementById(id);
     document.getElementById(id + 'Val').textContent = slider.value;
@@ -166,7 +186,7 @@ function initMap() {
 }
 
 function updateVisualization() {
-  updateVisualization(); // réutilise la même fonction
+  updateVisualization();
 }
 
 function resetWeights() {
