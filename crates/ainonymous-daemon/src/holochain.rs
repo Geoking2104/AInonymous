@@ -1,67 +1,70 @@
-/// Calcule un score géographique basé sur la distance (si les coordonnées sont partagées)
-fn geographic_proximity_score(
-    node_geo: Option<&GeoLocation>,
-    reference_geo: Option<&GeoLocation>,
-) -> f32 {
-    match (node_geo, reference_geo) {
-        (Some(node), Some(reference)) => {
-            let distance_km = haversine_distance(
-                node.latitude,
-                node.longitude,
-                reference.latitude,
-                reference.longitude,
-            );
-            // Score inversement proportionnel à la distance (max 15 points)
-            let score = (15.0 * (1.0 - (distance_km / 20000.0).min(1.0))).max(0.0);
-            score
+/// Validation stricte des warrants d'un nœud (Palier F)
+pub async fn validate_node_warrants(
+    holochain: &HolochainClient,
+    agent_id: &str,
+    required_model: Option<&str>,
+) -> Result<bool> {
+    let warrants = match holochain.get_warrants_for_agent(agent_id).await {
+        Ok(w) => w,
+        Err(e) => {
+            warn!("Impossible de récupérer les warrants de {}: {}", agent_id, e);
+            return Ok(false);
         }
-        (Some(_), None) => 8.0,  // Bonus si le nœud partage sa position
-        _ => 3.0,               // Score neutre si pas d'info géo
+    };
+
+    if warrants.is_empty() {
+        warn!("Aucun warrant trouvé pour le nœud {}", agent_id);
+        return Ok(false);
     }
-}
 
-/// Distance de Haversine en kilomètres
-fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f32 {
-    let r = 6371.0; // Rayon de la Terre en km
-    let dlat = (lat2 - lat1).to_radians();
-    let dlon = (lon2 - lon1).to_radians();
-    let a = (dlat / 2.0).sin().powi(2)
-        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
-    (r * c) as f32
-}
+    let mut has_valid_model_claim = false;
+    let mut has_valid_capabilities = false;
 
-impl HolochainClient {
-    pub async fn discover_nodes_p2p_optimized(
-        &self,
-        model_id: &str,
-        min_vram_gb: Option<f32>,
-        reference_geo: Option<&GeoLocation>, // Position de référence (coordinateur)
-    ) -> Result<Vec<NodeSummary>> {
-        let mut nodes = self.discover_nodes_p2p_cached(model_id).await?;
-
-        if let Some(min_vram) = min_vram_gb {
-            nodes.retain(|n| n.vram_gb >= min_vram);
+    for warrant in &warrants {
+        // Vérifier expiration
+        if warrant.is_expired() {
+            continue;
         }
 
-        // Calcul du score amélioré
-        for node in &mut nodes {
-            let vram_score = (node.vram_gb / 24.0).min(1.0) * 35.0;
-            let load_score = (1.0 - node.current_load.clamp(0.0, 1.0)) * 25.0;
-            let slots_score = ((node.available_slots as f32) / 8.0).min(1.0) * 15.0;
+        // Vérifier signature (si on a la pubkey de l'émetteur)
+        // Note: on suppose que l'issuer est l'agent lui-même
+        let pubkey = match VerifyingKey::from_bytes(&warrant.issuer) {
+            Ok(pk) => pk,
+            Err(_) => continue,
+        };
 
-            let geo_score = if let Some(geo) = &node.geo_location {
-                geographic_proximity_score(Some(geo), reference_geo)
-            } else {
-                5.0
-            };
-
-            node.score = vram_score + load_score + slots_score + geo_score;
+        if !warrant.verify(&pubkey) {
+            warn!("Warrant invalide (signature) pour {}", agent_id);
+            continue;
         }
 
-        // Tri par score décroissant
-        nodes.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-
-        Ok(nodes)
+        match warrant.warrant_type {
+            WarrantType::ModelClaim => {
+                if let Ok(claim) = serde_json::from_value::<ModelClaim>(warrant.payload.clone()) {
+                    if let Some(required) = required_model {
+                        if claim.model_id == required {
+                            has_valid_model_claim = true;
+                        }
+                    } else {
+                        has_valid_model_claim = true;
+                    }
+                }
+            }
+            WarrantType::NodeCapabilities => {
+                has_valid_capabilities = true;
+            }
+            _ => {}
+        }
     }
+
+    let is_valid = has_valid_model_claim && has_valid_capabilities;
+
+    if !is_valid {
+        warn!(
+            "Validation warrants échouée pour {} | ModelClaim: {} | Capabilities: {}",
+            agent_id, has_valid_model_claim, has_valid_capabilities
+        );
+    }
+
+    Ok(is_valid)
 }
