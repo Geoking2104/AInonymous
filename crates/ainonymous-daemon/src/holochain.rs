@@ -6,12 +6,9 @@ use serde_json::{json, Value};
 use tracing::{debug, info, warn};
 
 use ainonymous_types::{ExecutionPlan, NodeHeartbeat};
-use crate::DaemonConfig;
-use crate::config::HolochainBackendKind;
+use crate::config::{DaemonConfig, MembraneProofConfig};
 use crate::conductor_client::ConductorClient;
 
-/// Vue résumée d'un nœud du mesh retournée par `agent-registry-coordinator::get_available_nodes`.
-/// Correspond à `NodeSummary` côté zome.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeSummary {
     pub agent_id: String,
@@ -21,44 +18,38 @@ pub struct NodeSummary {
     pub quic_endpoint: Option<String>,
     pub region_hint: Option<String>,
     pub score: f32,
-    /// Clé publique ed25519 du nœud (hex) pour le pinning mTLS côté client QUIC.
     #[serde(default)]
     pub node_pubkey: Option<String>,
 }
 
-/// Plan de contrôle : bootstrap statique (hors DHT) ou conducteur Holochain réel.
 #[derive(Clone)]
 enum Backend {
-    /// Pas de conducteur : les appels de zome passent par le REST interne
-    /// (comportement testnet historique).
     Static,
-    /// Conducteur Holochain réel via `AppWebsocket`.
     Conductor(Arc<ConductorClient>),
 }
 
-/// Client pour le conducteur Holochain (via WebSocket app port)
 #[derive(Clone)]
 pub struct HolochainClient {
     app_port: u16,
     app_id: String,
     http: reqwest::Client,
-    /// Pairs statiques (bootstrap testnet, plan de contrôle hors DHT)
     peers: Vec<crate::config::PeerConfig>,
-    /// Backend actif (statique ou conducteur réel)
     backend: Backend,
+    membrane_proof: Option<Vec<u8>>,
 }
 
 impl HolochainClient {
     pub async fn connect(config: &DaemonConfig) -> Result<Self> {
-        // Sélection du backend. En mode conducteur, on tente la connexion ;
-        // en cas d'échec on retombe sur le bootstrap statique (démarrage non-fatal).
+        let membrane_proof = config.holochain.membrane_proof.clone();
+
         let backend = match config.holochain.backend {
-            HolochainBackendKind::Static => Backend::Static,
-            HolochainBackendKind::Conductor => {
+            crate::config::HolochainBackendKind::Static => Backend::Static,
+            crate::config::HolochainBackendKind::Conductor => {
                 match ConductorClient::connect(
                     config.holochain.admin_port,
                     config.holochain.app_port,
                     &config.holochain_app_id,
+                    membrane_proof.clone(),
                 )
                 .await
                 {
@@ -71,21 +62,25 @@ impl HolochainClient {
             }
         };
 
+        let proof_bytes = membrane_proof.and_then(|p| p.to_bytes().ok());
+
         let client = Self {
-            app_port: config.daemon_port, // port du daemon qui fait l'interface avec Holochain
+            app_port: config.daemon_port,
             app_id: config.holochain_app_id.clone(),
             http: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?,
             peers: config.peers.clone(),
             backend,
+            membrane_proof: proof_bytes,
         };
-        Ok(client)
+        Ok(client);
     }
 
-    /// Écoute les signaux du conducteur (mode conducteur) pour enregistrer les
-    /// sessions QUIC entrantes émises par le zome `negotiate_quic_session`.
-    /// No-op en bootstrap statique (la négociation entrante passe par le REST).
+    pub fn membrane_proof(&self) -> Option<&[u8]> {
+        self.membrane_proof.as_deref()
+    }
+
     pub async fn listen_quic_signals(
         &self,
         registry: ainonymous_quic::SessionRegistry,
@@ -100,7 +95,6 @@ impl HolochainClient {
         }
     }
 
-    /// Résoudre l'URL du daemon REST d'un pair via la config bootstrap.
     fn peer_daemon_url(&self, agent_id: &str) -> Option<String> {
         self.peers.iter()
             .find(|p| p.agent_id == agent_id)
@@ -111,7 +105,6 @@ impl HolochainClient {
         format!("http://127.0.0.1:{}", self.app_port)
     }
 
-    /// Appeler une zome function via le conducteur Holochain
     pub async fn zome_call(
         &self,
         dna: &str,
@@ -122,9 +115,7 @@ impl HolochainClient {
         debug!("Zome call: {}::{}::{}", dna, zome, function);
 
         match &self.backend {
-            // Conducteur réel : appel de zome signé via AppWebsocket.
             Backend::Conductor(c) => c.call_zome_json(dna, zome, function, payload).await,
-            // Bootstrap statique : passe par le REST interne (comportement testnet).
             Backend::Static => {
                 let resp = self.http
                     .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
@@ -137,15 +128,11 @@ impl HolochainClient {
                     anyhow::bail!("Zome call {}::{}::{} échouée: {}", dna, zome, function, body);
                 }
 
-                Ok(resp.json().await?)
+                Ok(resp.json().await?);
             }
         }
     }
 
-    /// Annoncer les capacités de ce nœud dans le DHT, y compris la clé publique
-    /// ed25519 pour le pinning mTLS QUIC (palier D).
-    ///
-    /// `node_pubkey_hex` : clé publique hex de `NodeIdentity::public_key_hex()`.
     pub async fn announce_capabilities(
         &self,
         config: &DaemonConfig,
@@ -164,10 +151,9 @@ impl HolochainClient {
         info!("Capacités annoncées: {:.1}GB VRAM, node_pubkey: {}",
             caps.vram_gb,
             node_pubkey_hex.unwrap_or("<non fournie>"));
-        Ok(())
+        Ok(());
     }
 
-    /// Publier un heartbeat
     pub async fn send_heartbeat(&self, hb: NodeHeartbeat) -> Result<()> {
         self.zome_call(
             "agent-registry",
@@ -175,10 +161,9 @@ impl HolochainClient {
             "heartbeat",
             serde_json::to_value(&hb)?,
         ).await?;
-        Ok(())
+        Ok(());
     }
 
-    /// Obtenir le plan d'exécution pour un modèle
     pub async fn get_execution_plan(&self, model_id: &str) -> Result<ExecutionPlan> {
         let resp = self.zome_call(
             "inference-mesh",
@@ -187,13 +172,9 @@ impl HolochainClient {
             json!({ "model_id": model_id }),
         ).await?;
 
-        Ok(serde_json::from_value(resp)?)
+        Ok(serde_json::from_value(resp)?);
     }
 
-    /// Récupérer les nœuds disponibles pour un modèle (résumé DHT).
-    ///
-    /// Retourne `NodeSummary` (sous-ensemble de `NodeCapabilities`) tel que
-    /// retourné par `agent-registry-coordinator::get_available_nodes`.
     pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
         let resp = self.zome_call(
             "agent-registry",
@@ -202,20 +183,9 @@ impl HolochainClient {
             json!(model_id),
         ).await?;
 
-        Ok(serde_json::from_value(resp)?)
+        Ok(serde_json::from_value(resp)?);
     }
 
-    /// Négocier une session QUIC avec un nœud distant.
-    ///
-    /// Plan de contrôle bootstrap statique (testnet) : appelle directement le
-    /// daemon REST du pair `target_agent` sur `POST /mesh/session/negotiate`.
-    /// Le pair génère un token, enregistre l'offre dans son listener QUIC, et
-    /// retourne l'offre (endpoint + token). Remplace l'ancien zome_call
-    /// auto-référent. L'intégration Holochain réelle se branchera ici plus tard.
-    ///
-    /// `requester_pubkey` (T3.2c) : clé publique ed25519 du coordinateur demandeur.
-    /// Transmise au pair pour que son listener vérifie le cert TLS client après
-    /// le handshake QUIC. `None` = repli sans pinning d'identité côté serveur.
     pub async fn negotiate_quic_session(
         &self,
         target_agent: &str,
@@ -225,7 +195,6 @@ impl HolochainClient {
         requester_pubkey: Option<[u8; 32]>,
     ) -> Result<ainonymous_quic::SessionOffer> {
         match &self.backend {
-            // Négociation via le DHT : zome `request_remote_session` (call_remote).
             Backend::Conductor(c) => {
                 let result = c
                     .call_zome_json(
@@ -245,25 +214,14 @@ impl HolochainClient {
                 let endpoint: SocketAddr = result["quic_endpoint"]
                     .as_str()
                     .ok_or_else(|| anyhow::anyhow!("réponse de négociation sans quic_endpoint"))?
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("endpoint QUIC invalide: {e}"))?;
-                let token: Vec<u8> = serde_json::from_value(result["session_token"].clone())
-                    .map_err(|e| anyhow::anyhow!("session_token invalide: {e}"))?;
+                    .parse()?
+                    ;
+                let token: Vec<u8> = serde_json::from_value(result["session_token"].clone())?;
 
-                // Palier D : pinning mTLS — le zome retourne la clé publique ed25519
-                // du nœud cible (publiée dans le DHT via announce_capabilities).
                 let peer_pubkey: Option<[u8; 32]> = result["node_pubkey"]
                     .as_str()
-                    .and_then(|hex_str| {
-                        let bytes = hex::decode(hex_str).ok()?;
-                        bytes.try_into().ok()
-                    });
-
-                if peer_pubkey.is_some() {
-                    debug!("Pinning mTLS activé pour le pair {}", target_agent);
-                } else {
-                    warn!("node_pubkey absent dans la réponse de {} — pinning désactivé (repli possession seule)", target_agent);
-                }
+                    .and_then(|hex_str| hex::decode(hex_str).ok())
+                    .and_then(|b| b.try_into().ok());
 
                 let mut offer = ainonymous_quic::SessionOffer::new(endpoint, layer_range);
                 offer.session_token = token;
@@ -272,16 +230,10 @@ impl HolochainClient {
                 offer.peer_pubkey = peer_pubkey;
                 Ok(offer)
             }
-            // Bootstrap statique : POST direct au daemon REST du pair.
             Backend::Static => {
                 let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Pair '{}' introuvable dans la config bootstrap (peers)",
-                        target_agent
-                    )
+                    anyhow::anyhow!("Pair '{}' introuvable dans la config bootstrap", target_agent)
                 })?;
-
-                debug!("Négociation session QUIC → pair {} ({})", target_agent, daemon_url);
 
                 let resp = self.http
                     .post(format!("{}/mesh/session/negotiate", daemon_url))
@@ -299,15 +251,11 @@ impl HolochainClient {
                     anyhow::bail!("Négociation refusée par {}: {}", target_agent, body);
                 }
 
-                Ok(resp.json::<ainonymous_quic::SessionOffer>().await?)
+                Ok(resp.json::<ainonymous_quic::SessionOffer>().await?);
             }
         }
     }
 
-    /// Re-annoncer les capacités avec une nouvelle clé publique ed25519 après
-    /// rotation (palier E). L'ancienne session mTLS reste active jusqu'au
-    /// prochain redémarrage du daemon ; les nouvelles connexions QUIC utiliseront
-    /// la nouvelle identité après redémarrage.
     pub async fn reannounce_pubkey(
         &self,
         new_pubkey_hex: &str,
@@ -315,10 +263,9 @@ impl HolochainClient {
     ) -> Result<()> {
         self.announce_capabilities(config, Some(new_pubkey_hex)).await?;
         info!("DHT : nouvelle clé publique annoncée après rotation : {}", new_pubkey_hex);
-        Ok(())
+        Ok(());
     }
 
-    /// Mettre à jour l'endpoint QUIC publié dans le DHT
     pub async fn update_quic_endpoint(&self, addr: SocketAddr) -> Result<()> {
         self.zome_call(
             "agent-registry",
@@ -326,10 +273,9 @@ impl HolochainClient {
             "update_quic_endpoint",
             json!({ "endpoint": addr.to_string() }),
         ).await?;
-        Ok(())
+        Ok(());
     }
 
-    /// Poster sur le Blackboard
     pub async fn blackboard_post(&self, prefix: &str, content: &str, tags: Vec<String>) -> Result<()> {
         self.zome_call(
             "blackboard",
@@ -342,10 +288,9 @@ impl HolochainClient {
                 "ttl_hours": 48,
             }),
         ).await?;
-        Ok(())
+        Ok(());
     }
 
-    /// Rechercher dans le Blackboard
     pub async fn blackboard_search(
         &self,
         terms: Vec<String>,
@@ -364,13 +309,11 @@ impl HolochainClient {
     }
 }
 
-/// Détecter les capacités GPU/CPU du nœud local
 fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCapabilities {
-    // Détection basique — TODO: utiliser nvml, metal-rs, etc.
     let (gpu_vendor, vram_gb) = detect_gpu();
 
     ainonymous_types::NodeCapabilities {
-        agent_id: "local".into(), // sera rempli par Holochain avec la vraie clé
+        agent_id: "local".into(),
         vram_gb,
         ram_gb: get_total_ram_gb(),
         gpu_vendor: gpu_vendor.clone(),
@@ -379,29 +322,23 @@ fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCap
         max_concurrent_requests: config.max_concurrent_requests,
         network_bandwidth_mbps: None,
         region_hint: config.region_hint.clone(),
-        quic_endpoint: None, // sera rempli après démarrage QUIC
-        node_pubkey: None,   // sera rempli via announce_capabilities(node_pubkey_hex)
+        quic_endpoint: None,
+        node_pubkey: None,
     }
 }
 
 fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
     #[cfg(target_os = "macos")]
     {
-        // Apple Silicon : mémoire unifiée
         let ram_gb = get_total_ram_gb();
         return (ainonymous_types::GpuVendor::AppleSilicon, ram_gb);
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        // NVIDIA via nvidia-smi (sans dépendance native nvml)
         if let Some((vram_gb, compute_capability)) = detect_nvidia() {
-            return (
-                ainonymous_types::GpuVendor::Nvidia { vram_gb, compute_capability },
-                vram_gb,
-            );
+            return (ainonymous_types::GpuVendor::Nvidia { vram_gb, compute_capability }, vram_gb);
         }
-        // AMD via rocm-smi
         if let Some(vram_gb) = detect_amd() {
             return (ainonymous_types::GpuVendor::Amd { vram_gb }, vram_gb);
         }
@@ -409,7 +346,6 @@ fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
     }
 }
 
-/// VRAM (GiB) + compute capability de la 1ère GPU NVIDIA, via `nvidia-smi`.
 #[cfg(not(target_os = "macos"))]
 fn detect_nvidia() -> Option<(f32, String)> {
     let out = std::process::Command::new("nvidia-smi")
@@ -424,10 +360,9 @@ fn detect_nvidia() -> Option<(f32, String)> {
     let mut parts = line.split(',').map(|s| s.trim());
     let mem_mib: f32 = parts.next()?.parse().ok()?;
     let cc = parts.next().unwrap_or("").to_string();
-    Some((mem_mib / 1024.0, cc)) // MiB → GiB
+    Some((mem_mib / 1024.0, cc))
 }
 
-/// VRAM (GiB) de la 1ère GPU AMD, via `rocm-smi` (heuristique best-effort).
 #[cfg(not(target_os = "macos"))]
 fn detect_amd() -> Option<f32> {
     let out = std::process::Command::new("rocm-smi")
@@ -438,7 +373,6 @@ fn detect_amd() -> Option<f32> {
         return None;
     }
     let text = String::from_utf8_lossy(&out.stdout);
-    // Format CSV: "GPU, VRAM Used (B), VRAM Total (B)\n0, <used>, <total>"
     for line in text.lines().skip(1) {
         let parts: Vec<&str> = line.split(',').collect();
         if parts.len() >= 3 {
@@ -451,7 +385,6 @@ fn detect_amd() -> Option<f32> {
 }
 
 fn get_total_ram_gb() -> f32 {
-    // Heuristique cross-platform basée sur la mémoire virtuelle disponible
     #[cfg(target_os = "macos")]
     {
         let out = std::process::Command::new("sysctl")
@@ -481,7 +414,6 @@ fn get_total_ram_gb() -> f32 {
     }
     #[cfg(target_os = "windows")]
     {
-        // GlobalMemoryStatusEx via wmic (sans dépendance winapi)
         let out = std::process::Command::new("wmic")
             .args(["computersystem", "get", "TotalPhysicalMemory", "/value"])
             .output()
@@ -497,7 +429,7 @@ fn get_total_ram_gb() -> f32 {
             }
         }
     }
-    8.0 // fallback : 8 GiB
+    8.0
 }
 
 fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
