@@ -1,56 +1,75 @@
-/// Estime la VRAM nécessaire (en MB) pour charger un modèle.
-///
-/// Formule approximative :
-/// - Poids du modèle sur GPU
-/// - KV-cache (2 * layers * context * hidden_size * bytes_per_element * parallel)
-/// - Activations + overhead
-pub fn estimate_model_vram_mb(
-    model_size_gb: f32,
-    n_layers: u32,
-    context_size: u32,
-    hidden_size: u32,
-    n_gpu_layers: i32,
-    kv_bytes: u32,        // 2 pour f16, 1 pour q8_0, 0.5 pour q4_0
-    parallel: u32,
-) -> f32 {
-    let gpu_layers = if n_gpu_layers < 0 {
-        n_layers as f32
-    } else {
-        n_gpu_layers as f32
-    };
+    pub async fn start(&self) -> Result<()> {
+        let model_path = self.config.models_dir.join(
+            format!("{}.gguf", self.config.inference.default_model)
+        );
 
-    // Poids du modèle sur GPU
-    let model_weights_mb = model_size_gb * 1024.0 * (gpu_layers / n_layers as f32);
+        if !model_path.exists() {
+            warn!("Modèle {:?} non trouvé", model_path);
+        }
 
-    // KV-cache estimation (très approximative)
-    let kv_cache_mb = (n_layers as f32)
-        * (context_size as f32)
-        * (hidden_size as f32)
-        * (kv_bytes as f32)
-        * 2.0 // K + V
-        * (parallel as f32)
-        / 1024.0 / 1024.0;
+        let ngl = detect_gpu_layers(self.config.inference.n_gpu_layers);
+        let is_gpu = ngl != 0;
 
-    // Overhead (activations, CUDA context, etc.)
-    let overhead_mb = 512.0 + (parallel as f32 * 128.0);
+        let mut cmd = std::process::Command::new(&self.config.llama_server_bin);
+        cmd.args([
+            "--host", "127.0.0.1",
+            "--port", &self.config.llama_server_port.to_string(),
+            "--ctx-size", &self.config.inference.context_size.to_string(),
+            "--n-gpu-layers", &ngl.to_string(),
+            "--parallel", &self.config.inference.parallel_requests.to_string(),
+        ]);
 
-    model_weights_mb + kv_cache_mb + overhead_mb
-}
+        // KV-cache compact par défaut (q8_0 = bon compromis)
+        let kv_type = if self.config.inference.kv_cache_type.is_empty() {
+            if is_gpu { "q8_0" } else { "f16" }
+        } else {
+            &self.config.inference.kv_cache_type
+        };
 
-/// Version simplifiée qui utilise des valeurs par défaut raisonnables
-pub fn estimate_vram_simple(
-    model_size_gb: f32,
-    context_size: u32,
-    n_gpu_layers: i32,
-) -> f32 {
-    // Hypothèses raisonnables pour un modèle type 7B-13B
-    estimate_model_vram_mb(
-        model_size_gb,
-        32,           // ~32 layers
-        context_size,
-        4096,         // hidden size typique
-        n_gpu_layers,
-        2,            // f16 KV-cache
-        1,            // parallel=1
-    )
-}
+        cmd.args(["--cache-type-k", kv_type, "--cache-type-v", kv_type]);
+
+        // Flash Attention
+        if self.config.inference.flash_attention {
+            cmd.arg("--flash-attn");
+        }
+
+        // mlock activé par défaut sur GPU pour réduire la fragmentation
+        let use_mlock = self.config.inference.mlock || is_gpu;
+        if use_mlock {
+            cmd.arg("--mlock");
+            info!("mlock activé (réduction fragmentation + swap)");
+        }
+
+        // Avertissement si contexte très grand
+        if self.config.inference.context_size > 8192 {
+            warn!(
+                "Contexte très grand ({} tokens). Risque de fragmentation et forte consommation VRAM.",
+                self.config.inference.context_size
+            );
+        }
+
+        if model_path.exists() {
+            cmd.args(["--model", model_path.to_str().unwrap()]);
+        }
+
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        let child = cmd.spawn()?;
+        info!(
+            "llama-server démarré | GPU={} | ctx={} | kv={} | mlock={}",
+            is_gpu, self.config.inference.context_size, kv_type, use_mlock
+        );
+
+        *self.process.lock().unwrap() = Some(child);
+
+        // Attente du démarrage
+        for i in 0..30 {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            if self.is_running().await {
+                info!("llama-server prêt après {}s", i + 1);
+                return Ok(());
+            }
+        }
+
+        anyhow::bail!("llama-server n'a pas démarré dans les 30 secondes");
+    }
