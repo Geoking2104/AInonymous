@@ -158,6 +158,7 @@
     <a href="#comment">Comment ça marche</a>
     <a href="#pourquoi">Pourquoi nous</a>
     <a href="#installer">Installer</a>
+    <a href="#hybridnode">HybridNode</a>
     <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
   </div>
   <a href="https://github.com/Geoking2104/AInonymous" class="nav-cta">Démarrer →</a>
@@ -277,6 +278,123 @@ cargo build --release
   </p>
 </div>
 
+<div class="section" id="hybridnode">
+  <div class="lang-switch" style="display:inline-flex; margin-bottom:20px;">
+    <a href="#" id="hn-btn-fr" class="active" onclick="hnLang('fr');return false;">FR</a>
+    <a href="#" id="hn-btn-en" onclick="hnLang('en');return false;">EN</a>
+  </div>
+
+  <div id="hn-fr">
+    <div class="eyebrow">Architecture avancée</div>
+    <h2>HybridNode : une architecture à trois couches</h2>
+    <p class="section-sub">AInonymous ne se limite pas à un simple réseau P2P. HybridNode combine SD-WAN, Holochain et QUIC/mTLS pour distribuer l'inférence en tenant compte de la topologie réseau.</p>
+
+    <table>
+      <thead>
+        <tr><th>Couche</th><th>Technologie</th><th>Rôle</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Overlay</td><td>Holochain 0.6.1</td><td>DHT, identité (AgentPubKey ed25519), coordination</td></tr>
+        <tr><td>Plan de données</td><td>QUIC / mTLS</td><td>Transfert des activations tensorielles, flux de tokens</td></tr>
+        <tr><td>Underlay</td><td>SD-WAN</td><td>Routage conscient de la topologie, SLA, QoS</td></tr>
+      </tbody>
+    </table>
+
+    <div class="feat-grid" style="margin-top:40px;">
+      <div class="feat-card">
+        <div class="feat-icon fi-p">🔒</div>
+        <h3>mTLS strict</h3>
+        <p>La clé AgentPubKey ed25519 sert de certificat QUIC ; PeerKeyVerifier impose l'authentification mutuelle.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-t">🧬</div>
+        <h3>Attestation de modèle</h3>
+        <p>Vérification SHA-256 locale, confirmée par au moins 2 pairs du réseau.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-c">⚠️</div>
+        <h3>Système de mandats (warrants)</h3>
+        <p>Preuve cryptographique de mauvais comportement stockée dans le DHT Holochain ; exclusion automatique du scheduling.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-p">🔐</div>
+        <h3>Bootstrap privé</h3>
+        <p>Membrane PrivateNetworkProof pour les déploiements en consortium fermé.</p>
+      </div>
+    </div>
+
+    <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
+      <pre style="margin:0; font-size:14px; line-height:1.8;">
+# Installer depuis les sources
+cargo install --path crates/hybridnode-daemon --features mock-sdwan
+
+# Initialiser la config d'un nouveau projet
+bash scripts/hybridnode/init_project.sh mon-projet
+
+# Lancer
+hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
+    </div>
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Documentation complète : <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/HYBRIDNODE.md">docs/HYBRIDNODE.md</a> sur GitHub.
+    </p>
+  </div>
+
+  <div id="hn-en" style="display:none;">
+    <div class="eyebrow">Advanced architecture</div>
+    <h2>HybridNode: a three-layer architecture</h2>
+    <p class="section-sub">AInonymous isn't just another P2P network. HybridNode combines SD-WAN, Holochain, and QUIC/mTLS to schedule inference with full network-topology awareness.</p>
+
+    <table>
+      <thead>
+        <tr><th>Layer</th><th>Technology</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Overlay</td><td>Holochain 0.6.1</td><td>DHT, identity (AgentPubKey ed25519), coordination</td></tr>
+        <tr><td>Data plane</td><td>QUIC / mTLS</td><td>Tensor activation transfers, token streams</td></tr>
+        <tr><td>Underlay</td><td>SD-WAN</td><td>Topology-aware routing, SLA enforcement, QoS</td></tr>
+      </tbody>
+    </table>
+
+    <div class="feat-grid" style="margin-top:40px;">
+      <div class="feat-card">
+        <div class="feat-icon fi-p">🔒</div>
+        <h3>Strict mTLS</h3>
+        <p>The ed25519 AgentPubKey is reused as the QUIC certificate; PeerKeyVerifier enforces mutual authentication.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-t">🧬</div>
+        <h3>Model attestation</h3>
+        <p>SHA-256 verified locally, confirmed by at least 2 peers on the network.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-c">⚠️</div>
+        <h3>Warrant system</h3>
+        <p>Holochain DHT cryptographic proof of misbehavior; automatically excludes the peer from scheduling.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon fi-p">🔐</div>
+        <h3>Private bootstrap</h3>
+        <p>PrivateNetworkProof membrane for closed consortium deployments.</p>
+      </div>
+    </div>
+
+    <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
+      <pre style="margin:0; font-size:14px; line-height:1.8;">
+# Install from source
+cargo install --path crates/hybridnode-daemon --features mock-sdwan
+
+# Initialize a new project config
+bash scripts/hybridnode/init_project.sh myproject
+
+# Run
+hybridnode --config hybridnode/configs/myproject.hybridnode.yaml</pre>
+    </div>
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Full documentation: <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/HYBRIDNODE.md">docs/HYBRIDNODE.md</a> on GitHub.
+    </p>
+  </div>
+</div>
+
 <footer>
   <div class="f-logo">AI<span>n</span>onymous</div>
   <p style="margin-bottom:12px;">Decentralized AI, for everyone, forever.</p>
@@ -286,6 +404,15 @@ cargo build --release
   </div>
   <p style="margin-top:32px; font-size:12px; opacity:0.4;">Built with Holochain · Gemma 4 · llama.cpp · Apache 2.0</p>
 </footer>
+
+<script>
+  function hnLang(lang) {
+    document.getElementById('hn-fr').style.display = lang === 'fr' ? 'block' : 'none';
+    document.getElementById('hn-en').style.display = lang === 'en' ? 'block' : 'none';
+    document.getElementById('hn-btn-fr').classList.toggle('active', lang === 'fr');
+    document.getElementById('hn-btn-en').classList.toggle('active', lang === 'en');
+  }
+</script>
 
 </body>
 </html>
