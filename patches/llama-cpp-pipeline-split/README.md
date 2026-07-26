@@ -1,6 +1,8 @@
 # Pipeline-split patch for llama.cpp — Gemma3 Dense (Preuve de concept vérifiée)
 
-Statut : **mécanisme prouvé, réel et compilé, y compris en HTTP réel entre 2 process** — pas une simulation, pas un plan. Portée volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
+Statut : **mécanisme prouvé, réel et compilé, y compris en HTTP réel entre 2 process, et branché dans le
+testnet du daemon** — pas une simulation, pas un plan. Portée volontairement réduite (voir "Ce qui n'est PAS
+fait" plus bas).
 
 ## Contexte
 
@@ -79,16 +81,55 @@ existant dans `ainonymous-daemon`), pour que ce binaire puisse servir de backend
 - Endpoints : `GET /status`, `POST /prefill`, `POST /decode`, `POST /clear`, `POST /tokenize`,
   `POST /detokenize` — champs JSON alignés avec `PipelineStatus` côté Rust (`layer_end` inclus).
 - Base64 encode/decode implémenté à la main (pas de lib externe).
+- **CLI aligné sur `scripts/pipeline_server.py`** : accepte `--layer-end`, `--is-first-node`, `--is-last-node`
+  en plus des flags internes (`--split`, `--last`), et `--device`/`--dtype` (acceptés puis ignorés — ce
+  binaire est CPU/F32 uniquement). But : pouvoir le lancer avec exactement les mêmes arguments que le
+  serveur Python dans un script de testnet.
 
-**Test end-to-end réel** : 2 process serveur lancés (node0 : `--layer-start 0 --split 1 --port 9340` ;
-node1 : `--layer-start 1 --last --port 9341`), requêtes envoyées via un script Python (`urllib`) simulant
-exactement ce que ferait `pipeline_client.rs` : `/status` sur les deux (vérifié `layer_end=1` et `layer_end=2`
-respectivement), puis même prompt fixe `[2, 55123, 9821, 174, 61000, 3]` envoyé en `/prefill` puis `/decode`
-à travers les deux nœuds.
+**Test end-to-end réel** : 2 process serveur lancés (node0 : `--layer-start 0 --layer-end 1 --is-first-node
+--port 9350` ; node1 : `--layer-start 1 --is-last-node --port 9351`), requêtes envoyées via un script Python
+(`urllib`) simulant exactement ce que ferait `pipeline_client.rs` : `/status` sur les deux (vérifié
+`layer_end=1` et `layer_end=2` respectivement, `is_first_node`/`is_last_node` corrects), puis même prompt
+fixe `[2, 55123, 9821, 174, 61000, 3]` envoyé en `/prefill` puis `/decode` à travers les deux nœuds.
 
 Résultat : **`step1: next_token_id=34658 " Não"`, `step2: next_token_id=34658 " Não"`, match exact avec le
 baseline in-process C++ (`pipeline_test2` → 34658/34658).** Le round-trip HTTP réel (sérialisation base64 des
-états cachés, requêtes réseau réelles sur 127.0.0.1) est donc bit-exact-équivalent au mécanisme in-process.
+états cachés, requêtes réseau réelles sur 127.0.0.1) est donc bit-exact-équivalent au mécanisme in-process, et
+ce avec les flags CLI calqués sur `pipeline_server.py`.
+
+### 4. Intégration dans le testnet du daemon — `scripts/testnet/run_testnet_2.sh`
+
+Lecture du code réel (`crates/ainonymous-daemon/src/pipeline_client.rs`, `conductor.rs`, `config.rs`,
+`scripts/testnet/run_testnet_2.sh`) : **`PipelineClient` est un simple client HTTP générique** — il ne sait
+pas si le process en face est `pipeline_server.py` ou autre chose, il parle juste le protocole JSON défini
+par les structs `PrefillRequest`/`PrefillResponse`/`DecodeRequest`/`DecodeResponse`/`PipelineStatus`. Les
+configs `node-a.toml`/`node-b.toml` générées par le script ne référencent même pas le backend — elles ne
+contiennent que le port (`pipeline_server_port`). Autrement dit : **aucun changement Rust n'était nécessaire**
+pour brancher `pipeline_server.cpp`, seul le lanceur de process (le script bash) doit choisir quel binaire
+démarrer sur ce port.
+
+Changements livrés :
+- `pipeline_server.cpp` : CLI étendu (section 3 ci-dessus) pour matcher exactement les flags de
+  `pipeline_server.py`.
+- `scripts/testnet/run_testnet_2.sh` : nouvelle variable `BACKEND` (`python` par défaut, ou `native`). En mode
+  `native`, lance `$NATIVE_BIN` (le binaire `pipeline_server` compilé) avec `$NATIVE_MODEL_GGUF` (un `.gguf`
+  local, pas un ID HuggingFace) au lieu de `python3 scripts/pipeline_server.py` — le reste du script (configs
+  daemon, attente `/status`, requête `/mesh/infer`) est identique.
+- `Makefile` : cible `testnet-2-native` (variables : `TOTAL_LAYERS`, `NATIVE_BIN`, `NATIVE_MODEL_GGUF`, `SPLIT`).
+
+Exemple :
+```bash
+make testnet-2-native TOTAL_LAYERS=2 \
+  NATIVE_BIN=/tmp/pipeline_server \
+  NATIVE_MODEL_GGUF=/tmp/models/gemma3-tiny.gguf
+```
+
+**Vérifié dans cette session** : le binaire natif avec les nouveaux flags CLI (`--layer-end`,
+`--is-first-node`, `--is-last-node`) reproduit exactement le comportement testé en section 3 (mêmes tokens,
+mêmes champs `/status`). **Non vérifié** : le run complet du script bash avec de vrais binaires
+`ainonymous-daemon` (pas de toolchain Rust/cargo dans le sandbox de cette session) — seule la syntaxe bash du
+script modifié a été validée (`bash -n` sur le patron identique). À faire avant de considérer l'intégration
+"testée en conditions réelles" : lancer `make testnet-2-native` sur une machine avec `cargo build` disponible.
 
 ## Comment reproduire
 
@@ -130,11 +171,16 @@ g++ -std=c++17 -O2 -pthread \
   build/src/libllama.a build/ggml/src/libggml.a build/ggml/src/libggml-cpu.a build/ggml/src/libggml-base.a \
   -fopenmp -lpthread -ldl -lm -o pipeline_server
 
-# terminal 1 (node0, first node, tape la couche 1)
-./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 0 --split 1 --port 9340
+# terminal 1 (node0, first node, tape la couche 1) -- CLI calqué sur pipeline_server.py
+./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 0 --layer-end 1 --is-first-node --port 9340
 # terminal 2 (node1, last node, reprend à la couche 1)
-./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 1 --last --port 9341
+./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 1 --is-last-node --port 9341
 # puis POST /prefill sur node0 -> hidden_states_b64 -> POST /prefill sur node1 -> next_token_id
+
+# 8. Testnet complet avec le daemon Rust (depuis la racine du repo AInonymous)
+make testnet-2-native TOTAL_LAYERS=2 \
+  NATIVE_BIN=/chemin/vers/pipeline_server \
+  NATIVE_MODEL_GGUF=/tmp/models/gemma3-tiny.gguf
 ```
 
 ## Ce qui n'est PAS fait (à ne pas confondre avec "terminé")
@@ -152,12 +198,21 @@ g++ -std=c++17 -O2 -pthread \
 - **Efficacité calcul sur node0** : node0 recalcule le modèle complet à chaque étape au lieu de s'arrêter à
   la couche de coupure (conséquence directe du revert de `pipeline_layer_end`) — correct numériquement,
   gaspille du CPU/temps par rapport à un vrai pipeline-split optimisé.
-- **Migration `conductor.rs`** : `pipeline_client.rs` continue de parler à `pipeline_server.py` (pont Python)
-  en production. Le nouveau `pipeline_server.cpp` n'a pas encore été branché comme backend réel côté
-  `ainonymous-daemon` — c'est un binaire testé et fonctionnel, mais pas encore intégré au conducteur.
+- **Build automatisé du binaire natif** : le fork llama.cpp patché n'est pas vendoré dans ce repo ni construit
+  par `cargo build`/le Makefile — `NATIVE_BIN` doit être compilé et fourni à la main (voir "Comment reproduire").
+  Automatiser ça (script de build, ou vendoring du fork) reste à faire.
+- **Run réel du testnet natif avec `cargo build`** : le branchement `BACKEND=native` dans
+  `run_testnet_2.sh`/`Makefile` a été écrit et sa logique (choix du process à lancer) validée manuellement,
+  mais pas exécutée de bout en bout avec un vrai `ainonymous-daemon` compilé (pas de toolchain Rust dans le
+  sandbox de cette session).
+- **Format de sérialisation incompatible avec le backend Python** : `pipeline_server.py` sérialise les hidden
+  states en **float16**, `pipeline_server.cpp` en **float32**. Ne pas mélanger un nœud natif et un nœud Python
+  dans la même chaîne — les deux process d'un même testnet doivent être du même backend.
 
 ## Prochaine étape logique
 
-Brancher `pipeline_server.cpp` comme backend réel derrière `LlamaPipelineClient` côté `ainonymous-daemon`
-(remplacement progressif de `pipeline_server.py`), et/ou déboguer la vraie cause du crash `pipeline_layer_end`
-dans le scheduler ggml pour débloquer les chaînes à N > 2 nœuds.
+Lancer `make testnet-2-native` sur une machine avec `cargo build` + le binaire natif compilé, pour vérifier
+l'intégration de bout en bout (pas seulement le mécanisme HTTP isolé). Ensuite : déboguer la vraie cause du
+crash `pipeline_layer_end` dans le scheduler ggml pour débloquer les chaînes à N > 2 nœuds, et/ou automatiser
+le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin d'être
+compilé à la main.

@@ -9,12 +9,18 @@
 #
 # Prérequis :
 #   - binaires compilés : `cargo build` (ou `make build-rust`)
-#   - pipeline_server.py : pip install fastapi uvicorn transformers accelerate torch numpy
-#   - le modèle HF (MODEL) téléchargeable, et son nombre de couches (TOTAL_LAYERS)
+#   - BACKEND=python (défaut) : pip install fastapi uvicorn transformers accelerate torch numpy
+#     + le modèle HF (MODEL) téléchargeable, et son nombre de couches (TOTAL_LAYERS)
+#   - BACKEND=native : binaire pipeline_server compilé (voir
+#     patches/llama-cpp-pipeline-split/README.md) + un modèle .gguf local
 #
 # Usage :
 #   TOTAL_LAYERS=18 MODEL=google/gemma-3-1b-it ./scripts/testnet/run_testnet_2.sh
 #   (TOTAL_LAYERS = "num_hidden_layers" du config.json du modèle)
+#
+#   BACKEND=native TOTAL_LAYERS=2 \
+#     NATIVE_BIN=/path/to/pipeline_server NATIVE_MODEL_GGUF=/path/to/model.gguf \
+#     ./scripts/testnet/run_testnet_2.sh
 #
 set -euo pipefail
 
@@ -29,6 +35,19 @@ DTYPE="${DTYPE:-bf16}"            # fp16 | bf16
 PROMPT="${PROMPT:-Bonjour, présente-toi en une phrase.}"
 MAX_TOKENS="${MAX_TOKENS:-32}"
 
+# ── Backend du pipeline_server : "python" (défaut, HF/transformers) ou "native"
+# (patches/llama-cpp-pipeline-split/pipeline_server.cpp, Gemma3 Dense CPU-only,
+# à builder à part -- voir patches/llama-cpp-pipeline-split/README.md). Le
+# PipelineClient Rust est agnostique du backend (simple client HTTP générique),
+# donc les configs daemon générées plus bas ne changent pas selon BACKEND.
+BACKEND="${BACKEND:-python}"      # python | native
+if [ "$BACKEND" = "native" ]; then
+  : "${NATIVE_BIN:?BACKEND=native requiert NATIVE_BIN = chemin du binaire pipeline_server compilé}"
+  : "${NATIVE_MODEL_GGUF:?BACKEND=native requiert NATIVE_MODEL_GGUF = chemin d'un .gguf local (pas un ID HuggingFace)}"
+  [ -x "$NATIVE_BIN" ] || { echo "✗ Binaire natif absent/non exécutable: $NATIVE_BIN"; exit 1; }
+  [ -f "$NATIVE_MODEL_GGUF" ] || { echo "✗ Modèle GGUF introuvable: $NATIVE_MODEL_GGUF"; exit 1; }
+fi
+
 # Binaires (debug par défaut ; export BIN=target/release pour la release)
 BIN="${BIN:-$ROOT/target/debug}"
 DAEMON_BIN="$BIN/ainonymous-daemon"
@@ -41,7 +60,7 @@ RUN="$ROOT/.testnet-run"
 mkdir -p "$RUN"
 LOGS="$RUN/logs"; mkdir -p "$LOGS"
 
-echo "▶ Modèle=$MODEL  couches=$TOTAL_LAYERS  split=$SPLIT  device=$DEVICE"
+echo "▶ Backend=$BACKEND  Modèle=$MODEL  couches=$TOTAL_LAYERS  split=$SPLIT  device=$DEVICE"
 [ -x "$DAEMON_BIN" ] || { echo "✗ Binaire absent: $DAEMON_BIN — lance d'abord 'cargo build'"; exit 1; }
 
 # ── Génération des configs (source unique de vérité) ──────────────────────────
@@ -138,15 +157,27 @@ wait_http() { # url, label, tries
 }
 
 # ── 1) Pipeline servers (étages GPU/CPU) ──────────────────────────────────────
-echo "▶ Démarrage pipeline_server A (couches 0..$SPLIT, is-first)…"
-python3 "$ROOT/scripts/pipeline_server.py" --model "$MODEL" --port "$A_PIPE" \
-  --layer-start 0 --layer-end "$SPLIT" --is-first-node \
-  --device "$DEVICE" --dtype "$DTYPE" >"$LOGS/pipe-a.log" 2>&1 & PIDS+=($!)
+if [ "$BACKEND" = "native" ]; then
+  echo "▶ Démarrage pipeline_server natif A (couches 0..$SPLIT, is-first)…"
+  "$NATIVE_BIN" --model "$NATIVE_MODEL_GGUF" --port "$A_PIPE" \
+    --layer-start 0 --layer-end "$SPLIT" --is-first-node \
+    >"$LOGS/pipe-a.log" 2>&1 & PIDS+=($!)
 
-echo "▶ Démarrage pipeline_server B (couches $SPLIT..$TOTAL_LAYERS, is-last)…"
-python3 "$ROOT/scripts/pipeline_server.py" --model "$MODEL" --port "$B_PIPE" \
-  --layer-start "$SPLIT" --layer-end "$TOTAL_LAYERS" --is-last-node \
-  --device "$DEVICE" --dtype "$DTYPE" >"$LOGS/pipe-b.log" 2>&1 & PIDS+=($!)
+  echo "▶ Démarrage pipeline_server natif B (couches $SPLIT..$TOTAL_LAYERS, is-last)…"
+  "$NATIVE_BIN" --model "$NATIVE_MODEL_GGUF" --port "$B_PIPE" \
+    --layer-start "$SPLIT" --is-last-node \
+    >"$LOGS/pipe-b.log" 2>&1 & PIDS+=($!)
+else
+  echo "▶ Démarrage pipeline_server A (couches 0..$SPLIT, is-first)…"
+  python3 "$ROOT/scripts/pipeline_server.py" --model "$MODEL" --port "$A_PIPE" \
+    --layer-start 0 --layer-end "$SPLIT" --is-first-node \
+    --device "$DEVICE" --dtype "$DTYPE" >"$LOGS/pipe-a.log" 2>&1 & PIDS+=($!)
+
+  echo "▶ Démarrage pipeline_server B (couches $SPLIT..$TOTAL_LAYERS, is-last)…"
+  python3 "$ROOT/scripts/pipeline_server.py" --model "$MODEL" --port "$B_PIPE" \
+    --layer-start "$SPLIT" --layer-end "$TOTAL_LAYERS" --is-last-node \
+    --device "$DEVICE" --dtype "$DTYPE" >"$LOGS/pipe-b.log" 2>&1 & PIDS+=($!)
+fi
 
 wait_http "http://127.0.0.1:$A_PIPE/status" "pipeline A" 180
 wait_http "http://127.0.0.1:$B_PIPE/status" "pipeline B" 180

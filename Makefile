@@ -48,6 +48,15 @@ testnet-2:
 	$(CARGO) build
 	@BIN=$(CURDIR)/target/debug bash scripts/testnet/run_testnet_2.sh
 
+## testnet-2-native: idem, mais avec le pipeline_server natif llama.cpp (patch
+##            Gemma3 Dense, voir patches/llama-cpp-pipeline-split/) au lieu de
+##            pipeline_server.py. Binaire et modèle .gguf à builder/fournir soi-même.
+##            Variables : TOTAL_LAYERS, NATIVE_BIN, NATIVE_MODEL_GGUF (obligatoires), SPLIT
+##            Ex : make testnet-2-native TOTAL_LAYERS=2 NATIVE_BIN=/tmp/pipeline_server NATIVE_MODEL_GGUF=/tmp/models/gemma3-tiny.gguf
+testnet-2-native:
+	$(CARGO) build
+	@BIN=$(CURDIR)/target/debug BACKEND=native bash scripts/testnet/run_testnet_2.sh
+
 ## clippy: linter Rust
 clippy:
 	$(CARGO) clippy -- -D warnings

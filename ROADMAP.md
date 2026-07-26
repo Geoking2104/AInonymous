@@ -26,12 +26,13 @@ Voir `docs/PALIER_F.md` pour les détails.
 **Statut** : 🟡 En cours (corrigé le 26/07/2026)
 
 - Détection GPU + auto-ajustement `n_gpu_layers` selon VRAM estimée : ✅ fait (`crates/ainonymous-daemon/src/llama.rs`)
-- Testnet 2 nœuds (loopback, pipeline-split via `pipeline_server.py` Python/HuggingFace) : ✅ fonctionnel (`docs/TESTNET_2NODES.md`), mais decode séquentiel, KV-cache purgée par session
+- Testnet 2 nœuds (loopback, pipeline-split) : ✅ fonctionnel (`docs/TESTNET_2NODES.md`), 2 backends interchangeables via `BACKEND=python|native` (le client Rust `pipeline_client.rs` est agnostique du backend — simple client HTTP)
 - Patch natif llama.cpp (pipeline-split par couche, sans dépendance Python), Gemma3 Dense : ✅ preuve de concept réelle et vérifiée (voir `patches/llama-cpp-pipeline-split/`) —
   - single forward pass : bit-exact (2 prompts)
   - multi-step (prefill+decode) sans transfert de KV-cache entre nœuds : bit-exact, confirme que le KV-cache reste local par nœud (corrige l'hypothèse `kv_snapshot` de l'ancien doc)
-  - serveur HTTP réel (`pipeline_server.cpp`, 2 process séparés, protocole calqué sur `pipeline_client.rs`) : testé end-to-end, résultat identique au baseline in-process
-  - restent : MoE (Gemma4/gemma3n), N>2 nœuds (bloqué sur un crash ggml scheduler reverté), GPU, migration réelle dans `conductor.rs`/`ainonymous-daemon`, concurrence serveur
+  - serveur HTTP réel (`pipeline_server.cpp`, 2 process séparés, protocole + CLI calqués sur `pipeline_client.rs`/`pipeline_server.py`) : testé end-to-end, résultat identique au baseline in-process
+  - branché dans `scripts/testnet/run_testnet_2.sh` / `make testnet-2-native` (choix de backend au lancement, aucun changement Rust nécessaire) — logique validée, pas encore exécutée de bout en bout avec un vrai `ainonymous-daemon` compilé (pas de toolchain Rust dans le sandbox de dev)
+  - restent : MoE (Gemma4/gemma3n), N>2 nœuds (bloqué sur un crash ggml scheduler reverté), GPU, build automatisé du binaire natif (pas encore vendoré/scripté), run réel du testnet natif avec cargo, concurrence serveur
 - Speculative decoding, KV-cache quantization, layer splitting production : pas commencé
 
 ### Palier H — mTLS QUIC strict + PeerKeyVerifier

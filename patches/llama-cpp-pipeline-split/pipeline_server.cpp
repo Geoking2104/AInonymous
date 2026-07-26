@@ -10,7 +10,12 @@
 //     that needs the (currently reverted, crashing) pipeline_layer_end early-exit.
 //   - Single in-flight sequence per server process (no concurrent request slots).
 //   - Greedy decoding only (argmax), no sampling parameters.
-//   - Hidden states serialized as F32 base64 (not F16) for simplicity/precision.
+//   - Hidden states serialized as F32 base64 (NOT F16 like scripts/pipeline_server.py --
+//     don't mix a native node with a Python node in the same chain, the wire format differs).
+//
+// CLI is a superset of scripts/pipeline_server.py's, so this binary can be dropped
+// into run_testnet_2.sh (BACKEND=native) with the same --layer-end/--is-first-node/
+// --is-last-node flags. --device/--dtype are accepted and ignored (CPU/F32 only here).
 //
 // Endpoints (mirrors pipeline_client.rs):
 //   GET  /status
@@ -104,9 +109,11 @@ static std::vector<uint8_t> floats_to_bytes(const std::vector<float> & f) {
 struct ServerConfig {
     std::string model_path;
     int32_t layer_start = 0;
-    int32_t split = 0; // for non-last nodes: layer index to tap via embeddings_layer_inp
+    int32_t split = 0; // for non-last nodes: layer index to tap via embeddings_layer_inp (== --layer-end)
     int port = 9340;
     bool is_last_node = false;
+    bool is_first_node_flag = false;   // explicitly set via --is-first-node
+    bool is_first_node_flag_set = false;
 };
 
 struct ServerState {
@@ -125,7 +132,10 @@ struct ServerState {
 
 static ServerState S;
 
-static bool is_first_node() { return S.cfg.layer_start == 0; }
+static bool is_first_node() {
+    if (S.cfg.is_first_node_flag_set) return S.cfg.is_first_node_flag;
+    return S.cfg.layer_start == 0;
+}
 
 // runs one forward step (prefill or decode -- same code path) for n tokens starting at S.next_pos.
 // returns hidden_states (if not last node) or fills out_next_token (if last node).
@@ -223,7 +233,10 @@ int main(int argc, char ** argv) {
         else if (a == "--layer-start" && i+1 < argc) S.cfg.layer_start = std::atoi(argv[++i]);
         else if (a == "--port" && i+1 < argc) S.cfg.port = std::atoi(argv[++i]);
         else if (a == "--split" && i+1 < argc) S.cfg.split = std::atoi(argv[++i]);
-        else if (a == "--last") S.cfg.is_last_node = true;
+        else if (a == "--layer-end" && i+1 < argc) S.cfg.split = std::atoi(argv[++i]); // alias, matches scripts/pipeline_server.py CLI
+        else if (a == "--last" || a == "--is-last-node") S.cfg.is_last_node = true;
+        else if (a == "--is-first-node") { S.cfg.is_first_node_flag = true; S.cfg.is_first_node_flag_set = true; }
+        else if (a == "--device" || a == "--dtype") { ++i; } // accepted+ignored for CLI parity with pipeline_server.py (CPU/F32 only here)
     }
     if (S.cfg.model_path.empty()) { fprintf(stderr, "usage: %s --model PATH [--layer-start N] [--last] [--port P]\n", argv[0]); return 1; }
 
