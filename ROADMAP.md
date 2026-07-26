@@ -27,7 +27,11 @@ Voir `docs/PALIER_F.md` pour les détails.
 
 - Détection GPU + auto-ajustement `n_gpu_layers` selon VRAM estimée : ✅ fait (`crates/ainonymous-daemon/src/llama.rs`)
 - Testnet 2 nœuds (loopback, pipeline-split via `pipeline_server.py` Python/HuggingFace) : ✅ fonctionnel (`docs/TESTNET_2NODES.md`), mais decode séquentiel, KV-cache purgée par session
-- Patch natif llama.cpp (pipeline-split par couche, sans dépendance Python) : 🟡 preuve de concept réelle et vérifiée sur Gemma3 Dense (voir `patches/llama-cpp-pipeline-split/`), architecture MoE + endpoint serveur + migration `conductor.rs` restent à faire
+- Patch natif llama.cpp (pipeline-split par couche, sans dépendance Python), Gemma3 Dense : ✅ preuve de concept réelle et vérifiée (voir `patches/llama-cpp-pipeline-split/`) —
+  - single forward pass : bit-exact (2 prompts)
+  - multi-step (prefill+decode) sans transfert de KV-cache entre nœuds : bit-exact, confirme que le KV-cache reste local par nœud (corrige l'hypothèse `kv_snapshot` de l'ancien doc)
+  - serveur HTTP réel (`pipeline_server.cpp`, 2 process séparés, protocole calqué sur `pipeline_client.rs`) : testé end-to-end, résultat identique au baseline in-process
+  - restent : MoE (Gemma4/gemma3n), N>2 nœuds (bloqué sur un crash ggml scheduler reverté), GPU, migration réelle dans `conductor.rs`/`ainonymous-daemon`, concurrence serveur
 - Speculative decoding, KV-cache quantization, layer splitting production : pas commencé
 
 ### Palier H — mTLS QUIC strict + PeerKeyVerifier

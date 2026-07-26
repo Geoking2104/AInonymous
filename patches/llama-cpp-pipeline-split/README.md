@@ -1,6 +1,6 @@
 # Pipeline-split patch for llama.cpp — Gemma3 Dense (Preuve de concept vérifiée)
 
-Statut : **mécanisme prouvé, réel et compilé** — pas une simulation, pas un plan. Portée volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
+Statut : **mécanisme prouvé, réel et compilé, y compris en HTTP réel entre 2 process** — pas une simulation, pas un plan. Portée volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
 
 ## Contexte
 
@@ -15,6 +15,8 @@ Conséquence : le patch réellement nécessaire est **beaucoup plus petit** que 
 fichiers (voir `0001-pipeline-split-poc.patch`), pas des semaines de travail C++.
 
 ## Ce qui a été fait et vérifié
+
+### 1. Patch de base (single forward pass)
 
 1. Fork réel de `ggml-org/llama.cpp` (commit `42fc243060709331ff9b158a9ed2cbe37219ae83`, 26/07/2026).
 2. Compilation CPU-only réussie (`cmake` + `make`, backend CPU uniquement, pas de CUDA/Metal disponible dans
@@ -34,18 +36,59 @@ fichiers (voir `0001-pipeline-split-poc.patch`), pas des semaines de travail C++
    l'état caché en sortie de la couche 0 ; un contexte B **frais et indépendant**, configuré avec
    `pipeline_layer_start=1`, reçoit cet état caché via `llama_batch.embd` et ne calcule que la couche 1.
 
-### Résultat mesuré (2 prompts différents testés)
+Résultat (2 prompts différents testés) : argmax identique, diff absolue max = **0** (bit-exact), rel_l2 = **0**.
 
-| Métrique | Valeur |
-|---|---|
-| Argmax(logits) contexte complet vs contexte splitté | **identique** dans les 2 cas |
-| Différence absolue max sur les logits | **0** (bit-exact) |
-| Différence relative L2 | **0** |
-| Stats état caché transféré (n=192, prompt 2) | mean=0.587, std=3.20, min=-7.53, max=10.21 — non dégénéré |
-| Stats logits (prompt 2) | mean=0.0008, std=2.48, min=-10.9, max=11.5 — non dégénéré |
+### 2. Multi-step (prefill + decode), sans transfert de KV-cache — `pipeline_test2.cpp`
 
-Le deuxième prompt donne un argmax différent du premier (34658 vs 4000), ce qui exclut une sortie constante
-accidentelle qui aurait faussement validé le test.
+Question ouverte après la passe 1 : le mécanisme ne prouvait qu'un seul forward pass. Une génération réelle
+enchaîne plusieurs `llama_decode()` (prefill puis N decodes autorégressifs), et l'ancien `LLAMA_CPP_PATCH.md`
+supposait qu'il fallait un mécanisme de `kv_snapshot` pour transférer le KV-cache entre nœuds à chaque étape.
+
+Test : node0 (contexte complet, tape la couche 1 via `embeddings_layer_inp`) + node1
+(`pipeline_layer_start=1`), sur **2 étapes autorégressives réelles** (prefill du prompt, puis 1 decode du
+token généré), comparé à un contexte baseline unique faisant tout le calcul normalement.
+
+| Étape | Token match | max_abs_diff | rel_l2 |
+|---|---|---|---|
+| step1 (prefill) | **YES** | 0 | 0 |
+| step2 (decode) | **YES** | 0 | 0 |
+
+**Finding clé (corrige l'ancien doc) : aucun transfert de KV-cache entre nœuds n'est nécessaire.** Chaque
+contexte llama.cpp maintient son propre KV-cache local, qui persiste automatiquement entre appels successifs
+à `llama_decode()` sur ce même contexte. Seul l'état caché du flux résiduel (`hidden_states`, un vecteur par
+token) doit transiter d'un nœud à l'autre à chaque étape — pas le KV-cache. Le design `kv_snapshot` de
+l'ancien doc n'est donc pas nécessaire pour un pipeline-split séquentiel classique.
+
+Note : une tentative d'ajouter un `pipeline_layer_end` (arrêt anticipé sur node0 pour éviter de calculer la
+couche 1 inutilement) a fait planter le scheduler ggml (`GGML_ASSERT(buffer)` dans `ggml-backend.cpp`) quand
+l'ensemble des tensors de sortie du graphe change entre deux `reserve()` sur le même contexte. **Reverté**,
+pas livré dans le patch — node0 calcule donc le modèle complet à chaque étape (correct mais pas optimal en
+calcul ; voir limitations).
+
+### 3. Serveur HTTP réel, 2 process séparés — `pipeline_server.cpp`
+
+Objectif : sortir du test in-process C++ et vérifier que le mécanisme fonctionne à travers un vrai réseau
+(TCP + JSON + base64), avec une interface calquée exactement sur `pipeline_client.rs` (le client Rust déjà
+existant dans `ainonymous-daemon`), pour que ce binaire puisse servir de backend alternatif à
+`pipeline_server.py`.
+
+- Serveur autonome (~340 lignes), linké directement à `libllama.a` (pas `tools/server/`, trop lourd et hors
+  scope pour ce PoC).
+- Dépendances vendorées : `httplib.h` + `httplib.cpp` (cpp-httplib, fork qui sépare déclaration/implémentation
+  — inhabituel pour un header-only classique) + `json.hpp` (nlohmann).
+- Endpoints : `GET /status`, `POST /prefill`, `POST /decode`, `POST /clear`, `POST /tokenize`,
+  `POST /detokenize` — champs JSON alignés avec `PipelineStatus` côté Rust (`layer_end` inclus).
+- Base64 encode/decode implémenté à la main (pas de lib externe).
+
+**Test end-to-end réel** : 2 process serveur lancés (node0 : `--layer-start 0 --split 1 --port 9340` ;
+node1 : `--layer-start 1 --last --port 9341`), requêtes envoyées via un script Python (`urllib`) simulant
+exactement ce que ferait `pipeline_client.rs` : `/status` sur les deux (vérifié `layer_end=1` et `layer_end=2`
+respectivement), puis même prompt fixe `[2, 55123, 9821, 174, 61000, 3]` envoyé en `/prefill` puis `/decode`
+à travers les deux nœuds.
+
+Résultat : **`step1: next_token_id=34658 " Não"`, `step2: next_token_id=34658 " Não"`, match exact avec le
+baseline in-process C++ (`pipeline_test2` → 34658/34658).** Le round-trip HTTP réel (sérialisation base64 des
+états cachés, requêtes réseau réelles sur 127.0.0.1) est donc bit-exact-équivalent au mécanisme in-process.
 
 ## Comment reproduire
 
@@ -67,11 +110,31 @@ mkdir -p /tmp/models
 curl -L -o /tmp/models/gemma3-tiny.gguf \
   "https://huggingface.co/zelk12/gemma-3-tiny-random-Q6_K-GGUF/resolve/main/gemma-3-tiny-random-q6_k.gguf"
 
-# 5. Compiler et lancer le test de parité
+# 5. Test de parité single-step
 g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test.cpp \
   build/src/libllama.a build/ggml/src/libggml.a build/ggml/src/libggml-cpu.a build/ggml/src/libggml-base.a \
   -fopenmp -lpthread -ldl -lm -o pipeline_test
 ./pipeline_test
+
+# 6. Test multi-step (prefill + decode, sans transfert KV)
+g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test2.cpp \
+  build/src/libllama.a build/ggml/src/libggml.a build/ggml/src/libggml-cpu.a build/ggml/src/libggml-base.a \
+  -fopenmp -lpthread -ldl -lm -o pipeline_test2
+./pipeline_test2
+
+# 7. Serveur HTTP réel (2 nœuds) -- nécessite httplib.h/.cpp + json.hpp vendorés
+# (voir ggml-org/llama.cpp vendor/cpp-httplib/ et vendor/nlohmann/ pour les récupérer)
+g++ -std=c++17 -O2 -pthread \
+  -I include -I ggml/include -I src -I vendor/cpp-httplib -I vendor/nlohmann \
+  pipeline_server.cpp vendor/cpp-httplib/httplib.cpp \
+  build/src/libllama.a build/ggml/src/libggml.a build/ggml/src/libggml-cpu.a build/ggml/src/libggml-base.a \
+  -fopenmp -lpthread -ldl -lm -o pipeline_server
+
+# terminal 1 (node0, first node, tape la couche 1)
+./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 0 --split 1 --port 9340
+# terminal 2 (node1, last node, reprend à la couche 1)
+./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 1 --last --port 9341
+# puis POST /prefill sur node0 -> hidden_states_b64 -> POST /prefill sur node1 -> next_token_id
 ```
 
 ## Ce qui n'est PAS fait (à ne pas confondre avec "terminé")
@@ -79,21 +142,22 @@ g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test.cpp \
 - **MoE (Gemma4/gemma3n)** : hors scope de cette passe. L'architecture "Gemma4" réelle dans llama.cpp actuel
   (`src/models/gemma4.cpp`) implémente en fait le style Gemma 3n (embeddings par couche + KV partagée +
   sliding window par couche) — bien plus complexe qu'un décodeur dense classique. À traiter séparément.
-- **Endpoint serveur** (`POST /v1/pipeline/forward` dans `tools/server/`) : non fait. Le code serveur actuel
-  fait 217 Ko rien que pour `server-context.cpp` — une tâche à part entière, pas ajoutée dans cette passe pour
-  éviter un patch bâclé et non testé.
-- **Génération multi-tokens / KV-cache inter-process** : le test ne couvre qu'un seul forward pass (prefill).
-  Le maintien du KV-cache entre nœuds sur plusieurs étapes de decode (mentionné comme `kv_snapshot` dans
-  l'ancien `LLAMA_CPP_PATCH.md`) reste à concevoir.
-- **GPU (CUDA/Metal)** : patch et test faits en CPU-only (pas de matériel GPU dans l'environnement de build).
+- **N > 2 nœuds** : bloqué sur le `pipeline_layer_end` reverté (voir section 2). Sans lui, un nœud
+  intermédiaire ne peut pas s'arrêter proprement avant la fin du modèle — seul un split en exactement 2
+  segments (premier + dernier) fonctionne aujourd'hui.
+- **GPU (CUDA/Metal)** : patch et tests faits en CPU-only (pas de matériel GPU dans l'environnement de build).
   Le mécanisme (champs cparams + `llama_batch.embd`) est indépendant du backend, mais n'a pas été testé sur GPU.
+- **Concurrence en production** : le serveur HTTP ne gère qu'une seule séquence à la fois (pas de slots de
+  requêtes concurrentes, pas de file d'attente). Suffisant pour un testnet, pas pour de la charge réelle.
+- **Efficacité calcul sur node0** : node0 recalcule le modèle complet à chaque étape au lieu de s'arrêter à
+  la couche de coupure (conséquence directe du revert de `pipeline_layer_end`) — correct numériquement,
+  gaspille du CPU/temps par rapport à un vrai pipeline-split optimisé.
 - **Migration `conductor.rs`** : `pipeline_client.rs` continue de parler à `pipeline_server.py` (pont Python)
-  pour l'instant. Pas de `LlamaPipelineClient` Rust écrit dans cette passe — prématuré tant qu'il n'y a pas
-  d'endpoint serveur réel à cibler.
+  en production. Le nouveau `pipeline_server.cpp` n'a pas encore été branché comme backend réel côté
+  `ainonymous-daemon` — c'est un binaire testé et fonctionnel, mais pas encore intégré au conducteur.
 
 ## Prochaine étape logique
 
-Écrire l'endpoint serveur minimal (pas besoin de toute la complexité de `tools/server/` — un petit
-exécutable HTTP autonome linké à `libllama.a`, exposant `pipeline_layer_start` + injection/extraction via
-JSON+base64, suffit pour un testnet 2 nœuds réel). Ensuite seulement, écrire le client Rust côté
-`ainonymous-daemon`.
+Brancher `pipeline_server.cpp` comme backend réel derrière `LlamaPipelineClient` côté `ainonymous-daemon`
+(remplacement progressif de `pipeline_server.py`), et/ou déboguer la vraie cause du crash `pipeline_layer_end`
+dans le scheduler ggml pour débloquer les chaînes à N > 2 nœuds.
