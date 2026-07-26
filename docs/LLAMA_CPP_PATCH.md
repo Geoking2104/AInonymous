@@ -1,3 +1,14 @@
+> **Note de mise à jour (26/07/2026)** : ce plan date d'avant la refonte de llama.cpp
+> (architectures désormais séparées sous `src/models/*.cpp`, plus de fichier monolithique
+> `src/llama.cpp` >50k lignes). Une preuve de concept **réelle, compilée et vérifiée
+> numériquement** (Gemma3 Dense uniquement, CPU) existe maintenant dans
+> [`patches/llama-cpp-pipeline-split/`](../patches/llama-cpp-pipeline-split/README.md) — patch
+> de 37 lignes nettes au lieu du plan à 3 semaines ci-dessous, grâce à une infrastructure
+> d'extraction de hidden states déjà présente dans llama.cpp (mécanisme "nextn"/EAGLE3) qui
+> n'avait pas encore été branchée pour Gemma3. Le contenu ci-dessous reste utile comme
+> référence pour ce qui manque encore : MoE (Gemma4/gemma3n), endpoint serveur, KV-cache
+> multi-étapes, migration `conductor.rs`.
+
 # Patch llama.cpp — Pipeline Split natif
 
 ## Contexte

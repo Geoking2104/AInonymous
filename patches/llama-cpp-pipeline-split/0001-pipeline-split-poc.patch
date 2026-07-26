@@ -1,0 +1,107 @@
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index eed041e..9fe62a8 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -116,6 +116,7 @@ llama_context::llama_context(
+     cparams.embeddings              = params.embeddings;
+     cparams.embeddings_nextn        = false;
+     cparams.embeddings_nextn_masked = false;
++    cparams.pipeline_layer_start    = 0;
+     cparams.offload_kqv             = params.offload_kqv;
+     cparams.no_perf                 = params.no_perf;
+     cparams.warmup                  = false;
+@@ -1173,6 +1174,17 @@ void llama_context::set_nextn_layer_offset(int32_t offset) {
+     cparams.nextn_layer_offset = offset;
+ }
+ 
++void llama_context::set_pipeline_layer_start(int32_t start) {
++    LLAMA_LOG_DEBUG("%s: start = %d\n", __func__, start);
++
++    GGML_ASSERT(start >= 0 && (uint32_t) start < model.hparams.n_layer());
++
++    cparams.pipeline_layer_start = start;
++
++    // graph shape/behaviour changes with this value -> force a reserve
++    sched_need_reserve = true;
++}
++
+ void llama_context::set_causal_attn(bool value) {
+     LLAMA_LOG_DEBUG("%s: value = %d\n", __func__, value);
+ 
+@@ -3724,6 +3736,10 @@ void llama_set_nextn_layer_offset(llama_context * ctx, int32_t offset) {
+     ctx->set_nextn_layer_offset(offset);
+ }
+ 
++void llama_set_pipeline_layer_start(llama_context * ctx, int32_t start) {
++    ctx->set_pipeline_layer_start(start);
++}
++
+ llama_memory_t llama_get_memory(const struct llama_context * ctx) {
+     if (!ctx) {
+         return nullptr;
+diff --git a/src/llama-context.h b/src/llama-context.h
+index bf91daa..11c79ec 100644
+--- a/src/llama-context.h
++++ b/src/llama-context.h
+@@ -116,6 +116,7 @@ struct llama_context {
+     void set_embeddings_nextn(bool value, bool masked);
+     void set_embeddings_layer_inp(uint32_t lid, bool enable);
+     void set_nextn_layer_offset(int32_t offset);
++    void set_pipeline_layer_start(int32_t start);
+     void set_causal_attn(bool value);
+     void set_warmup(bool value);
+ 
+diff --git a/src/llama-cparams.h b/src/llama-cparams.h
+index 5018170..8445852 100644
+--- a/src/llama-cparams.h
++++ b/src/llama-cparams.h
+@@ -20,6 +20,11 @@ struct llama_cparams {
+ 
+     int32_t  nextn_layer_offset = 0;
+ 
++    // EXPERIMENTAL (pipeline-split PoC): if > 0, skip layers [0, pipeline_layer_start)
++    // and expect the hidden state for il == pipeline_layer_start to be supplied via
++    // llama_batch.embd instead of computing it from token embeddings.
++    int32_t  pipeline_layer_start = 0;
++
+     float rope_freq_base;
+     float rope_freq_scale;
+ 
+diff --git a/src/llama-ext.h b/src/llama-ext.h
+index 348bbae..6041fb3 100644
+--- a/src/llama-ext.h
++++ b/src/llama-ext.h
+@@ -100,6 +100,12 @@ LLAMA_API void llama_set_embeddings_nextn(struct llama_context * ctx, bool value
+ // chain multiple trained NextN heads. Default 0 (first head).
+ LLAMA_API void llama_set_nextn_layer_offset(struct llama_context * ctx, int32_t offset);
+ 
++// EXPERIMENTAL (pipeline-split PoC): skip layers [0, layer_start) on the next decode().
++// The caller must supply the hidden state for il == layer_start via llama_batch.embd
++// (shape [n_embd, n_tokens], same convention as multimodal embd input).
++// layer_start == 0 restores normal (full-model) behavior.
++LLAMA_API void llama_set_pipeline_layer_start(struct llama_context * ctx, int32_t layer_start);
++
+ // mirrors:
+ // LLAMA_API float * llama_get_embeddings(struct llama_context * ctx);
+ LLAMA_API float * llama_get_embeddings_nextn(struct llama_context * ctx);
+diff --git a/src/models/gemma3.cpp b/src/models/gemma3.cpp
+index 6901945..f010566 100644
+--- a/src/models/gemma3.cpp
++++ b/src/models/gemma3.cpp
+@@ -108,7 +108,15 @@ llama_model_gemma3::graph<iswa>::graph(const llama_model & model, const llm_grap
+ 
+     ggml_tensor * inp_out_ids = build_inp_out_ids();
+ 
+-    for (int il = 0; il < n_layer; ++il) {
++    // EXPERIMENTAL (pipeline-split PoC): start at an arbitrary layer instead of 0.
++    // When cparams.pipeline_layer_start > 0, `inpL` at this point is expected to already
++    // hold the injected hidden state (via build_inp_embd's ubatch.embd path above),
++    // NOT a token embedding -- so we simply skip the earlier iterations.
++    for (int il = cparams.pipeline_layer_start; il < n_layer; ++il) {
++        // expose the hidden state fed INTO this layer, so another context can later
++        // resume computation from here via cparams.pipeline_layer_start (see above).
++        res->t_layer_inp[il] = inpL;
++
+         float freq_base_l  = 0.0f;
+         float freq_scale_l = 0.0f;
+ 
