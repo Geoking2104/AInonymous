@@ -1,8 +1,9 @@
 # Pipeline-split patch for llama.cpp — Gemma3 Dense (Preuve de concept vérifiée)
 
-Statut : **mécanisme prouvé, réel et compilé, y compris en HTTP réel entre 2 process, et branché dans le
-testnet du daemon** — pas une simulation, pas un plan. Portée volontairement réduite (voir "Ce qui n'est PAS
-fait" plus bas).
+Statut : **mécanisme prouvé, réel et compilé** — single forward pass, multi-step, serveur HTTP réel entre 2
+process, branché dans le testnet du daemon, **et l'early-exit `pipeline_layer_end` (nécessaire pour des
+chaînes à N > 2 nœuds) qui plantait a été débogué et corrigé**. Pas une simulation, pas un plan. Portée
+volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
 
 ## Contexte
 
@@ -13,7 +14,7 @@ Ce plan est **obsolète** : llama.cpp a été refactorisé depuis — chaque arc
 infrastructure générique pour l'extraction d'états cachés intermédiaires (`cparams.embeddings_layer_inp`,
 `llama_get_embeddings_layer_inp`, mécanisme "nextn" pour le MTP/EAGLE3 speculative decoding).
 
-Conséquence : le patch réellement nécessaire est **beaucoup plus petit** que prévu — 37 lignes nettes sur 5
+Conséquence : le patch réellement nécessaire est **beaucoup plus petit** que prévu — 110 lignes nettes sur 5
 fichiers (voir `0001-pipeline-split-poc.patch`), pas des semaines de travail C++.
 
 ## Ce qui a été fait et vérifié
@@ -61,11 +62,9 @@ contexte llama.cpp maintient son propre KV-cache local, qui persiste automatique
 token) doit transiter d'un nœud à l'autre à chaque étape — pas le KV-cache. Le design `kv_snapshot` de
 l'ancien doc n'est donc pas nécessaire pour un pipeline-split séquentiel classique.
 
-Note : une tentative d'ajouter un `pipeline_layer_end` (arrêt anticipé sur node0 pour éviter de calculer la
-couche 1 inutilement) a fait planter le scheduler ggml (`GGML_ASSERT(buffer)` dans `ggml-backend.cpp`) quand
-l'ensemble des tensors de sortie du graphe change entre deux `reserve()` sur le même contexte. **Reverté**,
-pas livré dans le patch — node0 calcule donc le modèle complet à chaque étape (correct mais pas optimal en
-calcul ; voir limitations).
+Dans cette passe, node0 calculait le modèle complet à chaque étape au lieu de s'arrêter à la couche de
+coupure (une tentative d'early-exit avait planté et avait été revertée — voir section 5, le bug est
+maintenant corrigé).
 
 ### 3. Serveur HTTP réel, 2 process séparés — `pipeline_server.cpp`
 
@@ -131,6 +130,64 @@ mêmes champs `/status`). **Non vérifié** : le run complet du script bash avec
 script modifié a été validée (`bash -n` sur le patron identique). À faire avant de considérer l'intégration
 "testée en conditions réelles" : lancer `make testnet-2-native` sur une machine avec `cargo build` disponible.
 
+### 5. `pipeline_layer_end` : cause racine trouvée et corrigée — `pipeline_test3_earlyexit.cpp`
+
+Contexte : la section 2 utilisait node0 en calculant le **modèle complet** à chaque étape, même si seule la
+couche 0 nous intéressait — gaspillage de calcul. Une tentative précédente d'ajouter un early-exit
+(`pipeline_layer_end`, pour que node0 s'arrête après sa dernière couche assignée) avait fait planter le
+programme avec `GGML_ASSERT(buffer) failed` dans `ggml-backend.cpp`, et avait été revertée sans être
+diagnostiquée à fond.
+
+**Démarche de debug (cette session)** :
+1. Réimplémentation de `pipeline_layer_end` (nouveau champ `cparams`, setter `set_pipeline_layer_end()` avec
+   `sched_need_reserve = true` — même patron que `pipeline_layer_start`), et modification de
+   `src/models/gemma3.cpp` pour que la boucle de couches s'arrête à `pipeline_layer_end` au lieu de `n_layer`,
+   en sautant `norm`+`lm_head` dans ce cas.
+2. Reproduction immédiate et fiable du crash original (`pipeline_test3_earlyexit.cpp`, node0 =
+   `pipeline_layer_start=0` + `pipeline_layer_end=1`).
+3. Pas de `gdb` dans l'environnement de build → diagnostic par instrumentation : `fprintf` +
+   `__builtin_return_address(0)` injectés temporairement dans les fonctions `ggml_backend_buffer_get_usage`
+   et `ggml_backend_buffer_get_type` (`ggml/src/ggml-backend.cpp`), binaire recompilé en `-no-pie` pour avoir
+   des adresses fixes, puis `addr2line -f -C -e <binaire> <adresse>` pour résoudre le symbole appelant.
+4. **Résultat** : la fonction fautive est `llm_graph_input_out_ids::set_input()`. Cause racine exacte :
+   `build_inp_out_ids()` est appelé **inconditionnellement** en haut de la fonction de construction du graphe
+   Gemma3, **avant** le point où l'early-exit était décidé. Ce tenseur `inp_out_ids` n'est utilisé que dans la
+   branche `if (il == n_layer - 1 && inp_out_ids)`, jamais atteinte en mode early-exit. Résultat :
+   `ggml_build_forward_expand()` ne lui donne jamais d'arête consommatrice, le scheduler ne lui alloue donc
+   jamais de buffer — mais `set_input()` (appelé pour **tous** les inputs enregistrés, qu'ils soient
+   réellement utilisés dans le graphe ou non) tente quand même d'écrire dedans, et déréférence un
+   `tensor->buffer` nul. **Ce n'est pas un bug du scheduler ggml** : c'est un bug d'ordre de construction dans
+   le patch — `inp_out_ids` était construit avant que la portée réelle du graphe (early-exit ou non) ne soit
+   connue.
+5. **Fix** : ne construire `inp_out_ids` (`build_inp_out_ids()`) que si le graphe va réellement atteindre la
+   couche finale (`pipeline_end >= n_layer`). Une ligne de condition, pas de changement dans `ggml/`.
+6. Effet de bord découvert et corrigé au passage : quand `pipeline_layer_end` est actif,
+   `embeddings_layer_inp(pipeline_end)` (utilisé pour extraire l'état cascade vers le nœud suivant) attend que
+   `res->t_layer_inp[pipeline_end]` soit rempli — mais la boucle s'arrête avant d'atteindre cette itération.
+   Fix : peupler explicitement `res->t_layer_inp[pipeline_end] = cur;` dans la branche early-exit.
+
+**Vérification** (`pipeline_test3_earlyexit.cpp`, node0 = `layer_start=0` + `layer_end=1` + capture
+`embeddings_layer_inp(1)`, node1 = `layer_start=1` normal, 2 étapes prefill+decode) :
+
+| Étape | Token (avant fix) | Token (après fix) |
+|---|---|---|
+| step1 | **crash** | 34658 |
+| step2 | — | 34658 |
+
+Résultat identique au baseline `pipeline_test2.cpp` (34658/34658) — **aucune régression** : `pipeline_test.cpp`
+et `pipeline_test2.cpp` (non modifiés) ont été réexécutés après le fix et restent bit-exact (diff = 0, rel_l2
+= 0) — le changement structurel dans `gemma3.cpp` (réordonnancement de `build_inp_out_ids()`) n'affecte pas le
+chemin "normal" (`pipeline_layer_end = 0`, comportement par défaut).
+
+**Ce qui reste non vérifié** : le fix a été testé avec un node early-exit qui est aussi le **premier** nœud
+(`pipeline_layer_start=0` + `pipeline_layer_end<n_layer`). Un vrai **nœud intermédiaire** (`pipeline_layer_start>0`
+**et** `pipeline_layer_end<n_layer` simultanément, cas nécessaire pour des chaînes à N>2 nœuds) n'a pas été
+testé avec un modèle réel à 3+ couches — le modèle de test (`gemma3-tiny`) n'a que 2 couches, donc pas de
+place pour un vrai nœud du milieu. La correction est structurellement indépendante de `pipeline_layer_start`
+(la condition du fix ne dépend que de `pipeline_end` vs `n_layer`), donc il n'y a pas de raison théorique que
+ça se comporte différemment, mais ça reste à vérifier avec un modèle à 3 couches ou plus avant de déclarer les
+chaînes N>2 "prêtes".
+
 ## Comment reproduire
 
 ```bash
@@ -163,6 +220,12 @@ g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test2.cpp \
   -fopenmp -lpthread -ldl -lm -o pipeline_test2
 ./pipeline_test2
 
+# 6b. Test early-exit (pipeline_layer_end) -- le crash historique, maintenant corrigé
+g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test3_earlyexit.cpp \
+  build/src/libllama.a build/ggml/src/libggml.a build/ggml/src/libggml-cpu.a build/ggml/src/libggml-base.a \
+  -fopenmp -lpthread -ldl -lm -o pipeline_test3
+./pipeline_test3
+
 # 7. Serveur HTTP réel (2 nœuds) -- nécessite httplib.h/.cpp + json.hpp vendorés
 # (voir ggml-org/llama.cpp vendor/cpp-httplib/ et vendor/nlohmann/ pour les récupérer)
 g++ -std=c++17 -O2 -pthread \
@@ -188,16 +251,18 @@ make testnet-2-native TOTAL_LAYERS=2 \
 - **MoE (Gemma4/gemma3n)** : hors scope de cette passe. L'architecture "Gemma4" réelle dans llama.cpp actuel
   (`src/models/gemma4.cpp`) implémente en fait le style Gemma 3n (embeddings par couche + KV partagée +
   sliding window par couche) — bien plus complexe qu'un décodeur dense classique. À traiter séparément.
-- **N > 2 nœuds** : bloqué sur le `pipeline_layer_end` reverté (voir section 2). Sans lui, un nœud
-  intermédiaire ne peut pas s'arrêter proprement avant la fin du modèle — seul un split en exactement 2
-  segments (premier + dernier) fonctionne aujourd'hui.
+- **N > 2 nœuds avec un vrai nœud du milieu, non vérifié sur un modèle réel** : le fix `pipeline_layer_end`
+  (section 5) débloque *mécaniquement* le cas `pipeline_layer_start > 0` combiné à `pipeline_layer_end < n_layer`
+  (nécessaire pour un nœud intermédiaire), mais ça n'a pu être testé qu'avec `pipeline_layer_start = 0` faute
+  d'un modèle de test à 3+ couches dans cet environnement. À vérifier avant de déclarer les chaînes N>2 prêtes.
 - **GPU (CUDA/Metal)** : patch et tests faits en CPU-only (pas de matériel GPU dans l'environnement de build).
   Le mécanisme (champs cparams + `llama_batch.embd`) est indépendant du backend, mais n'a pas été testé sur GPU.
 - **Concurrence en production** : le serveur HTTP ne gère qu'une seule séquence à la fois (pas de slots de
   requêtes concurrentes, pas de file d'attente). Suffisant pour un testnet, pas pour de la charge réelle.
-- **Efficacité calcul sur node0** : node0 recalcule le modèle complet à chaque étape au lieu de s'arrêter à
-  la couche de coupure (conséquence directe du revert de `pipeline_layer_end`) — correct numériquement,
-  gaspille du CPU/temps par rapport à un vrai pipeline-split optimisé.
+- **`pipeline_server.cpp` ne profite pas encore du fix** : le serveur HTTP (section 3/4) a été testé et livré
+  *avant* la correction `pipeline_layer_end` de cette session — il ne l'utilise pas encore, node0 continue d'y
+  recalculer le modèle complet à chaque étape. Brancher `--layer-end`/le nouveau early-exit dans
+  `pipeline_server.cpp` pour de vrai (au lieu de simplement accepter le flag) reste à faire.
 - **Build automatisé du binaire natif** : le fork llama.cpp patché n'est pas vendoré dans ce repo ni construit
   par `cargo build`/le Makefile — `NATIVE_BIN` doit être compilé et fourni à la main (voir "Comment reproduire").
   Automatiser ça (script de build, ou vendoring du fork) reste à faire.
@@ -211,8 +276,11 @@ make testnet-2-native TOTAL_LAYERS=2 \
 
 ## Prochaine étape logique
 
-Lancer `make testnet-2-native` sur une machine avec `cargo build` + le binaire natif compilé, pour vérifier
-l'intégration de bout en bout (pas seulement le mécanisme HTTP isolé). Ensuite : déboguer la vraie cause du
-crash `pipeline_layer_end` dans le scheduler ggml pour débloquer les chaînes à N > 2 nœuds, et/ou automatiser
-le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin d'être
-compilé à la main.
+1. Brancher le fix `pipeline_layer_end` dans `pipeline_server.cpp` (actuellement il accepte le flag CLI mais
+   ne l'utilise pas pour économiser du calcul — node0 continue de tourner le modèle complet).
+2. Tester un vrai nœud intermédiaire (`pipeline_layer_start>0` + `pipeline_layer_end<n_layer` simultanément)
+   avec un modèle à 3+ couches, pour valider une chaîne N=3 de bout en bout.
+3. Lancer `make testnet-2-native` sur une machine avec `cargo build` + le binaire natif compilé, pour vérifier
+   l'intégration testnet de bout en bout (pas seulement le mécanisme HTTP isolé).
+4. Automatiser le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin
+   d'être compilé à la main.

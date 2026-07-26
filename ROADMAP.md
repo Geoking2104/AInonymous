@@ -32,7 +32,8 @@ Voir `docs/PALIER_F.md` pour les détails.
   - multi-step (prefill+decode) sans transfert de KV-cache entre nœuds : bit-exact, confirme que le KV-cache reste local par nœud (corrige l'hypothèse `kv_snapshot` de l'ancien doc)
   - serveur HTTP réel (`pipeline_server.cpp`, 2 process séparés, protocole + CLI calqués sur `pipeline_client.rs`/`pipeline_server.py`) : testé end-to-end, résultat identique au baseline in-process
   - branché dans `scripts/testnet/run_testnet_2.sh` / `make testnet-2-native` (choix de backend au lancement, aucun changement Rust nécessaire) — logique validée, pas encore exécutée de bout en bout avec un vrai `ainonymous-daemon` compilé (pas de toolchain Rust dans le sandbox de dev)
-  - restent : MoE (Gemma4/gemma3n), N>2 nœuds (bloqué sur un crash ggml scheduler reverté), GPU, build automatisé du binaire natif (pas encore vendoré/scripté), run réel du testnet natif avec cargo, concurrence serveur
+  - **`pipeline_layer_end` (early-exit, nécessaire pour N>2 nœuds) : bug diagnostiqué et corrigé** — cause racine trouvée par instrumentation (`ggml_backend_buffer_get_type` appelé sur un tenseur `inp_out_ids` jamais alloué car construit avant que la portée early-exit ne soit connue dans `gemma3.cpp`). Fix d'une ligne (construction conditionnelle), pas de bug du scheduler ggml. Vérifié bit-exact (34658/34658) sans régression sur les tests existants. Reste à vérifier : un vrai nœud du milieu (`layer_start>0` + `layer_end<n_layer` simultanément) sur un modèle à 3+ couches (le modèle de test n'a que 2 couches) ; brancher ce fix dans `pipeline_server.cpp` (qui ne l'utilise pas encore)
+  - restent : MoE (Gemma4/gemma3n), GPU, build automatisé du binaire natif (pas encore vendoré/scripté), run réel du testnet natif avec cargo, concurrence serveur
 - Speculative decoding, KV-cache quantization, layer splitting production : pas commencé
 
 ### Palier H — mTLS QUIC strict + PeerKeyVerifier

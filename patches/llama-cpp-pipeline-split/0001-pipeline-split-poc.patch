@@ -1,16 +1,17 @@
 diff --git a/src/llama-context.cpp b/src/llama-context.cpp
-index eed041e..9fe62a8 100644
+index eed041e..0b468f1 100644
 --- a/src/llama-context.cpp
 +++ b/src/llama-context.cpp
-@@ -116,6 +116,7 @@ llama_context::llama_context(
+@@ -116,6 +116,8 @@ llama_context::llama_context(
      cparams.embeddings              = params.embeddings;
      cparams.embeddings_nextn        = false;
      cparams.embeddings_nextn_masked = false;
 +    cparams.pipeline_layer_start    = 0;
++    cparams.pipeline_layer_end      = 0;
      cparams.offload_kqv             = params.offload_kqv;
      cparams.no_perf                 = params.no_perf;
      cparams.warmup                  = false;
-@@ -1173,6 +1174,17 @@ void llama_context::set_nextn_layer_offset(int32_t offset) {
+@@ -1173,6 +1175,28 @@ void llama_context::set_nextn_layer_offset(int32_t offset) {
      cparams.nextn_layer_offset = offset;
  }
  
@@ -25,10 +26,21 @@ index eed041e..9fe62a8 100644
 +    sched_need_reserve = true;
 +}
 +
++void llama_context::set_pipeline_layer_end(int32_t end) {
++    LLAMA_LOG_DEBUG("%s: end = %d\n", __func__, end);
++
++    GGML_ASSERT(end >= 0 && (uint32_t) end <= model.hparams.n_layer());
++
++    cparams.pipeline_layer_end = end;
++
++    // graph shape/behaviour changes with this value -> force a reserve
++    sched_need_reserve = true;
++}
++
  void llama_context::set_causal_attn(bool value) {
      LLAMA_LOG_DEBUG("%s: value = %d\n", __func__, value);
  
-@@ -3724,6 +3736,10 @@ void llama_set_nextn_layer_offset(llama_context * ctx, int32_t offset) {
+@@ -3724,6 +3748,14 @@ void llama_set_nextn_layer_offset(llama_context * ctx, int32_t offset) {
      ctx->set_nextn_layer_offset(offset);
  }
  
@@ -36,26 +48,31 @@ index eed041e..9fe62a8 100644
 +    ctx->set_pipeline_layer_start(start);
 +}
 +
++void llama_set_pipeline_layer_end(llama_context * ctx, int32_t end) {
++    ctx->set_pipeline_layer_end(end);
++}
++
  llama_memory_t llama_get_memory(const struct llama_context * ctx) {
      if (!ctx) {
          return nullptr;
 diff --git a/src/llama-context.h b/src/llama-context.h
-index bf91daa..11c79ec 100644
+index bf91daa..35f0eff 100644
 --- a/src/llama-context.h
 +++ b/src/llama-context.h
-@@ -116,6 +116,7 @@ struct llama_context {
+@@ -116,6 +116,8 @@ struct llama_context {
      void set_embeddings_nextn(bool value, bool masked);
      void set_embeddings_layer_inp(uint32_t lid, bool enable);
      void set_nextn_layer_offset(int32_t offset);
 +    void set_pipeline_layer_start(int32_t start);
++    void set_pipeline_layer_end(int32_t end);
      void set_causal_attn(bool value);
      void set_warmup(bool value);
  
 diff --git a/src/llama-cparams.h b/src/llama-cparams.h
-index 5018170..8445852 100644
+index 5018170..6113bda 100644
 --- a/src/llama-cparams.h
 +++ b/src/llama-cparams.h
-@@ -20,6 +20,11 @@ struct llama_cparams {
+@@ -20,6 +20,17 @@ struct llama_cparams {
  
      int32_t  nextn_layer_offset = 0;
  
@@ -64,14 +81,20 @@ index 5018170..8445852 100644
 +    // llama_batch.embd instead of computing it from token embeddings.
 +    int32_t  pipeline_layer_start = 0;
 +
++    // EXPERIMENTAL (pipeline-split PoC): if > 0 and < n_layer, stop after building
++    // layer (pipeline_layer_end - 1) and skip norm+lm_head entirely -- the caller is
++    // expected to only want the intermediate hidden state (via embeddings_layer_inp),
++    // not logits, from this context.
++    int32_t  pipeline_layer_end = 0;
++
      float rope_freq_base;
      float rope_freq_scale;
  
 diff --git a/src/llama-ext.h b/src/llama-ext.h
-index 348bbae..6041fb3 100644
+index 348bbae..8c9df89 100644
 --- a/src/llama-ext.h
 +++ b/src/llama-ext.h
-@@ -100,6 +100,12 @@ LLAMA_API void llama_set_embeddings_nextn(struct llama_context * ctx, bool value
+@@ -100,6 +100,17 @@ LLAMA_API void llama_set_embeddings_nextn(struct llama_context * ctx, bool value
  // chain multiple trained NextN heads. Default 0 (first head).
  LLAMA_API void llama_set_nextn_layer_offset(struct llama_context * ctx, int32_t offset);
  
@@ -81,27 +104,106 @@ index 348bbae..6041fb3 100644
 +// layer_start == 0 restores normal (full-model) behavior.
 +LLAMA_API void llama_set_pipeline_layer_start(struct llama_context * ctx, int32_t layer_start);
 +
++// EXPERIMENTAL (pipeline-split PoC): if > 0, stop building the graph after layer
++// (layer_end - 1) on this context -- skips norm+lm_head. Combine with
++// embeddings_layer_inp to extract the intermediate hidden state instead.
++LLAMA_API void llama_set_pipeline_layer_end(struct llama_context * ctx, int32_t layer_end);
++
  // mirrors:
  // LLAMA_API float * llama_get_embeddings(struct llama_context * ctx);
  LLAMA_API float * llama_get_embeddings_nextn(struct llama_context * ctx);
 diff --git a/src/models/gemma3.cpp b/src/models/gemma3.cpp
-index 6901945..f010566 100644
+index 6901945..cad5960 100644
 --- a/src/models/gemma3.cpp
 +++ b/src/models/gemma3.cpp
-@@ -108,7 +108,15 @@ llama_model_gemma3::graph<iswa>::graph(const llama_model & model, const llm_grap
+@@ -106,9 +106,30 @@ llama_model_gemma3::graph<iswa>::graph(const llama_model & model, const llm_grap
+         inp_attn = build_attn_inp_kv();
+     }
  
-     ggml_tensor * inp_out_ids = build_inp_out_ids();
- 
--    for (int il = 0; il < n_layer; ++il) {
+-    ggml_tensor * inp_out_ids = build_inp_out_ids();
 +    // EXPERIMENTAL (pipeline-split PoC): start at an arbitrary layer instead of 0.
 +    // When cparams.pipeline_layer_start > 0, `inpL` at this point is expected to already
 +    // hold the injected hidden state (via build_inp_embd's ubatch.embd path above),
 +    // NOT a token embedding -- so we simply skip the earlier iterations.
-+    for (int il = cparams.pipeline_layer_start; il < n_layer; ++il) {
++    const int32_t pipeline_end = (cparams.pipeline_layer_end > 0 && (uint32_t) cparams.pipeline_layer_end <= n_layer)
++        ? cparams.pipeline_layer_end : (int32_t) n_layer;
++
++    // ROOT CAUSE of the crash this replaces (see patches/llama-cpp-pipeline-split/README.md):
++    // build_inp_out_ids() unconditionally registers an input that
++    // llm_graph_input_out_ids::set_input() will later try to write into for EVERY
++    // graph, regardless of whether the tensor ends up referenced by any op. In the
++    // early-exit path (pipeline_end < n_layer), the code below never uses inp_out_ids
++    // (that only happens at il == n_layer - 1, a point early-exit never reaches), so
++    // ggml_build_forward_expand() never gives it a producer/consumer edge and the
++    // scheduler never allocates it a buffer. set_input() then dereferences a null
++    // buffer -> GGML_ASSERT(buffer) in ggml-backend.cpp. Fix: only build this input
++    // when we will actually reach the trimming code that consumes it.
++    ggml_tensor * inp_out_ids = (pipeline_end >= (int32_t) n_layer) ? build_inp_out_ids() : nullptr;
++
++    for (int il = cparams.pipeline_layer_start; il < pipeline_end; ++il) {
 +        // expose the hidden state fed INTO this layer, so another context can later
 +        // resume computation from here via cparams.pipeline_layer_start (see above).
 +        res->t_layer_inp[il] = inpL;
-+
+ 
+-    for (int il = 0; il < n_layer; ++il) {
          float freq_base_l  = 0.0f;
          float freq_scale_l = 0.0f;
  
+@@ -199,26 +220,42 @@ llama_model_gemma3::graph<iswa>::graph(const llama_model & model, const llm_grap
+     }
+     cur = inpL;
+ 
+-    cur = build_norm(cur,
+-            model.output_norm, NULL,
+-            LLM_NORM_RMS, -1);
++    if (pipeline_end < (int32_t) n_layer) {
++        // EXPERIMENTAL (pipeline-split PoC): early exit -- this context only owns
++        // layers [pipeline_layer_start, pipeline_layer_end). Skip norm+lm_head; the
++        // caller is expected to pull the hidden state via embeddings_layer_inp
++        // (res->t_layer_inp[pipeline_end] was captured at the top of the loop body
++        // for il == pipeline_end, i.e. the iteration we did NOT execute -- so instead
++        // we expose `cur` (== inpL after the last executed layer) directly here).
++        // Populate t_layer_inp[pipeline_end] as if the (skipped) iteration il ==
++        // pipeline_end had run its capture line -- embeddings_layer_inp(pipeline_end)
++        // extraction relies on this slot being non-null.
++        res->t_layer_inp[pipeline_end] = cur;
++        res->t_embd = cur;
++        cb(cur, "result_embd_pipeline_early_exit", -1);
++        ggml_build_forward_expand(gf, cur);
++    } else {
++        cur = build_norm(cur,
++                model.output_norm, NULL,
++                LLM_NORM_RMS, -1);
+ 
+-    cb(cur, "result_norm", -1);
+-    res->t_embd = cur;
++        cb(cur, "result_norm", -1);
++        res->t_embd = cur;
+ 
+-    // lm_head
+-    cur = build_lora_mm(model.output, cur, model.output_s);
++        // lm_head
++        cur = build_lora_mm(model.output, cur, model.output_s);
+ 
+-    if (hparams.f_final_logit_softcapping) {
+-        cur = ggml_scale(ctx0, cur, 1.0f / hparams.f_final_logit_softcapping);
+-        cur = ggml_tanh(ctx0, cur);
+-        cur = ggml_scale(ctx0, cur, hparams.f_final_logit_softcapping);
+-    }
++        if (hparams.f_final_logit_softcapping) {
++            cur = ggml_scale(ctx0, cur, 1.0f / hparams.f_final_logit_softcapping);
++            cur = ggml_tanh(ctx0, cur);
++            cur = ggml_scale(ctx0, cur, hparams.f_final_logit_softcapping);
++        }
+ 
+-    cb(cur, "result_output", -1);
+-    res->t_logits = cur;
++        cb(cur, "result_output", -1);
++        res->t_logits = cur;
+ 
+-    ggml_build_forward_expand(gf, cur);
++        ggml_build_forward_expand(gf, cur);
++    }
+ }
+ 
+ template struct llama_model_gemma3::graph<false>;
