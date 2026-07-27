@@ -1,4 +1,4 @@
-.PHONY: all build build-rust build-happ install clean dev test testnet-2
+.PHONY: all build build-rust build-happ install clean dev test testnet-2 build-native-pipeline-server
 
 # ─── Variables ────────────────────────────────────────────────────────────────
 CARGO        := cargo
@@ -50,12 +50,24 @@ testnet-2:
 
 ## testnet-2-native: idem, mais avec le pipeline_server natif llama.cpp (patch
 ##            Gemma3 Dense, voir patches/llama-cpp-pipeline-split/) au lieu de
-##            pipeline_server.py. Binaire et modèle .gguf à builder/fournir soi-même.
+##            pipeline_server.py. Binaire et modèle .gguf à builder/fournir soi-même
+##            (voir la cible build-native-pipeline-server pour construire le binaire).
 ##            Variables : TOTAL_LAYERS, NATIVE_BIN, NATIVE_MODEL_GGUF (obligatoires), SPLIT
 ##            Ex : make testnet-2-native TOTAL_LAYERS=2 NATIVE_BIN=/tmp/pipeline_server NATIVE_MODEL_GGUF=/tmp/models/gemma3-tiny.gguf
 testnet-2-native:
 	$(CARGO) build
 	@BIN=$(CURDIR)/target/debug BACKEND=native bash scripts/testnet/run_testnet_2.sh
+
+## build-native-pipeline-server: clone/patch/compile le binaire pipeline_server natif
+##            llama.cpp (Gemma3 Dense, pipeline-split -- voir patches/llama-cpp-pipeline-split/).
+##            Idempotent : peut être relancé sans tout refaire (skip clone/patch/build déjà faits).
+##            Variables : WORKDIR (défaut /tmp/llama.cpp), OUT_BIN (défaut $WORKDIR/pipeline_server),
+##            JOBS (défaut nproc), FORCE_CLEAN=1 pour repartir de zéro.
+##            Prérequis : git, cmake, g++ (C++17), sur le PATH.
+##            Ex : make build-native-pipeline-server
+##                 make build-native-pipeline-server WORKDIR=/opt/llama-native OUT_BIN=/opt/bin/pipeline_server
+build-native-pipeline-server:
+	@bash patches/llama-cpp-pipeline-split/build_native.sh
 
 ## clippy: linter Rust
 clippy:

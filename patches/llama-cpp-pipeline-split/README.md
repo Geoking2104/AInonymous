@@ -2,10 +2,11 @@
 
 Statut : **mécanisme prouvé, réel et compilé** — single forward pass, multi-step, serveur HTTP réel entre 2
 process, branché dans le testnet du daemon, l'early-exit `pipeline_layer_end` (nécessaire pour des chaînes à
-N > 2 nœuds) débogué et branché dans `pipeline_server.cpp` (économie de calcul confirmée), **et un vrai nœud
-du milieu (`pipeline_layer_start>0` ET `pipeline_layer_end<n_layer` simultanément) désormais testé et
-vérifié bit-exact sur une vraie chaîne à 3 nœuds**. Pas une simulation, pas un plan. Portée volontairement
-réduite (voir "Ce qui n'est PAS fait" plus bas).
+N > 2 nœuds) débogué et branché dans `pipeline_server.cpp` (économie de calcul confirmée), un vrai nœud du
+milieu (`pipeline_layer_start>0` ET `pipeline_layer_end<n_layer` simultanément) testé et vérifié bit-exact sur
+une vraie chaîne à 3 nœuds, **et le build du binaire natif désormais automatisé et idempotent**
+(`build_native.sh` / `make build-native-pipeline-server`). Pas une simulation, pas un plan. Portée
+volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
 
 ## Contexte
 
@@ -18,6 +19,18 @@ infrastructure générique pour l'extraction d'états cachés intermédiaires (`
 
 Conséquence : le patch réellement nécessaire est **beaucoup plus petit** que prévu — 110 lignes nettes sur 5
 fichiers (voir `0001-pipeline-split-poc.patch`), pas des semaines de travail C++.
+
+## Démarrage rapide
+
+```bash
+make build-native-pipeline-server
+# ou directement :
+bash patches/llama-cpp-pipeline-split/build_native.sh
+```
+
+Ça clone llama.cpp, applique le patch, compile tout, et produit `/tmp/llama.cpp/pipeline_server` prêt à
+l'emploi. Voir section 8 ci-dessous pour le détail, ou "Comment reproduire" pour la version manuelle pas à
+pas (utile pour comprendre ou déboguer chaque étape).
 
 ## Ce qui a été fait et vérifié
 
@@ -254,10 +267,48 @@ en arrière-plan avec `pkill -f pipeline_server` en tête de script tue le scrip
 littéralement la chaîne "pipeline_server" dans son propre texte. Fix : capturer les PID via `$!` et ne jamais
 utiliser `pkill -f` avec un motif qui apparaît dans le script appelant.
 
+### 8. Build automatisé du binaire natif — `build_native.sh`
+
+Jusqu'ici, obtenir `pipeline_server` nécessitait de rejouer à la main toute la séquence clone + checkout +
+patch + cmake + g++ (section "Comment reproduire" ci-dessous), à refaire manuellement à chaque nouvel
+environnement. `build_native.sh` automatise ça en un seul script **idempotent** :
+
+1. Clone `ggml-org/llama.cpp` avec `--filter=blob:none` (clone "partiel" : ne télécharge le contenu des
+   fichiers qu'à la demande lors du checkout — beaucoup plus rapide qu'un clone complet puisqu'on n'a besoin
+   que d'un seul commit, pas de tout l'historique ; reste un dépôt git normal, pas de bricolage).
+2. Checkout du commit pin (`42fc243...`) -- sauté si déjà au bon commit.
+3. Applique `0001-pipeline-split-poc.patch` -- sauté si déjà appliqué (détection via `grep` d'une marque du
+   patch dans `src/llama-cparams.h`, pour ne pas planter sur un re-run).
+4. Vérifie que les dépendances vendorées (`vendor/cpp-httplib`, `vendor/nlohmann`) sont présentes -- erreur
+   claire sinon plutôt qu'un plantage cryptique au link.
+5. Configure cmake (statique, cibles inutiles désactivées) -- sauté si déjà configuré à l'identique.
+6. `cmake --build` (incrémental -- ne recompile que ce qui a changé).
+7. Compile `pipeline_server.cpp` -> binaire final (toujours refait, compilation rapide).
+
+Variables : `WORKDIR` (défaut `/tmp/llama.cpp`), `OUT_BIN` (défaut `$WORKDIR/pipeline_server`), `JOBS`
+(défaut `nproc`), `FORCE_CLEAN=1` pour repartir de zéro.
+
+**Vérifié dans cette session, à froid, sur un répertoire neuf** (`/tmp/llama-autobuild-test`, jamais touché
+auparavant) : clone partiel en 13s, checkout du commit pin en 4s, patch appliqué sans erreur, build cmake
+complet (chunké en plusieurs passes du fait des limites de l'environnement de test, mais géré nativement par
+la reprise incrémentale de `cmake --build` -- aucune intervention manuelle nécessaire au-delà de relancer le
+script), binaire compilé, et **testé** : `--layer-start 0 --is-last-node` sur `gemma3-tiny.gguf` donne
+`next_token_id=34658 " Não"` -- identique bit pour bit à tous les builds manuels précédents. Un second
+lancement du script sur ce même répertoire confirme l'idempotence : clone/checkout/patch tous détectés comme
+déjà faits et sautés, cmake ne refait qu'une vérification de dépendances (aucune recompilation), seul
+`pipeline_server.cpp` est recompilé (~1s).
+
+**Prérequis** : `git`, `cmake`, `g++` (C++17) sur le `PATH`. Pas de dépendance Python/torch pour cette étape
+(seul `build_3layer_test_gguf.py`, optionnel, section 7, a besoin du package `gguf`).
+
 ## Comment reproduire
 
+**Recommandé : `make build-native-pipeline-server` (voir section 8) pour le binaire seul.** Ce qui suit est
+la version manuelle, étape par étape, utile pour comprendre ou déboguer chaque brique individuellement (tests
+in-process, modèle à 3 couches, testnet complet).
+
 ```bash
-# 1. Cloner llama.cpp au commit testé
+# 1. Cloner llama.cpp au commit testé (ou laisser build_native.sh le faire pour vous)
 git clone https://github.com/ggml-org/llama.cpp.git
 cd llama.cpp && git checkout 42fc243060709331ff9b158a9ed2cbe37219ae83
 
@@ -298,6 +349,7 @@ g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test3_earlyexit.cp
 
 # 7. Serveur HTTP réel (2 nœuds) -- nécessite httplib.h/.cpp + json.hpp vendorés
 # (déjà présents dans vendor/cpp-httplib et vendor/nlohmann de ce fork llama.cpp)
+# -- ou juste `make build-native-pipeline-server` (section 8), qui fait exactement ça.
 g++ -std=c++17 -O2 -pthread \
   -I include -I ggml/include -I src -I vendor/cpp-httplib -I vendor/nlohmann \
   pipeline_server.cpp vendor/cpp-httplib/httplib.cpp \
@@ -330,11 +382,13 @@ make testnet-2-native TOTAL_LAYERS=2 \
   sliding window par couche) — bien plus complexe qu'un décodeur dense classique. À traiter séparément.
 - **GPU (CUDA/Metal)** : patch et tests faits en CPU-only (pas de matériel GPU dans l'environnement de build).
   Le mécanisme (champs cparams + `llama_batch.embd`) est indépendant du backend, mais n'a pas été testé sur GPU.
+  `build_native.sh` compile aussi en CPU-only (pas de flags GGML_CUDA/GGML_METAL) -- à adapter si besoin.
 - **Concurrence en production** : le serveur HTTP ne gère qu'une seule séquence à la fois (pas de slots de
   requêtes concurrentes, pas de file d'attente). Suffisant pour un testnet, pas pour de la charge réelle.
-- **Build automatisé du binaire natif** : le fork llama.cpp patché n'est pas vendoré dans ce repo ni construit
-  par `cargo build`/le Makefile — `NATIVE_BIN` doit être compilé et fourni à la main (voir "Comment reproduire").
-  Automatiser ça (script de build, ou vendoring du fork) reste à faire.
+- **Le build natif n'est pas intégré à `cargo build`** : `build_native.sh` est un script séparé (make
+  `build-native-pipeline-server`), pas une dépendance de build Rust -- il faut l'exécuter explicitement avant
+  d'utiliser `BACKEND=native`. Le vendoring du fork llama.cpp dans le repo (pour éviter le clone réseau à
+  chaque fois) n'a pas été fait non plus.
 - **Run réel du testnet natif avec `cargo build`** : le branchement `BACKEND=native` dans
   `run_testnet_2.sh`/`Makefile` a été écrit et sa logique (choix du process à lancer) validée manuellement,
   mais pas exécutée de bout en bout avec un vrai `ainonymous-daemon` compilé (pas de toolchain Rust dans le
@@ -350,8 +404,9 @@ make testnet-2-native TOTAL_LAYERS=2 \
 ## Prochaine étape logique
 
 1. Lancer `make testnet-2-native` (ou une variante `testnet-3-native`) sur une machine avec `cargo build` +
-   le binaire natif compilé, pour vérifier l'intégration testnet de bout en bout (pas seulement le mécanisme
-   HTTP isolé) — y compris avec un vrai nœud du milieu maintenant que le mécanisme est vérifié.
-2. Automatiser le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin
-   d'être compilé à la main.
-3. Tester une chaîne à 4+ nœuds (2+ nœuds du milieu successifs) pour généraliser au-delà de N=3.
+   le binaire natif compilé (`make build-native-pipeline-server`), pour vérifier l'intégration testnet de
+   bout en bout (pas seulement le mécanisme HTTP isolé) — y compris avec un vrai nœud du milieu maintenant
+   que le mécanisme est vérifié.
+2. Tester une chaîne à 4+ nœuds (2+ nœuds du milieu successifs) pour généraliser au-delà de N=3.
+3. Éventuellement : vendorer le fork llama.cpp patché dans le repo (ou le committer comme submodule) pour
+   éviter le clone réseau à chaque `make build-native-pipeline-server` sur un poste neuf.
