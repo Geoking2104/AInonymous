@@ -2,7 +2,8 @@
 
 Statut : **mécanisme prouvé, réel et compilé** — single forward pass, multi-step, serveur HTTP réel entre 2
 process, branché dans le testnet du daemon, **et l'early-exit `pipeline_layer_end` (nécessaire pour des
-chaînes à N > 2 nœuds) qui plantait a été débogué et corrigé**. Pas une simulation, pas un plan. Portée
+chaînes à N > 2 nœuds) qui plantait a été débogué, corrigé, et branché dans `pipeline_server.cpp`** (économie
+de calcul confirmée : le graphe de node0 passe de 87 à 42 nœuds ggml). Pas une simulation, pas un plan. Portée
 volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
 
 ## Contexte
@@ -64,7 +65,7 @@ l'ancien doc n'est donc pas nécessaire pour un pipeline-split séquentiel class
 
 Dans cette passe, node0 calculait le modèle complet à chaque étape au lieu de s'arrêter à la couche de
 coupure (une tentative d'early-exit avait planté et avait été revertée — voir section 5, le bug est
-maintenant corrigé).
+maintenant corrigé et branché dans le serveur HTTP, section 6).
 
 ### 3. Serveur HTTP réel, 2 process séparés — `pipeline_server.cpp`
 
@@ -73,7 +74,7 @@ Objectif : sortir du test in-process C++ et vérifier que le mécanisme fonction
 existant dans `ainonymous-daemon`), pour que ce binaire puisse servir de backend alternatif à
 `pipeline_server.py`.
 
-- Serveur autonome (~340 lignes), linké directement à `libllama.a` (pas `tools/server/`, trop lourd et hors
+- Serveur autonome (~360 lignes), linké directement à `libllama.a` (pas `tools/server/`, trop lourd et hors
   scope pour ce PoC).
 - Dépendances vendorées : `httplib.h` + `httplib.cpp` (cpp-httplib, fork qui sépare déclaration/implémentation
   — inhabituel pour un header-only classique) + `json.hpp` (nlohmann).
@@ -138,7 +139,7 @@ couche 0 nous intéressait — gaspillage de calcul. Une tentative précédente 
 programme avec `GGML_ASSERT(buffer) failed` dans `ggml-backend.cpp`, et avait été revertée sans être
 diagnostiquée à fond.
 
-**Démarche de debug (cette session)** :
+**Démarche de debug** :
 1. Réimplémentation de `pipeline_layer_end` (nouveau champ `cparams`, setter `set_pipeline_layer_end()` avec
    `sched_need_reserve = true` — même patron que `pipeline_layer_start`), et modification de
    `src/models/gemma3.cpp` pour que la boucle de couches s'arrête à `pipeline_layer_end` au lieu de `n_layer`,
@@ -188,6 +189,25 @@ place pour un vrai nœud du milieu. La correction est structurellement indépend
 ça se comporte différemment, mais ça reste à vérifier avec un modèle à 3 couches ou plus avant de déclarer les
 chaînes N>2 "prêtes".
 
+### 6. `pipeline_layer_end` branché dans `pipeline_server.cpp` — économie de calcul confirmée
+
+Le serveur HTTP (section 3/4) avait été testé et livré *avant* le fix `pipeline_layer_end` (section 5) : il
+acceptait le flag `--layer-end` mais ne l'utilisait que pour l'extraction (`embeddings_layer_inp`), sans
+jamais appeler `llama_set_pipeline_layer_end()` — node0 recalculait donc le modèle complet (couches + norm +
+lm_head) à chaque étape, pour ne garder que l'état intermédiaire de la couche 0.
+
+Changement : dans `main()`, la branche `if (!S.cfg.is_last_node)` appelle maintenant aussi
+`llama_set_pipeline_layer_end(S.ctx, S.cfg.split)`, en plus de `llama_set_embeddings_layer_inp(...)` déjà
+présent.
+
+**Vérifié** : recompilation + relance des 2 process HTTP (node0 : `--layer-start 0 --layer-end 1
+--is-first-node` ; node1 : `--layer-start 1 --is-last-node`), même prompt, même résultat bit-exact
+(`step1`/`step2` → token `34658` sur les deux, identique à avant le changement). **Et** les logs de reserve
+confirment l'économie de calcul réelle : le graphe ggml de node0 passe de **87 nœuds** (reserve initiale,
+modèle complet) à **42 nœuds** après que `set_pipeline_layer_end` force un nouveau reserve — soit à peu près
+la moitié du calcul, cohérent avec le fait que node0 ne possède qu'1 couche sur 2 dans ce modèle de test.
+node1 (dernier nœud, non affecté par ce changement) reste à 47 nœuds comme avant.
+
 ## Comment reproduire
 
 ```bash
@@ -199,7 +219,7 @@ cd llama.cpp && git checkout 42fc243060709331ff9b158a9ed2cbe37219ae83
 git apply /chemin/vers/0001-pipeline-split-poc.patch
 
 # 3. Configurer et compiler (CPU-only ; adapter les flags GGML_CUDA/GGML_METAL si GPU dispo)
-cmake -B build -DLLAMA_BUILD_COMMON=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=OFF \
+cmake -B build -DBUILD_SHARED_LIBS=OFF -DLLAMA_BUILD_COMMON=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=OFF \
   -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_APP=OFF -DLLAMA_BUILD_MTMD=OFF
 cmake --build build -j$(nproc)
 
@@ -227,14 +247,14 @@ g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test3_earlyexit.cp
 ./pipeline_test3
 
 # 7. Serveur HTTP réel (2 nœuds) -- nécessite httplib.h/.cpp + json.hpp vendorés
-# (voir ggml-org/llama.cpp vendor/cpp-httplib/ et vendor/nlohmann/ pour les récupérer)
+# (déjà présents dans vendor/cpp-httplib et vendor/nlohmann de ce fork llama.cpp)
 g++ -std=c++17 -O2 -pthread \
   -I include -I ggml/include -I src -I vendor/cpp-httplib -I vendor/nlohmann \
   pipeline_server.cpp vendor/cpp-httplib/httplib.cpp \
   build/src/libllama.a build/ggml/src/libggml.a build/ggml/src/libggml-cpu.a build/ggml/src/libggml-base.a \
   -fopenmp -lpthread -ldl -lm -o pipeline_server
 
-# terminal 1 (node0, first node, tape la couche 1) -- CLI calqué sur pipeline_server.py
+# terminal 1 (node0, first node, tape la couche 1, s'arrête après -- fix pipeline_layer_end branché)
 ./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 0 --layer-end 1 --is-first-node --port 9340
 # terminal 2 (node1, last node, reprend à la couche 1)
 ./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 1 --is-last-node --port 9341
@@ -259,10 +279,6 @@ make testnet-2-native TOTAL_LAYERS=2 \
   Le mécanisme (champs cparams + `llama_batch.embd`) est indépendant du backend, mais n'a pas été testé sur GPU.
 - **Concurrence en production** : le serveur HTTP ne gère qu'une seule séquence à la fois (pas de slots de
   requêtes concurrentes, pas de file d'attente). Suffisant pour un testnet, pas pour de la charge réelle.
-- **`pipeline_server.cpp` ne profite pas encore du fix** : le serveur HTTP (section 3/4) a été testé et livré
-  *avant* la correction `pipeline_layer_end` de cette session — il ne l'utilise pas encore, node0 continue d'y
-  recalculer le modèle complet à chaque étape. Brancher `--layer-end`/le nouveau early-exit dans
-  `pipeline_server.cpp` pour de vrai (au lieu de simplement accepter le flag) reste à faire.
 - **Build automatisé du binaire natif** : le fork llama.cpp patché n'est pas vendoré dans ce repo ni construit
   par `cargo build`/le Makefile — `NATIVE_BIN` doit être compilé et fourni à la main (voir "Comment reproduire").
   Automatiser ça (script de build, ou vendoring du fork) reste à faire.
@@ -276,11 +292,9 @@ make testnet-2-native TOTAL_LAYERS=2 \
 
 ## Prochaine étape logique
 
-1. Brancher le fix `pipeline_layer_end` dans `pipeline_server.cpp` (actuellement il accepte le flag CLI mais
-   ne l'utilise pas pour économiser du calcul — node0 continue de tourner le modèle complet).
-2. Tester un vrai nœud intermédiaire (`pipeline_layer_start>0` + `pipeline_layer_end<n_layer` simultanément)
+1. Tester un vrai nœud intermédiaire (`pipeline_layer_start>0` + `pipeline_layer_end<n_layer` simultanément)
    avec un modèle à 3+ couches, pour valider une chaîne N=3 de bout en bout.
-3. Lancer `make testnet-2-native` sur une machine avec `cargo build` + le binaire natif compilé, pour vérifier
+2. Lancer `make testnet-2-native` sur une machine avec `cargo build` + le binaire natif compilé, pour vérifier
    l'intégration testnet de bout en bout (pas seulement le mécanisme HTTP isolé).
-4. Automatiser le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin
+3. Automatiser le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin
    d'être compilé à la main.

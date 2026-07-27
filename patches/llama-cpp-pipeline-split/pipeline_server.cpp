@@ -5,9 +5,11 @@
 //
 // Scope (see patches/llama-cpp-pipeline-split/README.md for full limitations):
 //   - Gemma3 Dense only (this session's patch target)
-//   - Exactly 2 nodes: a "first" node (--layer-start 0) and a "last" node
-//     (--layer-start N, runs to real completion / real logits). No N>2 chains --
-//     that needs the (currently reverted, crashing) pipeline_layer_end early-exit.
+//   - Exactly 2 nodes verified so far: a "first" node (--layer-start 0) and a
+//     "last" node (--layer-start N, runs to real completion / real logits).
+//     A real middle node (layer_start>0 AND layer_end<n_layer) is supported by
+//     this same code path but has only been tested on a 2-layer model (no room
+//     for a real middle node there) -- see README section 5.
 //   - Single in-flight sequence per server process (no concurrent request slots).
 //   - Greedy decoding only (argmax), no sampling parameters.
 //   - Hidden states serialized as F32 base64 (NOT F16 like scripts/pipeline_server.py --
@@ -262,6 +264,11 @@ int main(int argc, char ** argv) {
     if (!S.cfg.is_last_node) {
         // tap the hidden state feeding the NEXT layer after our cut point
         llama_set_embeddings_layer_inp(S.ctx, S.cfg.split, true);
+        // EARLY-EXIT (fixed this session, see README section 5): stop building the
+        // graph after our last owned layer instead of recomputing the full model
+        // every step. Without this, node0/middle nodes were numerically correct
+        // but wasted CPU recomputing norm+lm_head+later layers they don't own.
+        llama_set_pipeline_layer_end(S.ctx, S.cfg.split);
     }
 
     httplib::Server svr;
