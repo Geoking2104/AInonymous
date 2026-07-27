@@ -1,10 +1,11 @@
 # Pipeline-split patch for llama.cpp — Gemma3 Dense (Preuve de concept vérifiée)
 
 Statut : **mécanisme prouvé, réel et compilé** — single forward pass, multi-step, serveur HTTP réel entre 2
-process, branché dans le testnet du daemon, **et l'early-exit `pipeline_layer_end` (nécessaire pour des
-chaînes à N > 2 nœuds) qui plantait a été débogué, corrigé, et branché dans `pipeline_server.cpp`** (économie
-de calcul confirmée : le graphe de node0 passe de 87 à 42 nœuds ggml). Pas une simulation, pas un plan. Portée
-volontairement réduite (voir "Ce qui n'est PAS fait" plus bas).
+process, branché dans le testnet du daemon, l'early-exit `pipeline_layer_end` (nécessaire pour des chaînes à
+N > 2 nœuds) débogué et branché dans `pipeline_server.cpp` (économie de calcul confirmée), **et un vrai nœud
+du milieu (`pipeline_layer_start>0` ET `pipeline_layer_end<n_layer` simultanément) désormais testé et
+vérifié bit-exact sur une vraie chaîne à 3 nœuds**. Pas une simulation, pas un plan. Portée volontairement
+réduite (voir "Ce qui n'est PAS fait" plus bas).
 
 ## Contexte
 
@@ -180,14 +181,10 @@ et `pipeline_test2.cpp` (non modifiés) ont été réexécutés après le fix et
 = 0) — le changement structurel dans `gemma3.cpp` (réordonnancement de `build_inp_out_ids()`) n'affecte pas le
 chemin "normal" (`pipeline_layer_end = 0`, comportement par défaut).
 
-**Ce qui reste non vérifié** : le fix a été testé avec un node early-exit qui est aussi le **premier** nœud
-(`pipeline_layer_start=0` + `pipeline_layer_end<n_layer`). Un vrai **nœud intermédiaire** (`pipeline_layer_start>0`
-**et** `pipeline_layer_end<n_layer` simultanément, cas nécessaire pour des chaînes à N>2 nœuds) n'a pas été
-testé avec un modèle réel à 3+ couches — le modèle de test (`gemma3-tiny`) n'a que 2 couches, donc pas de
-place pour un vrai nœud du milieu. La correction est structurellement indépendante de `pipeline_layer_start`
-(la condition du fix ne dépend que de `pipeline_end` vs `n_layer`), donc il n'y a pas de raison théorique que
-ça se comporte différemment, mais ça reste à vérifier avec un modèle à 3 couches ou plus avant de déclarer les
-chaînes N>2 "prêtes".
+**Ce qui restait non vérifié à l'époque (résolu section 7 ci-dessous)** : le fix avait été testé avec un node
+early-exit qui est aussi le **premier** nœud (`pipeline_layer_start=0` + `pipeline_layer_end<n_layer`). Un vrai
+**nœud intermédiaire** (`pipeline_layer_start>0` **et** `pipeline_layer_end<n_layer` simultanément, cas
+nécessaire pour des chaînes à N>2 nœuds) n'avait pas été testé avec un modèle réel à 3+ couches.
 
 ### 6. `pipeline_layer_end` branché dans `pipeline_server.cpp` — économie de calcul confirmée
 
@@ -208,6 +205,55 @@ modèle complet) à **42 nœuds** après que `set_pipeline_layer_end` force un n
 la moitié du calcul, cohérent avec le fait que node0 ne possède qu'1 couche sur 2 dans ce modèle de test.
 node1 (dernier nœud, non affecté par ce changement) reste à 47 nœuds comme avant.
 
+### 7. Vrai nœud du milieu (N=3, `layer_start>0` ET `layer_end<n_layer` simultanément) — vérifié
+
+Dernière limite explicitement non testée (sections 5/6) : tout ce qui précède n'avait été vérifié qu'avec un
+nœud early-exit qui est aussi le **premier** nœud (`pipeline_layer_start=0`). Un vrai nœud du **milieu** — ni
+premier ni dernier, qui reçoit un état caché injecté (comme un nœud non-first) **et** s'arrête avant la fin
+(comme un nœud non-last) — n'avait jamais été exercé faute d'un modèle de test à 3+ couches (le seul modèle
+disponible, `gemma3-tiny.gguf`, n'a que 2 couches).
+
+**Modèle de test à 3 couches** (`build_3layer_test_gguf.py`) : plutôt que d'installer `torch`/`transformers`
+(lourd, inutile pour un test de plomberie sur poids aléatoires), le script construit le GGUF directement avec
+le package `gguf` (pur Python + numpy, aucune dépendance ML) : il copie tous les tenseurs et métadonnées de
+`gemma3-tiny.gguf` **tels quels** (y compris les tenseurs déjà quantifiés Q8_0, copiés octet pour octet sans
+déquantification — piège rencontré : `raw_shape` doit être la "byte shape" du tenseur brut, pas sa forme
+logique ne, sinon `gguf-py` échoue en tentant de reconvertir une forme déjà convertie), passe `block_count` de
+2 à 3, et duplique les tenseurs de la couche 1 pour créer une couche 2. Les poids sont aléatoires de toute
+façon — seule la forme/le dtype comptent pour vérifier que le mécanisme fonctionne.
+
+**Test** : 4 process serveur HTTP lancés simultanément sur le modèle à 3 couches —
+- `baseline` (port 9500) : `--layer-start 0 --is-last-node` (calcule les 3 couches normalement, sert de référence)
+- `node0` (port 9501) : `--layer-start 0 --layer-end 1 --is-first-node` (possède la couche 0)
+- `node1` (port 9502) : `--layer-start 1 --layer-end 2` (**ni `--is-first-node` ni `--is-last-node` — le vrai
+  nœud du milieu recherché**, possède la couche 1 seule)
+- `node2` (port 9503) : `--layer-start 2 --is-last-node` (possède la couche 2, calcule les logits)
+
+Même prompt fixe envoyé au `baseline` (prefill + decode) et à la chaîne `node0 → node1 → node2` (prefill puis
+decode, relayant les états cachés en base64 à travers les 3 process réels) :
+
+| | baseline (1 contexte, 3 couches) | chaîne (node0→node1→node2) | match |
+|---|---|---|---|
+| step1 (prefill) | token 34658 | token 34658 | **YES** |
+| step2 (decode) | token 34658 | token 34658 | **YES** |
+
+**Bit-exact.** Et les logs de `sched_reserve` confirment que le nœud du milieu bénéficie bien du même
+mécanisme d'économie de calcul que les autres : `node1` (le vrai milieu) passe de 127 nœuds (réserve initiale
+plein modèle à 3 couches) à **42 nœuds** après `set_pipeline_layer_start` + `set_pipeline_layer_end` —
+identique à `node0` (42 nœuds). `node2` (dernier nœud, calcule jusqu'à la fin) reserve à 47 nœuds.
+
+**Conclusion** : le fix `pipeline_layer_end` (section 5) et son branchement dans `pipeline_server.cpp`
+(section 6) sont bien **indépendants de la valeur de `pipeline_layer_start`**, comme argumenté
+structurellement à l'époque — c'est maintenant vérifié empiriquement, pas juste déduit. Les chaînes N>2
+nœuds avec un vrai nœud intermédiaire sont donc débloquées de bout en bout au niveau du mécanisme llama.cpp +
+serveur HTTP (reste hors scope : le run réel avec `ainonymous-daemon`/cargo, voir "Ce qui n'est PAS fait").
+
+**Piège opérationnel rencontré (sandbox uniquement, sans rapport avec le patch)** : lancer 4 process serveur
+en arrière-plan avec `pkill -f pipeline_server` en tête de script tue le script lui-même, car sous `bwrap
+--unshare-pid`, `pkill -f` matche aussi le propre `argv` du process `bash -c "<script>"` qui contient
+littéralement la chaîne "pipeline_server" dans son propre texte. Fix : capturer les PID via `$!` et ne jamais
+utiliser `pkill -f` avec un motif qui apparaît dans le script appelant.
+
 ## Comment reproduire
 
 ```bash
@@ -223,10 +269,14 @@ cmake -B build -DBUILD_SHARED_LIBS=OFF -DLLAMA_BUILD_COMMON=OFF -DLLAMA_BUILD_TE
   -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_APP=OFF -DLLAMA_BUILD_MTMD=OFF
 cmake --build build -j$(nproc)
 
-# 4. Télécharger le modèle de test
+# 4. Télécharger le modèle de test (2 couches)
 mkdir -p /tmp/models
 curl -L -o /tmp/models/gemma3-tiny.gguf \
   "https://huggingface.co/zelk12/gemma-3-tiny-random-Q6_K-GGUF/resolve/main/gemma-3-tiny-random-q6_k.gguf"
+
+# 4b. (Optionnel, pour tester un vrai nœud du milieu / N=3) générer une variante à 3 couches
+pip install gguf --break-system-packages
+python3 build_3layer_test_gguf.py   # lit gemma3-tiny.gguf, écrit gemma3-tiny-3l.gguf
 
 # 5. Test de parité single-step
 g++ -std=c++17 -O2 -I include -I ggml/include -I src pipeline_test.cpp \
@@ -260,6 +310,13 @@ g++ -std=c++17 -O2 -pthread \
 ./pipeline_server --model /tmp/models/gemma3-tiny.gguf --layer-start 1 --is-last-node --port 9341
 # puis POST /prefill sur node0 -> hidden_states_b64 -> POST /prefill sur node1 -> next_token_id
 
+# 7b. (Optionnel) chaîne à 3 nœuds avec un vrai nœud du milieu, sur le modèle à 3 couches (voir 4b)
+./pipeline_server --model /tmp/models/gemma3-tiny-3l.gguf --layer-start 0 --layer-end 1 --is-first-node --port 9501
+./pipeline_server --model /tmp/models/gemma3-tiny-3l.gguf --layer-start 1 --layer-end 2 --port 9502              # <- vrai milieu
+./pipeline_server --model /tmp/models/gemma3-tiny-3l.gguf --layer-start 2 --is-last-node --port 9503
+# relayer hidden_states_b64 : node0 -> node1 -> node2, comparer au résultat d'un node --is-last-node seul
+# calculant les 3 couches (voir section 7 pour le script Python de test complet)
+
 # 8. Testnet complet avec le daemon Rust (depuis la racine du repo AInonymous)
 make testnet-2-native TOTAL_LAYERS=2 \
   NATIVE_BIN=/chemin/vers/pipeline_server \
@@ -271,10 +328,6 @@ make testnet-2-native TOTAL_LAYERS=2 \
 - **MoE (Gemma4/gemma3n)** : hors scope de cette passe. L'architecture "Gemma4" réelle dans llama.cpp actuel
   (`src/models/gemma4.cpp`) implémente en fait le style Gemma 3n (embeddings par couche + KV partagée +
   sliding window par couche) — bien plus complexe qu'un décodeur dense classique. À traiter séparément.
-- **N > 2 nœuds avec un vrai nœud du milieu, non vérifié sur un modèle réel** : le fix `pipeline_layer_end`
-  (section 5) débloque *mécaniquement* le cas `pipeline_layer_start > 0` combiné à `pipeline_layer_end < n_layer`
-  (nécessaire pour un nœud intermédiaire), mais ça n'a pu être testé qu'avec `pipeline_layer_start = 0` faute
-  d'un modèle de test à 3+ couches dans cet environnement. À vérifier avant de déclarer les chaînes N>2 prêtes.
 - **GPU (CUDA/Metal)** : patch et tests faits en CPU-only (pas de matériel GPU dans l'environnement de build).
   Le mécanisme (champs cparams + `llama_batch.embd`) est indépendant du backend, mais n'a pas été testé sur GPU.
 - **Concurrence en production** : le serveur HTTP ne gère qu'une seule séquence à la fois (pas de slots de
@@ -289,12 +342,16 @@ make testnet-2-native TOTAL_LAYERS=2 \
 - **Format de sérialisation incompatible avec le backend Python** : `pipeline_server.py` sérialise les hidden
   states en **float16**, `pipeline_server.cpp` en **float32**. Ne pas mélanger un nœud natif et un nœud Python
   dans la même chaîne — les deux process d'un même testnet doivent être du même backend.
+- **N > 3 nœuds jamais essayé** : le mécanisme pour un vrai nœud du milieu est maintenant vérifié (section 7),
+  mais seulement avec exactement 3 nœuds (1 first + 1 middle + 1 last). Une chaîne à 4+ nœuds (2+ middles
+  successifs) n'a pas été testée — devrait fonctionner par construction (chaque nœud est indépendant), mais
+  reste à vérifier empiriquement avant de l'affirmer.
 
 ## Prochaine étape logique
 
-1. Tester un vrai nœud intermédiaire (`pipeline_layer_start>0` + `pipeline_layer_end<n_layer` simultanément)
-   avec un modèle à 3+ couches, pour valider une chaîne N=3 de bout en bout.
-2. Lancer `make testnet-2-native` sur une machine avec `cargo build` + le binaire natif compilé, pour vérifier
-   l'intégration testnet de bout en bout (pas seulement le mécanisme HTTP isolé).
-3. Automatiser le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin
+1. Lancer `make testnet-2-native` (ou une variante `testnet-3-native`) sur une machine avec `cargo build` +
+   le binaire natif compilé, pour vérifier l'intégration testnet de bout en bout (pas seulement le mécanisme
+   HTTP isolé) — y compris avec un vrai nœud du milieu maintenant que le mécanisme est vérifié.
+2. Automatiser le build du fork llama.cpp patché (script ou vendoring) pour que `NATIVE_BIN` n'ait plus besoin
    d'être compilé à la main.
+3. Tester une chaîne à 4+ nœuds (2+ nœuds du milieu successifs) pour généraliser au-delà de N=3.
