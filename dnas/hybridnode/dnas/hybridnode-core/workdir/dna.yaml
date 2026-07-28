@@ -5,6 +5,12 @@ integrity:
   network_seed: "ainonymous-hybridnode-v1"
   properties:
     private_network: false
+    # Raw 36-byte ed25519 admin public key (32-byte key + 4-byte DHT location,
+    # NOT the "uhCAk..." string form) of the network administrator trusted to
+    # sign PrivateNetworkProofs. Required if private_network is true.
+    # Example (YAML flow sequence of 36 integers 0-255):
+    # network_admin_pubkey: [132, 32, 36, ...]
+    network_admin_pubkey: null
   zomes:
     - name: hybridnode_integrity
       bundled: "../../../zomes/integrity/target/wasm32-unknown-unknown/release/hybridnode_integrity.wasm"
