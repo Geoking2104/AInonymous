@@ -13,9 +13,13 @@ velocloud = ["reqwest"]
 private-network = []
 
 [dependencies]
-# Holochain client (version distincte de celle d'ainonymous-daemon : hybridnode-core
-# est concu pour etre reutilisable hors de ce repo, cf. HYBRIDNODE_APPLY.md)
-holochain_client = "0.6"
+# Holochain client — alignee sur ainonymous-daemon (0.8.1). La 0.6 (utilisee
+# hors-workspace, cf. HYBRIDNODE_APPLY.md) tire holochain_serialized_bytes
+# 0.0.55 qui epingle serde en =1.0.203, incompatible avec le reste du
+# workspace (serde 1.0.228 via holochain_types 0.6.3). Une fois dans le
+# meme workspace Cargo que ainonymous-daemon, un seul resolveur de deps
+# s'applique : les deux crates doivent partager la meme version.
+holochain_client = { version = "0.8.1", default-features = false }
 hdk = { version = "0.6.1", optional = true }
 
 # Networking — alignes sur workspace.dependencies pour eviter les conflits de
