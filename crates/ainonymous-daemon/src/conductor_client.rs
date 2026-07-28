@@ -43,9 +43,13 @@ impl ConductorClient {
         app_id: &str,
         membrane_proof: Option<MembraneProofConfig>,
     ) -> Result<Self> {
+        info!("[hc-connect] 1/5 AdminWebsocket::connect(port={})", admin_port);
         let admin = AdminWebsocket::connect(("127.0.0.1", admin_port), None).await?;
+
+        info!("[hc-connect] 2/5 issue_app_auth_token(app={})", app_id);
         let issued = admin.issue_app_auth_token(app_id.to_string().into()).await?;
 
+        info!("[hc-connect] 3/5 AppWebsocket::connect(port={})", app_port);
         let signer = ClientAgentSigner::default();
         let app = AppWebsocket::connect(
             ("127.0.0.1", app_port),
@@ -54,9 +58,12 @@ impl ConductorClient {
             None,
         ).await?;
 
+        info!("[hc-connect] 4/5 authorize_signing_credentials pour chaque cell");
+        let mut authorized = 0usize;
         for (role, cells) in app.cached_app_info().cell_info.iter() {
             for cell in cells {
                 if let CellInfo::Provisioned(pc) = cell {
+                    debug!("[hc-connect]   -> signing creds role={}", role);
                     let creds = admin
                         .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
                             cell_id: pc.cell_id.clone(),
@@ -64,9 +71,11 @@ impl ConductorClient {
                         })
                         .await?;
                     signer.add_credentials(pc.cell_id.clone(), creds);
+                    authorized += 1;
                 }
             }
         }
+        info!("[hc-connect] 5/5 Connecté ({} cell(s) signable(s))", authorized);
 
         let proof_bytes = membrane_proof.and_then(|cfg| cfg.to_bytes().ok());
 

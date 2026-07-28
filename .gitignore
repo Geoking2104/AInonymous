@@ -48,5 +48,28 @@ logs/
 tmp/
 temp/
 
-# Artefacts d'exécution du testnet loopback
+# Artefacts d'exï¿½cution du testnet loopback
 .testnet-run/
+
+# Scratch / debug local (build & diagnostics WSL, non partages)
+check_err.txt
+check_output.txt
+check_result.txt
+pr_e_body.md
+scripts/build_daemon.sh
+scripts/build_daemon2.sh
+scripts/build_daemon_wsl.sh
+scripts/diag_conductor.sh
+scripts/diag_start.sh
+scripts/diag_ws_proto.py
+scripts/do_build.sh
+scripts/do_t51.sh
+scripts/fix_dpkg_wsl.sh
+scripts/launch_t51.sh
+scripts/poll_build.sh
+scripts/poll_build2.sh
+scripts/run_t51_bg.sh
+scripts/run_t51_fg.sh
+scripts/start_build_bg.sh
+scripts/test_hc_call.sh
+scripts/test_hc_call2.sh
