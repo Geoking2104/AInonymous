@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, info};
@@ -131,32 +131,36 @@ impl ConductorClient {
             .await?;
 
         out.decode::<Value>()
+            .map_err(|e| anyhow::anyhow!("échec du décodage ExternIO (zome call {}::{}::{}): {}", role, zome, func, e))
     }
 
     /// Installe une happ avec un Membrane Proof (pour consortiums privés)
+    ///
+    /// TODO(holochain_client 0.8.1) : `InstallAppPayload` a changé de forme entre
+    /// l'écriture initiale de cette fonction (visait une API avec les champs
+    /// `bundle`/`membrane_proofs`) et la version actuellement épinglée dans le
+    /// workspace. `cargo check` confirme que les champs réels sont désormais
+    /// `source`, `roles_settings`, `ignore_genesis_failure` (vraisemblablement
+    /// `AppBundleSource` + une map de `RoleSettings` par rôle remplaçant la
+    /// liste plate de membrane proofs), mais je n'ai pas pu vérifier les types
+    /// exacts (holochain_conductor_api::admin_interface n'expose pas la
+    /// définition, et les sources complètes d'app.rs dépassent la limite de
+    /// récupération web). Fonction non appelée ailleurs dans le code
+    /// actuellement (`install_app_with_membrane_proof` n'a aucun appelant) :
+    /// stub explicite plutôt qu'une implémentation devinée à l'aveugle.
+    /// À réimplémenter avant tout usage réel, cf. ROADMAP.md / docs/PALIER_F.md.
     pub async fn install_app_with_membrane_proof(
         &self,
-        admin: &mut AdminWebsocket,
+        _admin: &mut AdminWebsocket,
         app_id: &str,
-        bundle_path: &Path,
-        membrane_proof: Option<Vec<u8>>,
+        _bundle_path: &Path,
+        _membrane_proof: Option<Vec<u8>>,
     ) -> Result<()> {
-        use holochain_types::prelude::{AppBundle, InstallAppPayload, MembraneProof};
-
-        let bundle = AppBundle::decode(std::fs::read(bundle_path)?)?;
-        let proof = membrane_proof.map(|bytes| MembraneProof::from(bytes));
-
-        let payload = InstallAppPayload {
-            installed_app_id: Some(app_id.to_string()),
-            agent_key: None,
-            membrane_proofs: proof.map(|p| vec![("default".into(), p)]).unwrap_or_default(),
-            bundle,
-            network_seed: None,
-        };
-
-        admin.install_app(payload).await?;
-        info!("App '{}' installée avec Membrane Proof", app_id);
-        Ok(())
+        anyhow::bail!(
+            "install_app_with_membrane_proof('{}'): non réimplémenté pour holochain_client 0.8.1 \
+             (InstallAppPayload::{{source,roles_settings,ignore_genesis_failure}} — cf. TODO dans le code)",
+            app_id
+        )
     }
 
     pub async fn listen_quic_signals(

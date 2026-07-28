@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 use anyhow::Result;
-use crate::error::HybridNodeError;
 
 /// Mirrors the ModelManifest Holochain entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]

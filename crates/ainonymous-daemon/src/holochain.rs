@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use ainonymous_types::{ExecutionPlan, GeoLocation, ModelClaim, NodeHeartbeat, Warrant, WarrantType};
-use crate::config::{DaemonConfig, MembraneProofConfig};
+use crate::config::DaemonConfig;
 use crate::conductor_client::ConductorClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,9 +146,10 @@ impl HolochainClient {
                     .map_err(|e| anyhow::anyhow!("Static zome call HTTP error: {}", e))?;
 
                 if !resp.status().is_success() {
+                    let status = resp.status();
                     let body = resp.text().await.unwrap_or_default();
                     anyhow::bail!("Static zome call failed [{}::{}::{}]: HTTP {} - {}",
-                        dna, zome, function, resp.status(), body);
+                        dna, zome, function, status, body);
                 }
 
                 resp.json::<Value>()
@@ -520,7 +521,7 @@ impl HolochainClient {
         };
 
         let warrant = Warrant::new_signed(
-            &identity.signing_key,
+            identity.signing_key(),
             WarrantType::ModelClaim,
             serde_json::to_value(claim)?,
             86400 * 90, // 90 jours
@@ -537,7 +538,7 @@ impl HolochainClient {
         let caps = detect_local_capabilities_from_config(&self.config);
 
         let warrant = Warrant::new_signed(
-            &identity.signing_key,
+            identity.signing_key(),
             WarrantType::NodeCapabilities,
             serde_json::to_value(&caps)?,
             86400 * 30, // 30 jours
@@ -567,7 +568,7 @@ impl HolochainClient {
         };
 
         let warrant = match Warrant::new_signed(
-            &identity.signing_key,
+            identity.signing_key(),
             WarrantType::ModelClaim,
             serde_json::to_value(claim)?,
             86400 * 90, // 90 jours
@@ -605,7 +606,7 @@ impl HolochainClient {
         final_caps.vram_gb = estimated_vram;
 
         let warrant = match Warrant::new_signed(
-            &identity.signing_key,
+            identity.signing_key(),
             WarrantType::NodeCapabilities,
             serde_json::to_value(&final_caps)?,
             86400 * 30,

@@ -140,6 +140,60 @@ pub struct InferenceConfig {
     pub parallel_requests: u8,
     #[serde(default)]
     pub speculative_k: u8,
+    /// mlock la mémoire du modèle (évite le swap). Activé automatiquement sur
+    /// GPU quel que soit ce champ (cf. llama.rs::LlamaManager::start).
+    #[serde(default)]
+    pub mlock: bool,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            quic_relay_fallback: true,
+            activation_compression: CompressionMode::Auto,
+            compression_threshold_gbps: 1.0,
+            max_activation_size_mb: 512,
+            max_concurrent_quic_sessions: 8,
+        }
+    }
+}
+
+impl Default for InferenceConfig {
+    fn default() -> Self {
+        Self {
+            default_model: "gemma4-e4b".to_string(),
+            context_size: 8192,
+            n_gpu_layers: -1,
+            flash_attention: true,
+            kv_cache_type: "q8_0".to_string(),
+            parallel_requests: 1,
+            speculative_k: 0,
+            mlock: false,
+        }
+    }
+}
+
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self {
+            daemon_port: 8890,
+            quic_port: 9000,
+            llama_server_port: 8081,
+            pipeline_server_port: 8180,
+            llama_server_bin: "llama-server".to_string(),
+            models_dir: PathBuf::from("models"),
+            holochain_conductor_url: "ws://127.0.0.1:8888".to_string(),
+            holochain_app_id: "ainonymous".to_string(),
+            region_hint: None,
+            max_concurrent_requests: 4,
+            network: NetworkConfig::default(),
+            inference: InferenceConfig::default(),
+            peers: Vec::new(),
+            pipeline_stages: Vec::new(),
+            quic_advertise: None,
+            holochain: HolochainConfig::default(),
+        }
+    }
 }
 
 impl DaemonConfig {
@@ -154,9 +208,9 @@ impl DaemonConfig {
             if let Some(parent) = config_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            std::fs::write(&config_path, toml::to_string_pretty(&config)?);
+            std::fs::write(&config_path, toml::to_string_pretty(&config)?)?;
             tracing::info!("Config par défaut créée: {:?}", config_path);
-            Ok(config);
+            Ok(config)
         }
     }
 

@@ -1,10 +1,9 @@
 use std::time::Instant;
 use anyhow::Result;
-use bytes::Bytes;
 use tracing::{debug, info};
 use wide::f32x8;
 
-use ainonymous_types::inference::{ActivationHeader, DType, GeneratedToken};
+use ainonymous_types::inference::{ActivationHeader, GeneratedToken};
 use crate::{QuicError, QuicSession, MAX_ACTIVATION_SIZE, COMPRESSION_THRESHOLD_BPS};
 
 /// Transfert d'activations tensorielles via QUIC

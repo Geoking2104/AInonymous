@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use hybridnode_core::HybridNode;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(

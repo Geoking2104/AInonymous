@@ -51,6 +51,12 @@ impl NodeIdentity {
         self.signing.to_bytes()
     }
 
+    /// Clé de signature ed25519 brute (pour signer des Warrants, cf.
+    /// `ainonymous_types::warrants::Warrant::new_signed`).
+    pub fn signing_key(&self) -> &ed25519_dalek::SigningKey {
+        &self.signing
+    }
+
     /// Charge la seed ed25519 depuis le keyring natif de l'OS (macOS Keychain,
     /// Windows Credential Manager, Linux libsecret) et retourne l'identité.
     ///
