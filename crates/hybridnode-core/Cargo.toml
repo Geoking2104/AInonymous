@@ -13,40 +13,42 @@ velocloud = ["reqwest"]
 private-network = []
 
 [dependencies]
-# Holochain client
+# Holochain client (version distincte de celle d'ainonymous-daemon : hybridnode-core
+# est concu pour etre reutilisable hors de ce repo, cf. HYBRIDNODE_APPLY.md)
 holochain_client = "0.6"
 hdk = { version = "0.6.1", optional = true }
 
-# Networking
-iroh-net = "0.23"
-quinn = "0.11"
-rustls = { version = "0.23", features = ["ring"] }
-ed25519-dalek = { version = "2", features = ["pkcs8"] }
+# Networking — alignes sur workspace.dependencies pour eviter les conflits de
+# resolution (ex: derive_more entre iroh 0.26 et iroh-net 0.23 pin isole)
+iroh-net = { workspace = true }
+quinn = { workspace = true }
+rustls = { workspace = true, features = ["ring"] }
+ed25519-dalek = { workspace = true }
 
 # Async runtime
-tokio = { version = "1", features = ["full"] }
-async-trait = "0.1"
+tokio = { workspace = true }
+async-trait = { workspace = true }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_yaml = "0.9"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 
 # HTTP (for SD-WAN REST APIs)
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], optional = true }
+reqwest = { workspace = true, optional = true }
 
 # Observability
-prometheus-client = "0.22"
-opentelemetry = { version = "0.22", features = ["trace"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["json"] }
+prometheus-client = { workspace = true }
+opentelemetry = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Utilities
-thiserror = "1"
-anyhow = "1"
-uuid = { version = "1", features = ["v4"] }
-sha2 = "0.10"
-hex = "0.4"
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
