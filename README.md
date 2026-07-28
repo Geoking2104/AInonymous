@@ -57,6 +57,27 @@ Principe dual-canal : Holochain transporte uniquement le plan de contrôle (déc
 
 ---
 
+## Mode privé : réseau fermé par Membrane Proofs
+
+Le mode par défaut d'AInonymous est un mesh public et anonyme : n'importe quel nœud peut rejoindre le DHT sans autorisation. À l'opposé, HybridNode permet un mode **privé** : un réseau fermé où l'admission est conditionnée à une preuve cryptographique signée par un administrateur du réseau — pensé pour un consortium d'entreprise multi-sites, un groupement de recherche ou tout déploiement où le contrôle d'accès prime sur l'ouverture publique.
+
+**Comment ça marche** : `MembraneProofConfig` (`Base64` ou fichier) porte la preuve d'admission dans la configuration du daemon et s'injecte automatiquement dans les appels de zome (`call_zome_with_proof`). Côté HybridNode, la feature Cargo `private-network` active un contrôle d'admission dans le zome d'intégrité : un nœud sans preuve est rejeté à l'entrée. `HolochainConfig::bootstrap_mode` permet de pointer vers un bootstrap privé plutôt que le réseau public par défaut.
+
+**Statut réel (pas d'enjolivement — cf. [`DISCLAIMER.md`](DISCLAIMER.md))** :
+
+| Composant | Statut |
+|---|---|
+| `MembraneProofConfig` + injection automatique dans les appels de zome | ✅ codé et fonctionnel |
+| Feature `private-network` + admission gate dans le zome d'intégrité | ✅ `genesis_self_check` désérialise la preuve (`PrivateNetworkProof`) et vérifie sa signature ed25519 via `hdi::prelude::verify_signature` contre la clé d'administrateur réseau lue dans les propriétés de la DNA (`dna.yaml` → `network_admin_pubkey`, baked into le hash de la DNA) — un nœud dont la preuve est absente, mal signée, ou adressée à une autre clé d'agent est rejeté |
+| `install_app_with_membrane_proof` (installation d'une hApp avec preuve, côté conducteur) | ❌ non fonctionnel actuellement — l'API `holochain_client` a changé de forme depuis l'écriture initiale ; la fonction est volontairement stubbée (erreur explicite) plutôt que de deviner une implémentation non vérifiée |
+| Expiration / anti-rejeu de la preuve (`issued_at`) | ❌ le champ existe dans `PrivateNetworkProof` mais n'est pas encore vérifié — `genesis_self_check` n'a pas d'accès horloge vérifié dans HDI 0.7.1, disclosed plutôt que deviné |
+| Configuration de la clé admin dans `dna.yaml` | 🟡 fonctionnelle mais peu ergonomique — tableau brut de 36 octets, pas encore le format lisible `uhCAk...` |
+| Proof-of-work à l'admission, liste blanche d'agents de confiance | ❌ pas implémenté — présents uniquement comme architecture cible dans `docs/ARCHITECTURE.md`, pas dans le code |
+
+Le mode privé a donc désormais une vérification cryptographique réelle de l'admission (signature ed25519 contre la clé d'administrateur réseau), mais reste incomplet pour un déploiement production : pas d'expiration de preuve, configuration de clé peu ergonomique, et le chemin d'installation `install_app_with_membrane_proof` côté conducteur est toujours stubbé.
+
+---
+
 ## Statut du Projet (Juillet 2026)
 
 **Palier F — Intégration Holochain + Warrants** : Largement terminé
