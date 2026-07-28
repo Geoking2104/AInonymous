@@ -323,6 +323,38 @@ cargo build --release
       </div>
     </div>
 
+    <div class="eyebrow" style="margin-top:56px;">Positionnement</div>
+    <h2 style="font-size:clamp(24px,3.2vw,34px);">Ce qui différencie AInonymous sur le marché</h2>
+    <p class="section-sub" style="margin-bottom:32px;">Le paysage de l'inférence LLM distribuée en 2026 se divise en deux familles — et AInonymous ne rentre dans aucune des deux telles qu'elles existent aujourd'hui.</p>
+
+    <table>
+      <thead>
+        <tr><th>Face aux mesh communautaires</th><th>Petals · Exo · Kalavai · SharedLLM</th><th style="color:var(--accent);">AInonymous</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Identité & confiance</td><td class="no">Secret partagé, coordinateur central, ou swarm public ouvert à l'abus</td><td class="col ok">Identité ed25519 auto-certifiante par nœud, aucun tiers</td></tr>
+        <tr><td>Comportement invalide</td><td class="no">Non modélisé</td><td class="col ok">Warrant signé publié dans le DHT, expirable, contestable</td></tr>
+        <tr><td>Réseau physique (WAN/QoS)</td><td class="no">Non intégré chez les 4</td><td class="col ok">Couche HybridNode : SLA par lien, QoS DSCP 46, scoring géographique</td></tr>
+        <tr><td>Backend inférence</td><td>PyTorch custom (Petals) ou llama.cpp RPC (SharedLLM)</td><td class="col ok">llama.cpp patché nativement — pipeline-split vérifié bit-exact à 2 et 3 nœuds</td></tr>
+      </tbody>
+    </table>
+
+    <table style="margin-top:40px;">
+      <thead>
+        <tr><th>Face aux marchés du calcul</th><th>Bittensor · Gensyn · Ritual · io.net</th><th style="color:var(--accent);">AInonymous</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mécanisme de confiance</td><td>Blockchain, staking, preuves ZK/TEE</td><td class="col ok">Hash-chain agent-centrique (Holochain), sans consensus global</td></tr>
+        <tr><td>Barrière à l'entrée</td><td class="no">Wallet + token natif à détenir/staker</td><td class="col ok">Aucune — clé ed25519 générée localement</td></tr>
+        <tr><td>Frais réseau</td><td class="no">Gas / frais de transaction</td><td class="col ok">Aucun</td></tr>
+        <tr><td>Objectif</td><td>Marché du calcul, financiarisé et volatil</td><td class="col ok">Usage direct : faire tourner un modèle, pas un actif</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Ce comparatif ne dit pas tout : AInonymous est expérimental. Le support GPU/MoE du pipeline natif n'est pas fini, le mTLS n'est pas encore strict de bout en bout, et rien ici n'a l'ancienneté d'usage de Petals. Détails vérifiés : <a href="https://github.com/Geoking2104/AInonymous/blob/main/DISCLAIMER.md">DISCLAIMER.md</a> et <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a> sur GitHub.
+    </p>
+
     <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
       <pre style="margin:0; font-size:14px; line-height:1.8;">
 # Installer depuis les sources
@@ -377,6 +409,38 @@ hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
         <p>PrivateNetworkProof membrane for closed consortium deployments.</p>
       </div>
     </div>
+
+    <div class="eyebrow" style="margin-top:56px;">Positioning</div>
+    <h2 style="font-size:clamp(24px,3.2vw,34px);">What sets AInonymous apart in the market</h2>
+    <p class="section-sub" style="margin-bottom:32px;">The distributed LLM inference landscape in 2026 splits into two families — and AInonymous doesn't fit cleanly into either as they exist today.</p>
+
+    <table>
+      <thead>
+        <tr><th>vs. community mesh networks</th><th>Petals · Exo · Kalavai · SharedLLM</th><th style="color:var(--accent);">AInonymous</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Identity & trust</td><td class="no">Shared secret, central coordinator, or public swarm open to abuse</td><td class="col ok">Self-certifying ed25519 identity per node, no third party</td></tr>
+        <tr><td>Invalid behavior</td><td class="no">Not modeled</td><td class="col ok">Signed Warrant published to the DHT, expirable, contestable</td></tr>
+        <tr><td>Physical network (WAN/QoS)</td><td class="no">Not integrated by any of the four</td><td class="col ok">HybridNode layer: per-link SLA, DSCP 46 QoS marking, geo-aware scoring</td></tr>
+        <tr><td>Inference backend</td><td>Custom PyTorch (Petals) or llama.cpp RPC (SharedLLM)</td><td class="col ok">Natively patched llama.cpp — pipeline-split verified bit-exact at 2 and 3 nodes</td></tr>
+      </tbody>
+    </table>
+
+    <table style="margin-top:40px;">
+      <thead>
+        <tr><th>vs. blockchain compute markets</th><th>Bittensor · Gensyn · Ritual · io.net</th><th style="color:var(--accent);">AInonymous</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Trust mechanism</td><td>Blockchain, staking, ZK/TEE proofs</td><td class="col ok">Agent-centric hash-chain (Holochain), no global consensus</td></tr>
+        <tr><td>Barrier to entry</td><td class="no">Wallet + native token to hold/stake</td><td class="col ok">None — ed25519 key generated locally</td></tr>
+        <tr><td>Network fees</td><td class="no">Gas / transaction fees</td><td class="col ok">None</td></tr>
+        <tr><td>Purpose</td><td>Financialized, volatile compute market</td><td class="col ok">Direct usage: running a model, not trading an asset</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      This comparison doesn't tell the whole story: AInonymous is experimental. GPU/MoE support for the native pipeline isn't finished, mTLS isn't strict end-to-end yet, and nothing here has Petals' track record. Verified details: <a href="https://github.com/Geoking2104/AInonymous/blob/main/DISCLAIMER.md">DISCLAIMER.md</a> and the <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a> on GitHub.
+    </p>
 
     <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
       <pre style="margin:0; font-size:14px; line-height:1.8;">
