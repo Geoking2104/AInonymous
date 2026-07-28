@@ -65,7 +65,7 @@ zstd = "0.13"
 sha2 = "0.10"
 base64 = "0.22"
 hex = "0.4"
-ed25519-dalek = { version = "2", features = ["pkcs8", "rand_core", "hazmat"] }
+ed25519-dalek = { version = "2", features = ["pkcs8", "rand_core", "digest"] }
 # Keyring OS natif (macOS Keychain, Windows Credential Manager, Linux libsecret)
 # Utilisé par la feature `secure-keyring` d'ainonymous-quic pour chiffrer la seed.
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

@@ -1,6 +1,7 @@
 use anyhow::Result;
-use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
+use ed25519_dalek::{DigestSigner, DigestVerifier, Signature, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha512};
 use std::fmt;
 
 /// Attestation signée par un nœud sur ses propres capacités ou sur un modèle.
@@ -68,7 +69,13 @@ impl Warrant {
         now > self.issued_at + self.ttl_seconds
     }
 
-    /// Crée et signe un warrant en utilisant Ed25519ctx (RFC 8032)
+    /// Crée et signe un warrant en Ed25519ph avec contexte (RFC 8032 §8.3).
+    ///
+    /// ed25519-dalek 2.x n'expose le contexte que couplé au pré-hachage
+    /// SHA-512 (`SigningKey::with_context` + `DigestSigner`), pas de variante
+    /// "contexte seul" sans pré-hachage (Ed25519ctx pur). On utilise donc
+    /// Ed25519ph : le message est haché en SHA-512 avant signature, ce qui
+    /// est au moins aussi robuste pour des payloads de taille arbitraire.
     pub fn new_signed(
         signing_key: &SigningKey,
         warrant_type: WarrantType,
@@ -80,7 +87,6 @@ impl Warrant {
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
 
-        // Contexte Ed25519ctx (RFC 8032)
         let context = b"AInonymous-Warrant-v1";
 
         // Construction des données à signer
@@ -90,15 +96,11 @@ impl Warrant {
         message.extend_from_slice(warrant_type.to_string().as_bytes());
         message.extend_from_slice(&serde_json::to_vec(&payload)?);
 
-        // Signature avec contexte Ed25519ctx
-        let signature = signing_key
-            .sign_prehashed(
-                &message,
-                Some(context),
-            )
-            .map_err(|e| anyhow::anyhow!("Ed25519ctx signing failed: {}", e))?
-            .to_bytes()
-            .to_vec();
+        let signing_context = signing_key
+            .with_context(context)
+            .map_err(|e| anyhow::anyhow!("contexte Ed25519ph invalide: {}", e))?;
+        let digest = Sha512::new_with_prefix(&message);
+        let signature = signing_context.sign_digest(digest).to_bytes().to_vec();
 
         Ok(Self {
             issuer,
@@ -110,7 +112,7 @@ impl Warrant {
         })
     }
 
-    /// Vérifie la signature en utilisant Ed25519ctx
+    /// Vérifie la signature (Ed25519ph + contexte, cf. `new_signed`)
     pub fn verify(&self, issuer_pubkey: &VerifyingKey) -> bool {
         if self.issuer != issuer_pubkey.to_bytes() {
             return false;
@@ -129,13 +131,15 @@ impl Warrant {
             message.extend_from_slice(&payload_bytes);
         }
 
-        if let Ok(sig_array) = <[u8; 64]>::try_from(self.signature.as_slice()) {
-            let signature = Signature::from_bytes(&sig_array);
+        let Ok(sig_array) = <[u8; 64]>::try_from(self.signature.as_slice()) else {
+            return false;
+        };
+        let signature = Signature::from_bytes(&sig_array);
 
-            return issuer_pubkey
-                .verify_prehashed(&message, Some(context), &signature)
-                .is_ok();
-        }
-        false
+        let Ok(verifying_context) = issuer_pubkey.with_context(context) else {
+            return false;
+        };
+        let digest = Sha512::new_with_prefix(&message);
+        verifying_context.verify_digest(digest, &signature).is_ok()
     }
 }

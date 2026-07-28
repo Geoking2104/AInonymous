@@ -11,5 +11,6 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
-# Signature/vérification des Warrants (Ed25519ctx, RFC 8032)
+# Signature/vérification des Warrants (Ed25519ph + contexte, RFC 8032 §8.3)
 ed25519-dalek = { workspace = true }
+sha2 = { workspace = true }
