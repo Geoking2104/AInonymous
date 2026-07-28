@@ -1,0 +1,107 @@
+# docker-compose.yml — démonstration d'un déploiement conforme aux bonnes
+# pratiques runtime OCI pour ainonymous-daemon et hybridnode-daemon.
+#
+# Compose ne parle pas directement runtime-spec (c'est Docker/containerd +
+# runc qui traduisent ces options en config.json OCI au moment du run), mais
+# chaque option ci-dessous correspond à un champ précis de la spec. Détail
+# complet : docs/OCI_RUNTIME_SPEC_COMPLIANCE.md.
+#
+# Usage :
+#   cp scripts/testnet/daemon_t51.toml config/ainonymous-daemon.toml   # à adapter
+#   cp hybridnode/configs/ainonymous.hybridnode.yaml config/hybridnode.yaml  # à adapter
+#   docker compose up --build
+
+services:
+  ainonymous-daemon:
+    build:
+      context: .
+      dockerfile: docker/ainonymous-daemon.Dockerfile
+    image: ainonymous-daemon:local
+    container_name: ainonymous-daemon
+
+    # --- process (runtime-spec §process) ---------------------------------
+    # USER est déjà fixé dans l'image (non-root, uid 10001) ; pas besoin de
+    # le répéter ici. `init: true` demande à Docker d'insérer tini comme
+    # PID 1 réel du conteneur : il reçoit SIGTERM en premier, le relaie à
+    # notre process, ET reap les processus zombies. Complète (ne remplace
+    # pas) le graceful shutdown applicatif ajouté dans main.rs — défense en
+    # profondeur si un futur sous-process échappe au Drop de LlamaManager.
+    init: true
+
+    # --- linux.namespaces / capabilities (runtime-spec §linux) -----------
+    # Aucune capability Linux nécessaire (pas de bind sur port <1024, pas
+    # d'accès réseau bas niveau) : on part de zéro et on n'ajoute rien.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    # --- root filesystem (runtime-spec §root) -----------------------------
+    # rootfs en lecture seule ; seuls /data (modèles + état) et /tmp sont
+    # inscriptibles, montés en tmpfs pour /tmp (pas de persistance requise).
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    volumes:
+      - ./config/ainonymous-daemon.toml:/config/config.toml:ro
+      - ainonymous-models:/data/models
+
+    environment:
+      RUST_LOG: "info"
+
+    # --- linux.resources (runtime-spec §linux.resources, cgroups) --------
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+        reservations:
+          cpus: "1"
+          memory: 2G
+
+    ports:
+      - "9000:9000/udp"
+      # 8890 (REST interne) volontairement NON publié : le code le lie sur
+      # 127.0.0.1 dans le conteneur, cf. commentaire dans le Dockerfile.
+
+    restart: unless-stopped
+
+  hybridnode-daemon:
+    build:
+      context: .
+      dockerfile: docker/hybridnode-daemon.Dockerfile
+    image: hybridnode-daemon:local
+    container_name: hybridnode-daemon
+
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    volumes:
+      - ./config/hybridnode.yaml:/config/ainonymous.hybridnode.yaml:ro
+
+    environment:
+      RUST_LOG: "info"
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    ports:
+      - "9338:9338/tcp"   # endpoint Prometheus (0.0.0.0, cf. Dockerfile)
+
+    restart: unless-stopped
+
+volumes:
+  ainonymous-models:

@@ -53,8 +53,36 @@ impl HybridNode {
 
         info!("HybridNode ready");
 
-        // Keep alive until Ctrl-C
-        tokio::signal::ctrl_c().await?;
+        // Attend SIGINT (Ctrl-C, dev) OU SIGTERM (arrêt conteneur OCI —
+        // `docker stop` / kubelet envoient SIGTERM au process PID 1, puis
+        // SIGKILL après le délai de grâce si le process n'a pas quitté).
+        // `ctrl_c()` seul n'intercepte QUE SIGINT sous Unix ; sans handler
+        // SIGTERM explicite, le process est tué par l'action par défaut du
+        // signal (pas d'unwind, ce code de nettoyage ne s'exécuterait jamais).
+        let ctrl_c = async {
+            let _ = tokio::signal::ctrl_c().await;
+        };
+
+        #[cfg(unix)]
+        let terminate = async {
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut sig) => {
+                    sig.recv().await;
+                }
+                Err(e) => {
+                    warn!("Impossible d'installer le handler SIGTERM ({e}) — seul SIGINT sera intercepté");
+                    std::future::pending::<()>().await;
+                }
+            }
+        };
+
+        #[cfg(not(unix))]
+        let terminate = std::future::pending::<()>();
+
+        tokio::select! {
+            _ = ctrl_c => info!("SIGINT reçu"),
+            _ = terminate => info!("SIGTERM reçu"),
+        }
         warn!("Shutdown signal received");
         Ok(())
     }

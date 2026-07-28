@@ -150,6 +150,47 @@ async fn main() -> Result<()> {
     info!("Daemon REST interne sur http://{}", addr);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
-    axum::serve(listener, app).await?;
+    // Extinction propre sur SIGTERM/SIGINT : indispensable sous un runtime
+    // OCI (docker stop / kubelet) qui envoie SIGTERM au process PID 1 puis
+    // SIGKILL après le délai de grâce. Sans ce handler, le process est tué
+    // brutalement (pas de unwind Rust, aucun Drop exécuté), ce qui laisse
+    // `llama-server` (process enfant de LlamaManager) orphelin. En laissant
+    // axum::serve retourner proprement, `llama` (déclaré plus haut dans
+    // main()) est droppé normalement en sortie de fonction, ce qui déclenche
+    // LlamaManager::drop() -> child.kill().
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+
+    info!("Extinction propre terminée");
     Ok(())
+}
+
+/// Attend SIGTERM (arrêt conteneur OCI) ou SIGINT (Ctrl-C en dev).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                warn!("Impossible d'installer le handler SIGTERM ({e}) — seul SIGINT sera intercepté");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => info!("SIGINT reçu"),
+        _ = terminate => info!("SIGTERM reçu"),
+    }
+    warn!("Signal d'arrêt reçu — extinction propre en cours (llama-server sera terminé)...");
 }
