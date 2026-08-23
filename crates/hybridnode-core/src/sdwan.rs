@@ -45,7 +45,8 @@ pub async fn connect(config: &SdwanConfig) -> Result<Box<dyn SdwanProvider>> {
                 Err(HybridNodeError::Sdwan(format!(
                     "Provider '{}' not yet implemented — build with 'mock-sdwan' for dev",
                     config.provider
-                )).into())
+                ))
+                .into())
             }
             #[cfg(not(feature = "vmanage"))]
             {
@@ -69,12 +70,16 @@ pub struct MockSdwan {
 
 impl MockSdwan {
     pub fn new() -> Self {
-        Self { local_site: "site-local".to_string() }
+        Self {
+            local_site: "site-local".to_string(),
+        }
     }
 }
 
 impl Default for MockSdwan {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]

@@ -178,7 +178,7 @@ observability:
 
 ```
 Identité unique par nœud :
-  ed25519 Holochain = AgentPubKey = certificat QUIC mTLS = identité SD-WAN (optionnel)
+  AgentPubKey Holochain --signed capability binding--> separate Ed25519 QUIC transport key
 
 Double chiffrement en inter-sites :
   Tunnel SD-WAN (IPsec/TLS 1.3) → chiffrement WAN niveau 3/4

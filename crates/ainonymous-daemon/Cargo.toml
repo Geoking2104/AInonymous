@@ -37,6 +37,6 @@ once_cell   = { workspace = true }
 # Intégration Holochain réelle (mode `holochain.backend = "conductor"`).
 # default-features=false : client websocket + signature en mémoire
 # (ClientAgentSigner), SANS tirer le conducteur `holochain` (wasmer/iroh).
-holochain_client     = { version = "0.8.1", default-features = false }
+holochain_client     = { version = "=0.8.3", default-features = false }
 holochain_zome_types = "0.6.2"
 holochain_types      = { version = "0.6.2", default-features = false }

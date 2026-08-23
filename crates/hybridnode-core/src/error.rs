@@ -30,7 +30,11 @@ pub enum HybridNodeError {
     WarrantPublished { peer_id: String, reason: String },
 
     #[error("SLA violation on link {link_id}: latency={latency_ms}ms budget={budget_ms}ms")]
-    SlaViolation { link_id: String, latency_ms: f64, budget_ms: f64 },
+    SlaViolation {
+        link_id: String,
+        latency_ms: f64,
+        budget_ms: f64,
+    },
 
     #[error(transparent)]
     Io(#[from] std::io::Error),

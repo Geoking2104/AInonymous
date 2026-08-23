@@ -1,6 +1,6 @@
 # AInonymous
 
-> Inference LLM décentralisée et anonyme — architecture **HybridNode** : Holochain 0.6.1 (overlay DHT agent-centrique) + QUIC/mTLS ed25519 (data plane) + SD-WAN (underlay). Souveraineté agent-centrique, zéro serveur central, zéro token.
+> Inférence LLM décentralisée à identité pseudonyme — architecture **HybridNode** : Holochain 0.6.1 (overlay DHT agent-centrique) + QUIC/mTLS ed25519 (data plane) + SD-WAN (underlay). Souveraineté agent-centrique, zéro serveur central, zéro token.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Holochain](https://img.shields.io/badge/Holochain-0.6.1-purple)](https://holochain.org)
@@ -8,11 +8,13 @@
 
 > ⚠️ **Projet expérimental (juillet 2026).** Avant toute évaluation technique ou déploiement, lire [`DISCLAIMER.md`](DISCLAIMER.md) — statut réel des fonctionnalités, ce qui est vérifié vs. ce qui reste architecture cible.
 
+> Security review (English, 2026-08-23): [`docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md`](docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md). It distinguishes implemented controls from target architecture and documents the remaining production blockers.
+
 ---
 
 ## Concept
 
-AInonymous est un réseau d'inférence distribué où chaque participant contribue et consomme de la puissance de calcul sans serveur central, sans compte, sans traçabilité. Il adapte le principe **mesh-llm** (pooling P2P de ressources GPU/CPU pour exécuter des LLMs ouverts) via une architecture **HybridNode** en trois couches :
+AInonymous est un réseau d'inférence distribué où chaque participant contribue et consomme de la puissance de calcul sans serveur ou compte central. Les AgentPubKeys, endpoints, horaires et volumes réseau restent corrélables : le système est pseudonyme, pas anonyme. Il adapte le principe **mesh-llm** (pooling P2P de ressources GPU/CPU pour exécuter des LLMs ouverts) via une architecture **HybridNode** en trois couches :
 
 | Couche | Technologie | Rôle |
 |--------|------------|------|
@@ -59,7 +61,7 @@ Principe dual-canal : Holochain transporte uniquement le plan de contrôle (déc
 
 ## Mode privé : réseau fermé par Membrane Proofs
 
-Le mode par défaut d'AInonymous est un mesh public et anonyme : n'importe quel nœud peut rejoindre le DHT sans autorisation. À l'opposé, HybridNode permet un mode **privé** : un réseau fermé où l'admission est conditionnée à une preuve cryptographique signée par un administrateur du réseau — pensé pour un consortium d'entreprise multi-sites, un groupement de recherche ou tout déploiement où le contrôle d'accès prime sur l'ouverture publique.
+Le mode par défaut d'AInonymous est un mesh public pseudonyme : n'importe quel nœud peut rejoindre le DHT sans autorisation et les métadonnées réseau restent observables. À l'opposé, HybridNode permet un mode **privé** : un réseau fermé où l'admission est conditionnée à une preuve cryptographique signée par un administrateur du réseau — pensé pour un consortium d'entreprise multi-sites, un groupement de recherche ou tout déploiement où le contrôle d'accès prime sur l'ouverture publique.
 
 **Comment ça marche** : `MembraneProofConfig` (`Base64` ou fichier) porte la preuve d'admission dans la configuration du daemon et s'injecte automatiquement dans les appels de zome (`call_zome_with_proof`). Côté HybridNode, la feature Cargo `private-network` active un contrôle d'admission dans le zome d'intégrité : un nœud sans preuve est rejeté à l'entrée. `HolochainConfig::bootstrap_mode` permet de pointer vers un bootstrap privé plutôt que le réseau public par défaut.
 

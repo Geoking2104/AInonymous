@@ -16,7 +16,7 @@ All properties of the HybridNode stack apply when using `ainonymous-torch`:
 
 | Property | How it applies |
 |---|---|
-| **mTLS ed25519** | Every QUIC connection for activation transfer authenticates both peers with the Holochain `AgentPubKey` as TLS cert. No anonymous connections. |
+| **mTLS Ed25519** | Every QUIC activation-transfer connection pins the peer's separate transport key, advertised in a Holochain agent-authored capability record. Missing pins fail closed. |
 | **Node Attestation** | `InferenceOptions(require_attestation=True)` restricts routing to peers with a valid `NodeAttestation` entry in the DHT. |
 | **Warrant exclusion** | The scheduler auto-excludes any peer with an active `Warrant`. Clients see `node.has_warrant` in `list_nodes()`. |
 | **SHA-256 model integrity** | `export_to_gguf()` computes and stores SHA-256. `verify_gguf()` must pass before a node serves the model. Cross-peer verification (≥ 2 peers confirm hash) is enforced by the `ModelClaim` coordinator zome. |
@@ -110,7 +110,7 @@ unpack_activation(result) ◀──
 model.norm + lm_head
 ```
 
-The QUIC connection reuses the peer's ed25519 `AgentPubKey` as the TLS certificate (verified by `PeerKeyVerifier`). The activation payload uses the [safe binary wire format](#activation-wire-format).
+The QUIC connection uses the peer's separate Ed25519 transport key as the TLS certificate (verified by `PeerKeyVerifier`). The public key is bound through an agent-authored Holochain capability record. The activation payload uses the [safe binary wire format](#activation-wire-format).
 
 ---
 

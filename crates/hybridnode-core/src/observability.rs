@@ -62,7 +62,9 @@ impl HybridNodeMetrics {
 }
 
 impl Default for HybridNodeMetrics {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Start the Prometheus HTTP scrape endpoint.
@@ -77,7 +79,9 @@ pub async fn start_prometheus(config: &ObservabilityConfig) -> Result<()> {
     info!("Prometheus metrics endpoint starting on {addr}");
 
     tokio::spawn(async move {
-        let listener = tokio::net::TcpListener::bind(addr).await.expect("bind metrics port");
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await
+            .expect("bind metrics port");
         loop {
             if let Ok((mut stream, _)) = listener.accept().await {
                 let metrics = metrics.clone();

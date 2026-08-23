@@ -28,12 +28,16 @@ impl NodeIdentity {
     /// Génère une identité aléatoire.
     pub fn generate() -> Self {
         let mut rng = rand::rngs::OsRng;
-        Self { signing: ed25519_dalek::SigningKey::generate(&mut rng) }
+        Self {
+            signing: ed25519_dalek::SigningKey::generate(&mut rng),
+        }
     }
 
     /// Identité déterministe à partir d'une graine de 32 octets.
     pub fn from_seed(seed: &[u8; 32]) -> Self {
-        Self { signing: ed25519_dalek::SigningKey::from_bytes(seed) }
+        Self {
+            signing: ed25519_dalek::SigningKey::from_bytes(seed),
+        }
     }
 
     /// Clé publique (AgentPubKey), 32 octets.
@@ -85,13 +89,16 @@ impl NodeIdentity {
         // Essaie de charger la seed depuis le keyring
         match entry.get_password() {
             Ok(hex_seed) => {
-                let bytes = hex::decode(&hex_seed)
-                    .context("seed keyring invalide (hex decode)")?;
+                let bytes = hex::decode(&hex_seed).context("seed keyring invalide (hex decode)")?;
                 let seed: [u8; 32] = bytes
                     .as_slice()
                     .try_into()
                     .map_err(|_| anyhow::anyhow!("seed keyring corrompue (len={})", bytes.len()))?;
-                tracing::info!("Identité ed25519 chargée depuis le keyring OS ({}/{})", service, account);
+                tracing::info!(
+                    "Identité ed25519 chargée depuis le keyring OS ({}/{})",
+                    service,
+                    account
+                );
                 Ok(Self::from_seed(&seed))
             }
             Err(keyring::Error::NoEntry) => {
@@ -167,16 +174,14 @@ impl NodeIdentity {
     pub fn load_or_generate(path: &std::path::Path) -> Result<Self> {
         if path.exists() {
             let bytes = std::fs::read(path).context("lecture seed identité ed25519")?;
-            let seed: [u8; 32] = bytes
-                .as_slice()
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("seed corrompue : attendu 32 octets, obtenu {}", bytes.len()))?;
+            let seed: [u8; 32] = bytes.as_slice().try_into().map_err(|_| {
+                anyhow::anyhow!("seed corrompue : attendu 32 octets, obtenu {}", bytes.len())
+            })?;
             tracing::info!("Identité ed25519 chargée depuis {:?}", path);
             Ok(Self::from_seed(&seed))
         } else {
             if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)
-                    .context("création répertoire identité")?;
+                std::fs::create_dir_all(parent).context("création répertoire identité")?;
             }
             let identity = Self::generate();
             std::fs::write(path, identity.seed_bytes())
@@ -188,7 +193,10 @@ impl NodeIdentity {
                 std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
                     .context("chmod 600 seed identité")?;
             }
-            tracing::info!("Nouvelle identité ed25519 générée et sauvegardée dans {:?}", path);
+            tracing::info!(
+                "Nouvelle identité ed25519 générée et sauvegardée dans {:?}",
+                path
+            );
             Ok(identity)
         }
     }
@@ -237,16 +245,18 @@ fn provider_algs() -> WebPkiSupportedAlgorithms {
 /// réellement (preuve de possession).
 #[derive(Debug)]
 pub struct PeerKeyVerifier {
-    expected: Option<[u8; 32]>,
+    expected: [u8; 32],
     algs: WebPkiSupportedAlgorithms,
 }
 
 impl PeerKeyVerifier {
-    /// `expected = Some(key)` : exige cette clé précise. `None` : accepte tout
-    /// certificat ed25519 auto-signé valide (possession prouvée) sans liaison
-    /// d'identité — repli quand le plan de contrôle ne fournit pas la clé.
-    pub fn new(expected: Option<[u8; 32]>) -> Self {
-        Self { expected, algs: provider_algs() }
+    /// Require the exact transport key advertised through the authenticated
+    /// control plane. Encryption without this pin is not peer authentication.
+    pub fn new(expected: [u8; 32]) -> Self {
+        Self {
+            expected,
+            algs: provider_algs(),
+        }
     }
 }
 
@@ -260,12 +270,10 @@ impl ServerCertVerifier for PeerKeyVerifier {
         _now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
         let key = ed25519_pubkey_from_cert(end_entity)?;
-        if let Some(expected) = self.expected {
-            if key != expected {
-                return Err(rustls::Error::General(
-                    "clé publique du pair != clé attendue".into(),
-                ));
-            }
+        if key != self.expected {
+            return Err(rustls::Error::General(
+                "clé publique du pair != clé attendue".into(),
+            ));
         }
         Ok(ServerCertVerified::assertion())
     }
@@ -303,13 +311,19 @@ pub struct Ed25519ClientVerifier {
 
 impl Ed25519ClientVerifier {
     pub fn new() -> Self {
-        Self { algs: provider_algs() }
+        Self {
+            algs: provider_algs(),
+        }
     }
 }
 
 impl ClientCertVerifier for Ed25519ClientVerifier {
-    fn offer_client_auth(&self) -> bool { true }
-    fn client_auth_mandatory(&self) -> bool { true }
+    fn offer_client_auth(&self) -> bool {
+        true
+    }
+    fn client_auth_mandatory(&self) -> bool {
+        true
+    }
 
     fn root_hint_subjects(&self) -> &[DistinguishedName] {
         &[]

@@ -77,7 +77,9 @@ pub struct NodeTopology {
 impl NodeTopology {
     /// Return peers in the same site, sorted by reputation descending.
     pub fn local_peers(&self) -> Vec<&PeerCapabilities> {
-        let mut peers: Vec<&PeerCapabilities> = self.peers.values()
+        let mut peers: Vec<&PeerCapabilities> = self
+            .peers
+            .values()
             .filter(|p| p.site_id == self.local_site && !p.has_active_warrant)
             .collect();
         peers.sort_by(|a, b| b.reputation.partial_cmp(&a.reputation).unwrap());
@@ -86,7 +88,8 @@ impl NodeTopology {
 
     /// Return the best link to `remote_site` (lowest latency).
     pub fn best_link_to(&self, remote_site: &str) -> Option<&LinkSla> {
-        self.links.iter()
+        self.links
+            .iter()
             .filter(|l| l.from_site == self.local_site && l.to_site == remote_site)
             .min_by(|a, b| a.latency_ms.partial_cmp(&b.latency_ms).unwrap())
     }

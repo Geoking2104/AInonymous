@@ -26,6 +26,11 @@ if [[ -z "$PROJECT" ]]; then
     exit 1
 fi
 
+if [[ ! "$PROJECT" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+    echo "ERROR: project name must be a 1-64 character slug (letters, digits, dot, underscore, hyphen)"
+    exit 1
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TEMPLATE="$REPO_ROOT/hybridnode/configs/generic-project.hybridnode.yaml"
 DEST="$REPO_ROOT/hybridnode/configs/${PROJECT}.hybridnode.yaml"
@@ -43,6 +48,8 @@ sed -i "s/otel_service_name: .*/otel_service_name: \"$PROJECT\"/" "$DEST" 2>/dev
 
 # Enable private-network if requested
 if [[ "$PRIVATE_NETWORK" == "true" ]]; then
+    sed -i "s/bootstrap_mode: public/bootstrap_mode: private/" "$DEST" 2>/dev/null || true
+    sed -i '/bootstrap_mode: private/a\  bootstrap_url: "https://bootstrap.example.invalid"' "$DEST" 2>/dev/null || true
     sed -i "s/private_network: false/private_network: true/" "$DEST" 2>/dev/null || true
     echo "  ✓ Private network mode enabled"
 fi

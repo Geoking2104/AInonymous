@@ -21,7 +21,7 @@
 
     "identity": {
       "type": "object",
-      "description": "Identity configuration. The ed25519 AgentPubKey serves as DHT identity, QUIC/mTLS certificate, and source-chain signer.",
+      "description": "Holochain identity configuration. The AgentPubKey remains in lair; QUIC uses a separate Ed25519 transport key bound through a Holochain-authored capability record.",
       "required": ["backend", "keystore"],
       "properties": {
         "backend": {
@@ -140,7 +140,7 @@
 
     "quic": {
       "type": "object",
-      "description": "QUIC/mTLS data plane. ed25519 AgentPubKey is reused as TLS certificate. PeerKeyVerifier enforces mutual authentication.",
+      "description": "QUIC/mTLS data plane. A separate Ed25519 transport key is pinned to the key advertised through the authenticated control plane.",
       "required": ["mtls_strict"],
       "properties": {
         "mtls_strict": {
@@ -164,33 +164,6 @@
           "maximum": 63,
           "default": 46,
           "description": "DSCP value for inference traffic. 46 = EF (Expedited Forwarding)."
-        },
-        "compression": {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "type": "string",
-              "enum": ["auto", "always", "never"],
-              "default": "auto"
-            },
-            "threshold_gbps": {
-              "type": "number",
-              "description": "Above this bandwidth, skip compression (already fast enough)."
-            }
-          }
-        },
-        "limits": {
-          "type": "object",
-          "properties": {
-            "max_activation_size_mb": {
-              "type": "integer",
-              "description": "Maximum activation blob size in MB per transfer."
-            },
-            "max_concurrent_sessions": {
-              "type": "integer",
-              "description": "Maximum concurrent QUIC sessions."
-            }
-          }
         }
       },
       "additionalProperties": false
@@ -214,47 +187,6 @@
           "type": "integer",
           "minimum": 1,
           "description": "Maximum nodes in a single inference plan."
-        }
-      },
-      "additionalProperties": false
-    },
-
-    "redundancy": {
-      "type": "object",
-      "description": "Inference redundancy configuration (mirrors RedundancyLevel enum).",
-      "properties": {
-        "mode": {
-          "type": "string",
-          "enum": ["none", "primary_shadow", "hot_standby", "n_of_m_quorum", "speculative_verify"],
-          "default": "none",
-          "description": "none=single node; primary_shadow=shadow copy; hot_standby=failover; n_of_m_quorum=consensus; speculative_verify=draft+verify."
-        },
-        "quorum_n": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "For n_of_m_quorum: minimum agreements required."
-        },
-        "quorum_m": {
-          "type": "integer",
-          "minimum": 2,
-          "description": "For n_of_m_quorum: total nodes to query."
-        }
-      },
-      "additionalProperties": false
-    },
-
-    "models": {
-      "type": "object",
-      "properties": {
-        "placement_strategy": {
-          "type": "string",
-          "enum": ["locality_aware", "replicated", "single"],
-          "default": "locality_aware"
-        },
-        "gguf_paths": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Directories to scan for GGUF model files."
         }
       },
       "additionalProperties": false
@@ -293,11 +225,6 @@
           "type": "string",
           "default": "hybridnode"
         },
-        "sdwan_metrics": {
-          "type": "boolean",
-          "default": true,
-          "description": "Include SD-WAN link metrics in NodeObservabilitySnapshot DHT entries."
-        },
         "log_level": {
           "type": "string",
           "enum": ["trace", "debug", "info", "warn", "error"],
@@ -317,13 +244,6 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically publish a Warrant when a peer fails audit checks."
-        },
-        "model_hash_check":   { "type": "boolean", "default": true },
-        "reputation_threshold": {
-          "type": "number",
-          "minimum": 0.0,
-          "maximum": 1.0,
-          "description": "Peers below this score are excluded from scheduling. Formula: (success_rate×0.4)+(speed×0.3)+(age×0.2)-(warrant_penalty×0.1)."
         }
       },
       "additionalProperties": false

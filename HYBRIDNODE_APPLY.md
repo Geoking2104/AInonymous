@@ -110,7 +110,12 @@ Pour un déploiement en consortium fermé :
 bash scripts/hybridnode/init_project.sh mon-projet --private-network
 ```
 
-Cela active `security.private_network: true`, ce qui déclenche `genesis_self_check` dans le zome d'intégrité — chaque nœud doit présenter un `PrivateNetworkProof` signé pour rejoindre le DHT.
+This enables both `security.private_network: true` and
+`holochain.bootstrap_mode: private`, and inserts the intentionally non-routable
+`https://bootstrap.example.invalid` placeholder. Replace it with the private
+bootstrap URL before deployment. The integrity zome then runs
+`genesis_self_check`; every node must present a signed `PrivateNetworkProof` to
+join the DHT.
 
 ## Support
 

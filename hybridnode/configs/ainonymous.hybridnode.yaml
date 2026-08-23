@@ -35,23 +35,11 @@ quic:
   bind_addr: "0.0.0.0:0"
   relay_fallback: true
   dscp_marking: 46
-  compression:
-    mode: auto
-    threshold_gbps: 1.0
-  limits:
-    max_activation_size_mb: 512
-    max_concurrent_sessions: 4
 
 scheduler:
   default_strategy: local_first
   max_inter_site_activation_mb: 50
   max_nodes_per_plan: 3
-
-models:
-  placement_strategy: locality_aware
-  gguf_paths:
-    - "~/.ainonymous/models"
-    - "/opt/ainonymous/models"
 
 inference:
   llama_server_port: 9337
@@ -64,15 +52,12 @@ observability:
   prometheus_addr: "0.0.0.0:9338"
   otel_endpoint: ""
   otel_service_name: "ainonymous"
-  sdwan_metrics: true
   log_level: info
 
 audit:
   enabled: true
   interval_hours: 6
   auto_warrant: true
-  model_hash_check: true
-  reputation_threshold: 0.5
 
 security:
   private_network: true

@@ -1,9 +1,9 @@
 //! Model validation and placement logic.
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::Path;
-use anyhow::Result;
 
 /// Mirrors the ModelManifest Holochain entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,10 @@ pub enum VerificationResult {
 }
 
 /// Compute SHA-256 of a GGUF file and compare against the manifest.
-pub async fn verify_local_model(manifest: &ModelManifest, path: &Path) -> Result<VerificationResult> {
+pub async fn verify_local_model(
+    manifest: &ModelManifest,
+    path: &Path,
+) -> Result<VerificationResult> {
     if !path.exists() {
         return Ok(VerificationResult::FileMissing);
     }
@@ -64,7 +67,9 @@ pub fn should_transfer_to_remote(
     bandwidth_mbps: f64,
     latency_budget_ms: f64,
 ) -> bool {
-    if bandwidth_mbps == 0.0 { return false; }
+    if bandwidth_mbps == 0.0 {
+        return false;
+    }
     let transfer_time_s = (activation_size_mb * 8.0) / bandwidth_mbps / 1000.0;
     transfer_time_s < latency_budget_ms / 1000.0
 }

@@ -7,10 +7,11 @@ use crate::topology::{NodeTopology, PeerCapabilities, PeerId};
 use serde::{Deserialize, Serialize};
 
 /// Strategy for selecting inference peers.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SchedulingStrategy {
     /// Prefer peers in the same SD-WAN site.
+    #[default]
     LocalFirst,
     /// Strict round-robin across all available peers.
     RoundRobin,
@@ -18,10 +19,6 @@ pub enum SchedulingStrategy {
     LowestLatency,
     /// Maximize bandwidth for large activation transfers.
     HighestBandwidth,
-}
-
-impl Default for SchedulingStrategy {
-    fn default() -> Self { Self::LocalFirst }
 }
 
 /// Input context for a scheduling decision.
@@ -62,7 +59,8 @@ pub fn schedule(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
 /// Prefer same-site peers; fall back to remote only if no local peer can serve.
 fn schedule_local_first(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
     let local_peers = ctx.topology.local_peers();
-    let capable: Vec<&&PeerCapabilities> = local_peers.iter()
+    let capable: Vec<&&PeerCapabilities> = local_peers
+        .iter()
         .filter(|p| p.held_models.contains(&ctx.model_name))
         .collect();
 
@@ -77,9 +75,15 @@ fn schedule_local_first(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
 
     // Fall back: find a remote peer that holds the model and satisfies the budget
     for peer in ctx.topology.peers.values() {
-        if peer.has_active_warrant { continue; }
-        if !peer.held_models.contains(&ctx.model_name) { continue; }
-        if peer.site_id == ctx.topology.local_site { continue; }
+        if peer.has_active_warrant {
+            continue;
+        }
+        if !peer.held_models.contains(&ctx.model_name) {
+            continue;
+        }
+        if peer.site_id == ctx.topology.local_site {
+            continue;
+        }
 
         if let Some(link) = ctx.topology.best_link_to(&peer.site_id) {
             if link.can_transfer_within(ctx.activation_size_mb, ctx.latency_budget_ms) {
@@ -87,7 +91,10 @@ fn schedule_local_first(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
                     peer_id: peer.peer_id.clone(),
                     estimated_latency_ms: link.latency_ms,
                     is_local: false,
-                    reason: format!("remote peer at {} — latency={:.1}ms", peer.site_id, link.latency_ms),
+                    reason: format!(
+                        "remote peer at {} — latency={:.1}ms",
+                        peer.site_id, link.latency_ms
+                    ),
                 });
             }
         }
@@ -97,7 +104,9 @@ fn schedule_local_first(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
 }
 
 fn schedule_lowest_latency(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
-    ctx.topology.peers.values()
+    ctx.topology
+        .peers
+        .values()
         .filter(|p| !p.has_active_warrant && p.held_models.contains(&ctx.model_name))
         .filter_map(|peer| {
             let latency = if peer.site_id == ctx.topology.local_site {
@@ -121,7 +130,9 @@ fn schedule_lowest_latency(ctx: &SchedulingContext) -> Option<SchedulingDecision
 }
 
 fn schedule_highest_bandwidth(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
-    ctx.topology.peers.values()
+    ctx.topology
+        .peers
+        .values()
         .filter(|p| !p.has_active_warrant && p.held_models.contains(&ctx.model_name))
         .filter_map(|peer| {
             let (latency, bw) = if peer.site_id == ctx.topology.local_site {
@@ -130,7 +141,11 @@ fn schedule_highest_bandwidth(ctx: &SchedulingContext) -> Option<SchedulingDecis
                 let link = ctx.topology.best_link_to(&peer.site_id)?;
                 (link.latency_ms, link.bandwidth_mbps)
             };
-            if latency < ctx.latency_budget_ms { Some((peer, latency, bw)) } else { None }
+            if latency < ctx.latency_budget_ms {
+                Some((peer, latency, bw))
+            } else {
+                None
+            }
         })
         .max_by(|(_, _, a), (_, _, b)| a.partial_cmp(b).unwrap())
         .map(|(peer, latency, bw)| SchedulingDecision {
@@ -144,13 +159,22 @@ fn schedule_highest_bandwidth(ctx: &SchedulingContext) -> Option<SchedulingDecis
 fn schedule_round_robin(ctx: &SchedulingContext) -> Option<SchedulingDecision> {
     // Deterministic round-robin: pick the first eligible peer alphabetically.
     // A real implementation would persist a cursor in shared state.
-    let mut eligible: Vec<&PeerCapabilities> = ctx.topology.peers.values()
+    let mut eligible: Vec<&PeerCapabilities> = ctx
+        .topology
+        .peers
+        .values()
         .filter(|p| !p.has_active_warrant && p.held_models.contains(&ctx.model_name))
         .collect();
     eligible.sort_by(|a, b| a.peer_id.cmp(&b.peer_id));
     eligible.first().map(|peer| {
-        let latency = if peer.site_id == ctx.topology.local_site { 1.0 }
-            else { ctx.topology.best_link_to(&peer.site_id).map(|l| l.latency_ms).unwrap_or(50.0) };
+        let latency = if peer.site_id == ctx.topology.local_site {
+            1.0
+        } else {
+            ctx.topology
+                .best_link_to(&peer.site_id)
+                .map(|l| l.latency_ms)
+                .unwrap_or(50.0)
+        };
         SchedulingDecision {
             peer_id: peer.peer_id.clone(),
             estimated_latency_ms: latency,

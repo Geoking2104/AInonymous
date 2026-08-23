@@ -42,13 +42,17 @@ Chaque nœud AInonymous est identifié par une paire de clés **ed25519** géré
 ```
 AgentPubKey (ed25519, 32 bytes)
   └── Identité permanente du nœud dans tous les DHTs
-  └── Réutilisée comme clé TLS pour les connexions QUIC (iroh-net)
   └── Signe toutes les entrées de la source chain
 
 AgentSecretKey (ed25519, 32 bytes — jamais exposée)
   └── Stockée dans le keystore Holochain (lair-keystore)
-  └── Dérivation des sous-clés de session QUIC via HKDF-SHA256
+  └── Signe les actions Holochain; n'est pas réutilisée par QUIC
   └── Jamais transmise sur le réseau
+
+QuicTransportKey (ed25519, 32 bytes)
+  └── Clé séparée et rotatable utilisée pour le certificat QUIC
+  └── Clé publique publiée dans NodeCapabilities, donc liée à l'AgentPubKey
+      par la signature de la source chain; clé privée jamais extraite de lair
 ```
 
 **Propriétés de l'identité :**

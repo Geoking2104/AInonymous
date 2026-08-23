@@ -43,11 +43,16 @@ impl ConductorClient {
         app_id: &str,
         membrane_proof: Option<MembraneProofConfig>,
     ) -> Result<Self> {
-        info!("[hc-connect] 1/5 AdminWebsocket::connect(port={})", admin_port);
+        info!(
+            "[hc-connect] 1/5 AdminWebsocket::connect(port={})",
+            admin_port
+        );
         let admin = AdminWebsocket::connect(("127.0.0.1", admin_port), None).await?;
 
         info!("[hc-connect] 2/5 issue_app_auth_token(app={})", app_id);
-        let issued = admin.issue_app_auth_token(app_id.to_string().into()).await?;
+        let issued = admin
+            .issue_app_auth_token(app_id.to_string().into())
+            .await?;
 
         info!("[hc-connect] 3/5 AppWebsocket::connect(port={})", app_port);
         let signer = ClientAgentSigner::default();
@@ -56,7 +61,8 @@ impl ConductorClient {
             issued.token,
             signer.clone().into(),
             None,
-        ).await?;
+        )
+        .await?;
 
         info!("[hc-connect] 4/5 authorize_signing_credentials pour chaque cell");
         let mut authorized = 0usize;
@@ -75,14 +81,27 @@ impl ConductorClient {
                 }
             }
         }
-        info!("[hc-connect] 5/5 Connecté ({} cell(s) signable(s))", authorized);
+        info!(
+            "[hc-connect] 5/5 Connecté ({} cell(s) signable(s))",
+            authorized
+        );
 
         let proof_bytes = membrane_proof.and_then(|cfg| cfg.to_bytes().ok());
 
-        info!("Conducteur Holochain connecté (app='{}', membrane_proof: {})",
-              app_id, if proof_bytes.is_some() { "présent" } else { "absent" });
+        info!(
+            "Conducteur Holochain connecté (app='{}', membrane_proof: {})",
+            app_id,
+            if proof_bytes.is_some() {
+                "présent"
+            } else {
+                "absent"
+            }
+        );
 
-        Ok(Self { app, membrane_proof: proof_bytes })
+        Ok(Self {
+            app,
+            membrane_proof: proof_bytes,
+        })
     }
 
     pub fn membrane_proof(&self) -> Option<&[u8]> {
@@ -121,7 +140,8 @@ impl ConductorClient {
         };
 
         let io = ExternIO::encode(payload)?;
-        let out = self.app
+        let out = self
+            .app
             .call_zome(
                 ZomeCallTarget::RoleName(RoleName::from(role.to_string())),
                 ZomeName::from(zome_name.clone()),
@@ -130,13 +150,20 @@ impl ConductorClient {
             )
             .await?;
 
-        out.decode::<Value>()
-            .map_err(|e| anyhow::anyhow!("échec du décodage ExternIO (zome call {}::{}::{}): {}", role, zome, func, e))
+        out.decode::<Value>().map_err(|e| {
+            anyhow::anyhow!(
+                "échec du décodage ExternIO (zome call {}::{}::{}): {}",
+                role,
+                zome,
+                func,
+                e
+            )
+        })
     }
 
     /// Installe une happ avec un Membrane Proof (pour consortiums privés)
     ///
-    /// TODO(holochain_client 0.8.1) : `InstallAppPayload` a changé de forme entre
+    /// TODO(holochain_client 0.8.3) : `InstallAppPayload` a changé de forme entre
     /// l'écriture initiale de cette fonction (visait une API avec les champs
     /// `bundle`/`membrane_proofs`) et la version actuellement épinglée dans le
     /// workspace. `cargo check` confirme que les champs réels sont désormais
@@ -157,7 +184,7 @@ impl ConductorClient {
         _membrane_proof: Option<Vec<u8>>,
     ) -> Result<()> {
         anyhow::bail!(
-            "install_app_with_membrane_proof('{}'): non réimplémenté pour holochain_client 0.8.1 \
+            "install_app_with_membrane_proof('{}'): non réimplémenté pour holochain_client 0.8.3 \
              (InstallAppPayload::{{source,roles_settings,ignore_genesis_failure}} — cf. TODO dans le code)",
             app_id
         )
@@ -169,20 +196,36 @@ impl ConductorClient {
         advertise: SocketAddr,
         identity: NodeIdentity,
     ) {
-        self.app.on_signal(move |sig| {
-            let Signal::App { zome_name, signal, .. } = sig else { return; };
-            if zome_name.to_string() != INFERENCE_COORDINATOR_ZOME { return; }
+        self.app
+            .on_signal(move |sig| {
+                let Signal::App {
+                    zome_name, signal, ..
+                } = sig
+                else {
+                    return;
+                };
+                if zome_name.to_string() != INFERENCE_COORDINATOR_ZOME {
+                    return;
+                }
 
-            if let Ok(qls) = signal.into_inner().decode::<QuicListenerSignal>() {
-                let mut offer = SessionOffer::new(advertise, qls.layer_range);
-                offer.session_token = qls.session_token;
-                offer.next_agent_id = qls.next_agent_id;
-                offer.next_layer_range = qls.next_layer_range;
-                offer.peer_pubkey = Some(identity.public_key_bytes());
-                offer.client_pubkey = qls.requester_pubkey
-                    .and_then(|v| <[u8; 32]>::try_from(v).ok());
-                registry.register(offer);
-            }
-        }).await;
+                if let Ok(qls) = signal.into_inner().decode::<QuicListenerSignal>() {
+                    let mut offer = SessionOffer::new(advertise, qls.layer_range);
+                    offer.session_token = qls.session_token;
+                    offer.next_agent_id = qls.next_agent_id;
+                    offer.next_layer_range = qls.next_layer_range;
+                    offer.peer_pubkey = Some(identity.public_key_bytes());
+                    offer.client_pubkey = qls
+                        .requester_pubkey
+                        .and_then(|v| <[u8; 32]>::try_from(v).ok());
+                    if offer.client_pubkey.is_some() {
+                        registry.register(offer);
+                    } else {
+                        tracing::warn!(
+                        "Ignoring unauthenticated QUIC offer: requester_pubkey missing or invalid"
+                    );
+                    }
+                }
+            })
+            .await;
     }
 }

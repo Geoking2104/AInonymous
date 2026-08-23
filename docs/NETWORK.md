@@ -49,7 +49,7 @@ Volume : < 10 KB par message        Volume : 10 MB — 500 MB par requête
 
 ### Principe
 
-Chaque nœud présente son **AgentPubKey Holochain (ed25519)** comme certificat TLS lors de l'établissement QUIC. Les deux extrémités vérifient mutuellement l'identité de leur pair avant d'échanger des activations :
+Chaque nœud présente une **clé de transport ed25519 séparée et rotatable** comme certificat TLS lors de l'établissement QUIC. Sa clé publique est publiée dans une entrée de capacités signée par l'AgentPubKey Holochain. Les deux extrémités épinglent la clé de transport attendue avant d'échanger des activations :
 
 ```
 Nœud A                              Nœud B

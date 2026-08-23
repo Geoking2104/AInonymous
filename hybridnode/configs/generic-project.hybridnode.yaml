@@ -11,14 +11,10 @@ holochain:
   conductor_url: "ws://localhost:8888"
   app_port: 8889
   version: "0.6.1"
-  bootstrap_mode: private                   # ou "public" pour internet ouvert
-  bootstrap_url: "<https://votre-bootstrap-interne:8888>"
+  bootstrap_mode: public
 
 sdwan:
   provider: mock                            # remplacer par "rest", "vmanage", etc.
-  api_url: "<https://votre-sdwan-controller>"
-  api_token_env: SDWAN_API_TOKEN
-  site_id_env: SDWAN_SITE_ID
   tls_verify: true
   poll_interval_seconds: 60
 

@@ -30,7 +30,7 @@ hybridnode --config hybridnode/configs/myproject.hybridnode.yaml
 
 ### Key Security Properties
 
-- **mTLS strict** — ed25519 AgentPubKey reused as QUIC certificate; `PeerKeyVerifier` enforces mutual auth
+- **Strict mTLS** — a separate, rotatable Ed25519 transport key is published in an agent-authored capability record; `PeerKeyVerifier` pins both peers
 - **Model attestation** — SHA-256 verified locally + cross-peer confirmation (≥2 peers)
 - **Warrant system** — Holochain DHT cryptographic proof of misbehavior; auto-excludes from scheduling
 - **Private bootstrap** — `PrivateNetworkProof` membrane for closed consortium deployments

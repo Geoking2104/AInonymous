@@ -1,6 +1,3 @@
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::Arc;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -10,11 +7,14 @@ use axum::{
 };
 use hex;
 use serde::Deserialize;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
-use ainonymous_quic::{NodeIdentity, SessionOffer, SessionRegistry};
 use crate::{conductor::Conductor, holochain::HolochainClient, DaemonConfig};
+use ainonymous_quic::{NodeIdentity, SessionOffer, SessionRegistry};
 
 #[derive(Clone)]
 struct DaemonState {
@@ -41,12 +41,19 @@ pub fn build(
     config: DaemonConfig,
     identity_path: PathBuf,
 ) -> Router {
-    let state = DaemonState { conductor, holochain, registry, quic_endpoint, identity, config, identity_path };
+    let state = DaemonState {
+        conductor,
+        holochain,
+        registry,
+        quic_endpoint,
+        identity,
+        config,
+        identity_path,
+    };
 
     Router::new()
         // Liveness check
         .route("/health", get(health))
-
         // Endpoints pour le proxy ainonymous-proxy
         .route("/mesh/status", get(mesh_status))
         .route("/mesh/nodes", get(mesh_nodes))
@@ -54,19 +61,14 @@ pub fn build(
         .route("/mesh/metrics", post(mesh_metrics))
         .route("/mesh/blackboard/post", post(blackboard_post))
         .route("/mesh/blackboard/search", post(blackboard_search))
-
         // Plan de contrôle : négociation de session QUIC entre pairs
         .route("/mesh/session/negotiate", post(session_negotiate))
-
         // Coordinateur : inférence distribuée (pipeline-split)
         .route("/mesh/infer", post(mesh_infer))
-
         // Endpoints internes (zome calls via daemon)
         .route("/zome/:dna/:zome/:function", post(zome_call))
-
         // Administration du nœud (palier E)
         .route("/daemon/rotate-identity", post(rotate_identity))
-
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -86,9 +88,7 @@ struct NegotiateBody {
     /// Clé publique ed25519 du coordinateur demandeur (hex ou raw [u8;32]).
     /// Envoyée par le coordinateur lors de la négociation pour permettre au
     /// listener de vérifier l'identité mTLS côté serveur (T3.2).
-    /// Absente en bootstrap statique → repli sur token seul.
-    #[serde(default)]
-    requester_pubkey: Option<[u8; 32]>,
+    requester_pubkey: [u8; 32],
 }
 
 /// POST /mesh/session/negotiate
@@ -109,7 +109,7 @@ async fn session_negotiate(
     // Notre propre clé : le client peut vérifier notre cert TLS.
     offer.peer_pubkey = Some(s.identity.public_key_bytes());
     // Clé du demandeur : on vérifiera son cert TLS après le handshake.
-    offer.client_pubkey = body.requester_pubkey;
+    offer.client_pubkey = Some(body.requester_pubkey);
 
     s.registry.register(offer.clone());
     Json(offer)
@@ -135,8 +135,13 @@ async fn mesh_infer(
         Some(p) => p,
         None => match s.holochain.get_execution_plan(&body.model_id).await {
             Ok(p) => p,
-            Err(e) => return (StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": format!("plan indisponible: {}", e)}))).into_response(),
+            Err(e) => {
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(serde_json::json!({"error": format!("plan indisponible: {}", e)})),
+                )
+                    .into_response()
+            }
         },
     };
 
@@ -150,30 +155,46 @@ async fn mesh_infer(
                 body.messages,
                 body.max_tokens,
                 &node_id,
-            ).await
+            )
+            .await
         }
         ainonymous_types::ExecutionPlan::PipelineSplit { .. } => {
             crate::conductor::run_pipeline_inference(
-                &s.holochain, &s.conductor.pipeline, &plan, body.messages, body.max_tokens,
-                &s.identity, s.conductor.eos_token_id, s.conductor.speculative_k,
-            ).await
+                &s.holochain,
+                &s.conductor.pipeline,
+                &plan,
+                body.messages,
+                body.max_tokens,
+                &s.identity,
+                s.conductor.eos_token_id,
+                s.conductor.speculative_k,
+            )
+            .await
         }
         other => Err(anyhow::anyhow!("plan non supporté: {:?}", other)),
     };
 
     match result {
         Ok(r) => {
-            let mode = if r.node_ids.len() == 1 { "solo" } else { "pipeline_split" };
+            let mode = if r.node_ids.len() == 1 {
+                "solo"
+            } else {
+                "pipeline_split"
+            };
             Json(serde_json::json!({
                 "content": r.text,
                 "token_count": r.token_count,
                 "node_ids": r.node_ids,
                 "execution_mode": mode,
                 "speculative_acceptance_rate": r.speculative_acceptance_rate,
-            })).into_response()
+            }))
+            .into_response()
         }
-        Err(e) => (StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -182,16 +203,20 @@ async fn mesh_status(State(s): State<DaemonState>) -> impl IntoResponse {
         Ok(_) => Json(serde_json::json!({
             "local_node": { "status": "active" },
             "mesh": { "status": "connected" }
-        })).into_response(),
+        }))
+        .into_response(),
         Err(_) => Json(serde_json::json!({
             "local_node": { "status": "degraded" },
             "mesh": { "status": "connecting" }
-        })).into_response(),
+        }))
+        .into_response(),
     }
 }
 
 #[derive(Deserialize)]
-struct ModelQuery { model_id: Option<String> }
+struct ModelQuery {
+    model_id: Option<String>,
+}
 
 async fn mesh_nodes(
     State(s): State<DaemonState>,
@@ -200,8 +225,11 @@ async fn mesh_nodes(
     let model_id = q.model_id.as_deref().unwrap_or("");
     match s.holochain.get_available_nodes(model_id).await {
         Ok(nodes) => Json(nodes).into_response(),
-        Err(e) => (StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -216,8 +244,11 @@ async fn mesh_plan(
     let model_id = body["model_id"].as_str().unwrap_or("");
     match s.holochain.get_execution_plan(model_id).await {
         Ok(plan) => Json(plan).into_response(),
-        Err(e) => (StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -235,14 +266,26 @@ async fn blackboard_post(
 ) -> impl IntoResponse {
     let prefix = body["prefix"].as_str().unwrap_or("STATUS");
     let content = body["content"].as_str().unwrap_or("");
-    let tags = body["tags"].as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+    let tags = body["tags"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     match s.holochain.blackboard_post(prefix, content, tags).await {
-        Ok(()) => (StatusCode::CREATED, Json(serde_json::json!({"status": "posted"}))).into_response(),
-        Err(e) => (StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Ok(()) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({"status": "posted"})),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -250,8 +293,13 @@ async fn blackboard_search(
     State(s): State<DaemonState>,
     Json(body): Json<serde_json::Value>,
 ) -> impl IntoResponse {
-    let terms = body["terms"].as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+    let terms = body["terms"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let prefix_filter = body["prefix_filter"].as_str().map(String::from);
 
@@ -269,8 +317,11 @@ async fn zome_call(
 ) -> impl IntoResponse {
     match s.holochain.zome_call(&dna, &zome, &function, payload).await {
         Ok(result) => Json(result).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -301,28 +352,39 @@ async fn rotate_identity(State(s): State<DaemonState>) -> impl IntoResponse {
     // 1. Générer la nouvelle clé et écraser le fichier
     let (new_identity, old_pubkey_bytes) = match NodeIdentity::rotate_file(&s.identity_path) {
         Ok(pair) => pair,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("rotation échouée: {e}")})),
-        ).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("rotation échouée: {e}")})),
+            )
+                .into_response()
+        }
     };
 
     let old_pubkey_hex = hex::encode(old_pubkey_bytes);
     let new_pubkey_hex = new_identity.public_key_hex();
-    info!("Nouvelle identité générée: {} (ancienne: {})", new_pubkey_hex, old_pubkey_hex);
+    info!(
+        "Nouvelle identité générée: {} (ancienne: {})",
+        new_pubkey_hex, old_pubkey_hex
+    );
 
     // 2. Re-annoncer dans le DHT (non-fatal)
-    let dht_updated = s.holochain
+    let dht_updated = s
+        .holochain
         .reannounce_pubkey(&new_pubkey_hex, &s.config)
         .await
         .is_ok();
 
     // 3. Émettre de nouveaux warrants de façon sûre (non-fatale)
-    if let Err(e) = s.holochain.try_emit_model_claim(
-        "gemma4-e4b", // TODO: rendre configurable
-        "sha256-pending", // TODO: calculer le vrai hash du modèle
-        &new_identity,
-    ).await {
+    if let Err(e) = s
+        .holochain
+        .try_emit_model_claim(
+            "gemma4-e4b",     // TODO: rendre configurable
+            "sha256-pending", // TODO: calculer le vrai hash du modèle
+            &new_identity,
+        )
+        .await
+    {
         warn!("Échec émission ModelClaim warrant: {}", e);
     }
 
@@ -336,5 +398,6 @@ async fn rotate_identity(State(s): State<DaemonState>) -> impl IntoResponse {
         "restart_required": true,
         "dht_updated": dht_updated,
         "warrants_emitted": true,
-    })).into_response()
+    }))
+    .into_response()
 }

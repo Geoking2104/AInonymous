@@ -4,17 +4,18 @@
 //!   1. handshake OK quand le client épingle la bonne clé du serveur ;
 //!   2. handshake REJETÉ quand la clé épinglée ne correspond pas (preuve que
 //!      `PeerKeyVerifier` ne se contente pas d'un `assertion()`) ;
-//!   3. handshake OK sans épinglage (peer_pubkey = None) mais cert ed25519 valide.
+//!   3. connection REJECTED when the authenticated control plane does not
+//!      provide a server key pin.
 
 use std::time::Duration;
 
-use ainonymous_quic::{
-    create_endpoint, NodeIdentity, QuicSession, SessionConfig, SessionOffer,
-};
+use ainonymous_quic::{create_endpoint, NodeIdentity, QuicSession, SessionConfig, SessionOffer};
 
 /// Démarre un endpoint serveur mTLS et une tâche d'acceptation qui lit le token
 /// d'auth puis garde la connexion ouverte. Retourne (adresse, handle).
-async fn spawn_server(server_id: NodeIdentity) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+async fn spawn_server(
+    server_id: NodeIdentity,
+) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     let ep = create_endpoint(Some("127.0.0.1:0".parse().unwrap()), &server_id)
         .await
         .expect("endpoint serveur");
@@ -59,7 +60,11 @@ async fn handshake_ok_avec_cle_epinglee_correcte() {
     )
     .await;
 
-    assert!(res.is_ok(), "le handshake aurait dû réussir: {:?}", res.err());
+    assert!(
+        res.is_ok(),
+        "le handshake aurait dû réussir: {:?}",
+        res.err()
+    );
     srv.abort();
 }
 
@@ -90,7 +95,7 @@ async fn handshake_rejete_avec_cle_epinglee_erronee() {
 }
 
 #[tokio::test]
-async fn handshake_ok_sans_epinglage() {
+async fn connexion_rejetee_sans_epinglage() {
     let server_id = NodeIdentity::generate();
     let client_id = NodeIdentity::generate();
 
@@ -99,7 +104,8 @@ async fn handshake_ok_sans_epinglage() {
     let client_ep = create_endpoint(Some("127.0.0.1:0".parse().unwrap()), &client_id)
         .await
         .unwrap();
-    // peer_pubkey = None : on accepte tout cert ed25519 valide (possession prouvée).
+    // An Ed25519 certificate proves possession of some key, not the expected
+    // peer's identity. Missing control-plane binding must fail closed.
     let res = QuicSession::connect(
         &client_ep,
         offer_for(addr, None),
@@ -108,6 +114,6 @@ async fn handshake_ok_sans_epinglage() {
     )
     .await;
 
-    assert!(res.is_ok(), "handshake sans épinglage: {:?}", res.err());
+    assert!(res.is_err(), "connexion sans épinglage aurait dû échouer");
     srv.abort();
 }
