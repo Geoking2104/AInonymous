@@ -26,6 +26,8 @@ venv/
 
 # Config locale (peut contenir des secrets)
 config.toml
+!.cargo/config.toml
+!dnas/**/.cargo/config.toml
 *.key
 *.pem
 

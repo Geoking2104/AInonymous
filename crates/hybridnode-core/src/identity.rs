@@ -6,8 +6,8 @@
 //! neither implemented nor required.
 
 use crate::config::HybridNodeConfig;
-use crate::error::HybridNodeError;
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
+use holochain_client::{AdminWebsocket, AppWebsocket, CellInfo, ClientAgentSigner};
 use tracing::info;
 
 /// Resolved identity for this node.
@@ -21,44 +21,42 @@ pub struct NodeIdentity {
 
 /// Connect to lair-keystore via Holochain conductor and load the agent key.
 ///
-/// In production this calls the Holochain conductor WebSocket to retrieve
-/// `AppInfo.agent_pub_key`. In mock mode (feature = "mock-sdwan") it returns
-/// a deterministic test key.
+/// This always calls the Holochain conductor. Mocking the SD-WAN topology must
+/// never silently replace the cryptographic control-plane identity.
 pub async fn load_from_conductor(config: &HybridNodeConfig) -> Result<NodeIdentity> {
-    #[cfg(feature = "mock-sdwan")]
-    {
-        let _ = config;
-        let fake_key = vec![0xabu8; 32];
-        let hex = hex::encode(&fake_key);
-        info!("Identity loaded (mock) — agent={hex}");
-        Ok(NodeIdentity {
-            agent_pub_key: fake_key,
-            agent_pub_key_hex: hex,
+    let admin = AdminWebsocket::connect(("127.0.0.1", config.holochain.admin_port), None)
+        .await
+        .context("failed to connect to the Holochain 0.7 admin interface")?;
+    let token = admin
+        .issue_app_auth_token(config.holochain.app_id.clone().into())
+        .await
+        .context("failed to issue a Holochain app authentication token")?;
+    let signer = ClientAgentSigner::default();
+    let app = AppWebsocket::connect(
+        ("127.0.0.1", config.holochain.app_port),
+        token.token,
+        signer.into(),
+        None,
+    )
+    .await
+    .context("failed to connect to the Holochain 0.7 app interface")?;
+
+    let agent = app
+        .cached_app_info()
+        .cell_info
+        .values()
+        .flatten()
+        .find_map(|cell| match cell {
+            CellInfo::Provisioned(provisioned) => Some(provisioned.cell_id.agent_pubkey().clone()),
+            _ => None,
         })
-    }
+        .ok_or_else(|| anyhow!("the configured Holochain app has no provisioned cell"))?;
 
-    #[cfg(not(feature = "mock-sdwan"))]
-    {
-        // Production path: connect to conductor via holochain_client
-        // TODO: replace with actual holochain_client call when stabilized
-        let _url = &config.holochain.conductor_url;
-        Err(HybridNodeError::Identity(
-            "holochain_client integration not yet implemented — build with mock-sdwan feature"
-                .to_string(),
-        )
-        .into())
-    }
-}
-
-impl NodeIdentity {
-    /// This type intentionally cannot derive the transport certificate because
-    /// it does not own the Holochain private key. Use
-    /// `ainonymous_quic::NodeIdentity` for the QUIC transport identity.
-    pub fn to_tls_cert_der(&self) -> Result<Vec<u8>> {
-        // In production: use rcgen + ed25519-dalek to generate a self-signed DER cert
-        // where the Subject Public Key Info contains the AgentPubKey.
-        // For now returns a stub — the daemon enforces mtls_strict=true which
-        // activates the real PeerKeyVerifier path in the QUIC module.
-        Err(HybridNodeError::Identity("TLS cert derivation not yet implemented".to_string()).into())
-    }
+    let raw = agent.get_raw_39().to_vec();
+    let encoded = agent.to_string();
+    info!("Holochain identity loaded — agent={encoded}");
+    Ok(NodeIdentity {
+        agent_pub_key: raw,
+        agent_pub_key_hex: encoded,
+    })
 }

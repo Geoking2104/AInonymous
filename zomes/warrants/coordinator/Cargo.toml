@@ -1,2 +1,0 @@
-[dependencies]
-ed25519-dalek = { version = "2.1", features = ["rand_core"] }

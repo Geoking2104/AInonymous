@@ -12,6 +12,7 @@ import argparse
 import sys
 import json
 import pathlib
+from urllib.parse import urlparse
 
 try:
     import yaml
@@ -39,6 +40,24 @@ def _semantic_errors(config: dict, production: bool) -> list[str]:
     security = config.get("security", {})
     holochain = config.get("holochain", {})
 
+    if holochain.get("version") != "0.7.0":
+        errors.append("holochain.version must be exactly 0.7.0")
+    if holochain.get("admin_port") == holochain.get("app_port"):
+        errors.append("holochain.admin_port and holochain.app_port must be different")
+    conductor_url = holochain.get("conductor_url", "")
+    try:
+        parsed_conductor_url = urlparse(conductor_url)
+        if parsed_conductor_url.scheme != "ws" or parsed_conductor_url.hostname not in {
+            "127.0.0.1",
+            "localhost",
+            "::1",
+        }:
+            errors.append(
+                "holochain.conductor_url must be an unencrypted loopback WebSocket endpoint"
+            )
+    except (TypeError, ValueError):
+        errors.append("holochain.conductor_url must be a valid loopback WebSocket URL")
+
     if quic.get("mtls_strict") is not True:
         errors.append("quic.mtls_strict must be true")
     if sdwan.get("tls_verify") is False:
@@ -49,6 +68,8 @@ def _semantic_errors(config: dict, production: bool) -> list[str]:
         errors.append(
             "security.private_network and holochain.bootstrap_mode must describe the same trust mode"
         )
+    if config.get("mode") == "sdwan-only" and security.get("private_network", False):
+        errors.append("sdwan-only mode cannot claim Holochain private-network admission")
     if holochain.get("bootstrap_mode") == "private" and not holochain.get("bootstrap_url"):
         errors.append("private networks require holochain.bootstrap_url")
 
@@ -57,6 +78,13 @@ def _semantic_errors(config: dict, production: bool) -> list[str]:
         errors.append("configuration still contains template placeholders")
 
     if production:
+        for label, value in (
+            ("holochain.bootstrap_url", holochain.get("bootstrap_url", "")),
+            ("sdwan.api_url", sdwan.get("api_url", "")),
+        ):
+            hostname = urlparse(value).hostname or ""
+            if value and hostname.endswith((".example", ".invalid")):
+                errors.append(f"production profile must replace the reserved {label} example")
         if sdwan.get("provider") == "mock":
             errors.append("production profile cannot use sdwan.provider=mock")
         if config.get("observability", {}).get("prometheus_addr", "").startswith("0.0.0.0"):

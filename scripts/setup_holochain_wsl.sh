@@ -1,51 +1,55 @@
 #!/usr/bin/env bash
-# T5.1 — Installer Holochain 0.6.2 + lair-keystore dans WSL2 (Ubuntu x86_64)
-#
-# Usage : bash scripts/setup_holochain_wsl.sh
-# Prérequis : WSL2 Ubuntu (wsl --install Ubuntu depuis PowerShell)
-#
-# Ce script est conçu pour tourner DANS WSL2 (pas depuis PowerShell).
-# Depuis PowerShell : wsl bash scripts/setup_holochain_wsl.sh
+# Install the exact Holochain toolchain used by this repository on x86_64 Linux/WSL2.
 set -euo pipefail
 
-HOLOCHAIN_VERSION="0.6.2"
+HOLOCHAIN_VERSION="0.7.0"
 RELEASE_TAG="holochain-${HOLOCHAIN_VERSION}"
 BASE_URL="https://github.com/holochain/holochain/releases/download/${RELEASE_TAG}"
 ARCH="x86_64-unknown-linux-gnu"
 INSTALL_DIR="${HOME}/.local/bin"
 
-echo "=== Holochain ${HOLOCHAIN_VERSION} installer (WSL2 Ubuntu) ==="
+declare -A SHA256=(
+    [hc]="f1eca56b97bc2261324e00e0e86a274f7dc8363f73264e697fd0c0216b2aac23"
+    [holochain]="ffa40a0c6fab5ce062c4af76328dfe2de143256ddf791a504d72bca698a9ba20"
+    [lair-keystore]="7a77822ab5e0020d0f3c358030d4ccfa8c6c144407a5c075d302c7b0fcf670c1"
+)
 
-# Créer le répertoire d'installation
+command -v curl >/dev/null 2>&1 || { echo "ERROR: curl is required" >&2; exit 1; }
+command -v sha256sum >/dev/null 2>&1 || { echo "ERROR: sha256sum is required" >&2; exit 1; }
+
 mkdir -p "${INSTALL_DIR}"
+DOWNLOAD_DIR="$(mktemp -d)"
+cleanup() { rm -rf "${DOWNLOAD_DIR}"; }
+trap cleanup EXIT
 
-# Vérifier si PATH contient déjà ~/.local/bin
-if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
-    echo "export PATH=\"\${HOME}/.local/bin:\${PATH}\"" >> ~/.bashrc
-    export PATH="${INSTALL_DIR}:${PATH}"
-    echo "→ ${INSTALL_DIR} ajouté au PATH"
-fi
-
-# Installer les binaires si pas déjà présents
-for BIN in holochain hc lair-keystore; do
-    TARGET="${INSTALL_DIR}/${BIN}"
-    if [[ -f "${TARGET}" ]]; then
-        echo "✓ ${BIN} déjà installé ($(${TARGET} --version 2>&1 | head -1))"
-        continue
-    fi
-    echo "→ Téléchargement ${BIN}..."
-    curl -fsSL "${BASE_URL}/${BIN}-${ARCH}" -o "${TARGET}"
-    chmod +x "${TARGET}"
-    echo "✓ ${BIN} installé"
+echo "Installing Holochain ${HOLOCHAIN_VERSION} from ${RELEASE_TAG}"
+for bin in holochain hc lair-keystore; do
+    asset="${bin}-${ARCH}"
+    downloaded="${DOWNLOAD_DIR}/${asset}"
+    echo "Downloading ${asset}"
+    curl --fail --location --silent --show-error "${BASE_URL}/${asset}" --output "${downloaded}"
+    printf '%s  %s\n' "${SHA256[$bin]}" "${downloaded}" | sha256sum --check --status || {
+        echo "ERROR: SHA-256 verification failed for ${asset}" >&2
+        exit 1
+    }
+    chmod 0755 "${downloaded}"
+    install -m 0755 "${downloaded}" "${INSTALL_DIR}/${bin}"
 done
 
-# Vérifications
-echo ""
-echo "=== Versions installées ==="
+export PATH="${INSTALL_DIR}:${PATH}"
+grep -Fq '${HOME}/.local/bin' "${HOME}/.bashrc" 2>/dev/null || \
+    printf '\nexport PATH="${HOME}/.local/bin:${PATH}"\n' >> "${HOME}/.bashrc"
+
+[[ "$(holochain --version 2>&1)" == *"${HOLOCHAIN_VERSION}"* ]] || {
+    echo "ERROR: unexpected holochain version" >&2
+    exit 1
+}
+[[ "$(hc --version 2>&1)" == *"${HOLOCHAIN_VERSION}"* ]] || {
+    echo "ERROR: unexpected hc version" >&2
+    exit 1
+}
+
 holochain --version
 hc --version
 lair-keystore --version
-
-echo ""
-echo "=== Installation terminée ==="
-echo "Lancez le test : bash scripts/run_t51_signal_test.sh"
+echo "Installation complete. Open a new shell or keep ${INSTALL_DIR} on PATH."

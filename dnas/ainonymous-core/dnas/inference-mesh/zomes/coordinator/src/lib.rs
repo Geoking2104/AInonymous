@@ -6,7 +6,7 @@ use inference_mesh_integrity::*;
 /// Soumettre une requête d'inférence dans le DHT
 #[hdk_extern]
 pub fn submit_inference_request(input: SubmitRequestInput) -> ExternResult<Record> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
     hasher.update(&input.prompt_bytes);
@@ -34,18 +34,51 @@ pub fn submit_inference_request(input: SubmitRequestInput) -> ExternResult<Recor
     )?;
 
     // Lier le modèle à ses requêtes (pour stats)
-    let model_anchor = anchor(LinkTypes::PathLinks, "models".to_string(), input.model_id.clone())?;
-    create_link(model_anchor, action_hash.clone(), LinkTypes::ModelToRequests, ())?;
+    let model_anchor = anchor(
+        LinkTypes::PathLinks,
+        "models".to_string(),
+        input.model_id.clone(),
+    )?;
+    create_link(
+        model_anchor,
+        action_hash.clone(),
+        LinkTypes::ModelToRequests,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record non trouvé".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Record non trouvé".into()
+    )))
 }
 
 /// Négocier une session QUIC avec un nœud distant (plan de contrôle)
 /// Le nœud distant ouvrira un listener QUIC et retournera son endpoint + token
 #[hdk_extern]
 pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSessionResult> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
+
+    let caller = call_info()?.provenance;
+    let supplied_key = input.requester_pubkey.as_deref().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "requester_pubkey is required for mTLS negotiation".into(),
+        ))
+    })?;
+    if supplied_key.len() != 32 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "requester_pubkey must contain exactly 32 bytes".into(),
+        )));
+    }
+    let caller_info = resolve_agent_info(caller.clone()).ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "the caller has no authored transport-key capability record".into(),
+        ))
+    })?;
+    let expected_key = caller_info.node_pubkey;
+    if hex_bytes(supplied_key) != expected_key.to_ascii_lowercase() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "requester_pubkey does not match the caller's authored capability record".into(),
+        )));
+    }
 
     // Générer token éphémère (32 bytes) via le host Holochain — jamais stocké en DHT
     let token = random_bytes(32)?.to_vec();
@@ -62,13 +95,13 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
         .as_ref()
         .and_then(|i| i.quic_endpoint.clone())
         .unwrap_or(input.local_quic_endpoint.clone());
-    let my_node_pubkey = my_info.and_then(|i| i.node_pubkey);
+    let my_node_pubkey = my_info.map(|i| i.node_pubkey);
 
     // Émettre un signal vers le daemon local pour ouvrir le listener QUIC.
     // Le next-hop est propagé pour que le worker sache vers qui relayer.
     emit_signal(QuicListenerSignal {
         session_token: token.clone(),
-        requestor: call_info()?.provenance,
+        requestor: caller.clone(),
         layer_range: input.layer_range,
         expires_in_seconds: 30,
         next_agent_id: input.next_agent_id.clone(),
@@ -79,11 +112,11 @@ pub fn negotiate_quic_session(input: QuicNegotiateInput) -> ExternResult<QuicSes
     // Publier l'offre de session (avec hash seulement) dans le DHT pour traçabilité
     let offer = QuicSessionOffer {
         request_id: input.request_id,
-        requestor: call_info()?.provenance,
+        requestor: caller,
         quic_endpoint: my_endpoint.clone(),
         session_token_hash: token_hash,
         expires_at: Timestamp::from_micros(
-            sys_time()?.as_micros() + 30_000_000 // +30 secondes
+            sys_time()?.as_micros() + 30_000_000, // +30 secondes
         ),
         layer_range: input.layer_range,
     };
@@ -121,8 +154,11 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// Pendant DHT du POST REST `/mesh/session/negotiate` du bootstrap statique.
 #[hdk_extern]
 pub fn request_remote_session(input: RemoteSessionInput) -> ExternResult<QuicSessionResult> {
-    let target = AgentPubKey::try_from(input.target.clone())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("agent cible invalide: {e:?}"))))?;
+    let target = AgentPubKey::try_from(input.target.clone()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "agent cible invalide: {e:?}"
+        )))
+    })?;
 
     let payload = QuicNegotiateInput {
         request_id: String::new(),
@@ -148,12 +184,12 @@ pub fn request_remote_session(input: RemoteSessionInput) -> ExternResult<QuicSes
             .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e))),
         ZomeCallResponse::Unauthorized(..)
         | ZomeCallResponse::CountersigningSession(..)
-        | ZomeCallResponse::AuthenticationFailed(..) => {
-            Err(wasm_error!(WasmErrorInner::Guest("call_remote non autorisé".into())))
-        }
-        ZomeCallResponse::NetworkError(e) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("erreur réseau call_remote: {e}"))))
-        }
+        | ZomeCallResponse::AuthenticationFailed(..) => Err(wasm_error!(WasmErrorInner::Guest(
+            "call_remote non autorisé".into()
+        ))),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "erreur réseau call_remote: {e}"
+        )))),
     }
 }
 
@@ -161,23 +197,22 @@ pub fn request_remote_session(input: RemoteSessionInput) -> ExternResult<QuicSes
 /// intra-agent) : endpoint QUIC + clé publique ed25519 pour le pinning mTLS.
 fn resolve_my_agent_info() -> Option<AgentQuicEndpoint> {
     let me = agent_info().ok()?.agent_initial_pubkey;
+    resolve_agent_info(me)
+}
+
+fn resolve_agent_info(agent: AgentPubKey) -> Option<AgentQuicEndpoint> {
     let resp = call(
         CallTargetCell::OtherRole("agent-registry".into()),
         "agent-registry-coordinator",
         "get_node_capabilities".into(),
         None,
-        me,
+        agent,
     )
     .ok()?;
     match resp {
         ZomeCallResponse::Ok(data) => data.decode().ok()?,
         _ => None,
     }
-}
-
-/// Endpoint QUIC de CET agent (wrapper de compatibilité).
-fn resolve_my_quic_endpoint() -> Option<String> {
-    resolve_my_agent_info()?.quic_endpoint
 }
 
 /// Publier les métriques d'inférence
@@ -199,21 +234,30 @@ pub fn compute_execution_plan(input: PlanInput) -> ExternResult<ExecutionPlanOut
     )?;
 
     let nodes: Vec<NodeInfo> = match available_nodes {
-        ZomeCallResponse::Ok(result) => result.decode()
+        ZomeCallResponse::Ok(result) => result
+            .decode()
             .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?,
         ZomeCallResponse::Unauthorized(..)
         | ZomeCallResponse::CountersigningSession(..)
-        | ZomeCallResponse::AuthenticationFailed(..) =>
-            return Err(wasm_error!(WasmErrorInner::Guest("Appel non autorisé".into()))),
-        ZomeCallResponse::NetworkError(e) =>
-            return Err(wasm_error!(WasmErrorInner::Guest(format!("Erreur réseau: {}", e)))),
+        | ZomeCallResponse::AuthenticationFailed(..) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Appel non autorisé".into()
+            )))
+        }
+        ZomeCallResponse::NetworkError(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Erreur réseau: {}",
+                e
+            ))))
+        }
     };
 
     // Sélectionner le mode d'exécution
     let plan = if nodes.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Aucun nœud disponible pour {}", input.model_id)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Aucun nœud disponible pour {}",
+            input.model_id
+        ))));
     } else if nodes.len() == 1 || input.force_solo {
         ExecutionPlanOutput::Solo {
             node: nodes[0].agent_id.clone(),
@@ -258,11 +302,17 @@ fn build_pipeline_split_plan(nodes: &[NodeInfo], model_id: &str) -> ExecutionPla
     let n = nodes.len().min(4) as u32; // max 4 nœuds pour le pipeline
     let layers_per_node = total_layers / n;
 
-    let stages: Vec<PipelineStageOutput> = nodes.iter().take(n as usize)
+    let stages: Vec<PipelineStageOutput> = nodes
+        .iter()
+        .take(n as usize)
         .enumerate()
         .map(|(i, node)| {
             let start = i as u32 * layers_per_node;
-            let end = if i == n as usize - 1 { total_layers - 1 } else { start + layers_per_node - 1 };
+            let end = if i == n as usize - 1 {
+                total_layers - 1
+            } else {
+                start + layers_per_node - 1
+            };
             PipelineStageOutput {
                 node: node.agent_id.clone(),
                 quic_endpoint: node.quic_endpoint.clone().unwrap_or_default(),
@@ -281,12 +331,15 @@ fn build_expert_shard_plan(nodes: &[NodeInfo], _model_id: &str) -> ExecutionPlan
     // Tous les nœuds portent le tronc dense ; les experts sparse sont distribués
     let trunk_node = nodes[0].agent_id.clone();
 
-    let stages: Vec<ExpertStageOutput> = nodes.iter()
+    let stages: Vec<ExpertStageOutput> = nodes
+        .iter()
         .enumerate()
         .map(|(i, node)| ExpertStageOutput {
             node: node.agent_id.clone(),
             quic_endpoint: node.quic_endpoint.clone().unwrap_or_default(),
-            expert_ids: (0..64u32).filter(|e| (*e as usize) % nodes.len() == i).collect(),
+            expert_ids: (0..64u32)
+                .filter(|e| (*e as usize) % nodes.len() == i)
+                .collect(),
             has_trunk: true,
         })
         .collect();
@@ -296,12 +349,12 @@ fn build_expert_shard_plan(nodes: &[NodeInfo], _model_id: &str) -> ExecutionPlan
 
 fn model_total_layers(model_id: &str) -> u32 {
     match model_id {
-        id if id.contains("31b")  => 48,
-        id if id.contains("26b")  => 30,
-        id if id.contains("e4b")  => 32,
-        id if id.contains("e2b")  => 18,
-        id if id.contains("70b")  => 80,
-        id if id.contains("72b")  => 80,
+        id if id.contains("31b") => 48,
+        id if id.contains("26b") => 30,
+        id if id.contains("e4b") => 32,
+        id if id.contains("e2b") => 18,
+        id if id.contains("70b") => 80,
+        id if id.contains("72b") => 80,
         _ => 32,
     }
 }
@@ -377,10 +430,8 @@ pub struct RemoteSessionInput {
 pub struct AgentQuicEndpoint {
     #[serde(default)]
     pub quic_endpoint: Option<String>,
-    /// Clé publique ed25519 hex (palier D) — absente si le nœud n'a pas encore
-    /// migré vers `load_or_generate` ; ignorée sans paniquer (`serde(default)`).
-    #[serde(default)]
-    pub node_pubkey: Option<String>,
+    /// Required Ed25519 transport public key encoded as hexadecimal.
+    pub node_pubkey: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -459,5 +510,15 @@ pub struct NodeInfo {
     #[serde(default)]
     pub model_id: Option<String>,
     #[serde(default)]
-    pub node_pubkey: Option<String>,
+    pub node_pubkey: String,
+}
+
+fn hex_bytes(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
 }

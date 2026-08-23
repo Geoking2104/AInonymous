@@ -1,99 +1,87 @@
-# Build & exécution Holochain (zomes → .happ → conducteur)
+# Holochain Build and Operations
 
-Statut : les zomes sont alignés sur **Holochain 0.6.1** (`hdk 0.6` / `hdi 0.7`) et
-**compilent en WASM** (6 `.wasm` : 3 integrity + 3 coordinator). Reste à packager
-le `.happ` et à le faire tourner dans un conducteur — ces étapes exigent la CLI
-`hc`, qui nécessite `libsodium`/`sqlite` (non installables dans tous les
-environnements). Voici comment procéder sur une machine de dev.
+## Required toolchain
 
-## Prérequis (CLI `hc`)
-
-La CLI Holochain `hc` doit correspondre à **Holochain 0.6**. Deux options.
-
-### Option A — Nix (recommandé, `hc` prêt à l'emploi)
+Use Holochain and `hc` 0.7.0 with Lair 0.7.1. The Rust crates are pinned separately: HDK 0.7.0, HDI 0.8.0 and `holochain_client` 0.9.0.
 
 ```bash
-# Dev shell Holochain 0.6 (fournit hc, holochain, lair-keystore)
-nix develop github:holochain/holochain#holonix --override-input versions \
-  'github:holochain/holochain?dir=versions/0_6'
-```
-
-### Option B — cargo install (Linux, avec libs système)
-
-```bash
-sudo apt install -y libsodium-dev libsqlite3-dev pkg-config build-essential
 rustup target add wasm32-unknown-unknown
-cargo install holochain_cli --version 0.6.1     # binaire `hc`
-# (optionnel, pour exécuter un conducteur : holochain + lair-keystore 0.6)
+hc --version          # must report 0.7.0
+holochain --version   # must report 0.7.0
 ```
 
-> Note : la compilation WASM des zomes dépend de
-> `dnas/ainonymous-core/.cargo/config.toml`, qui sélectionne le backend
-> `getrandom="custom"` requis pour `wasm32-unknown-unknown` sous Holochain 0.6.
+## Build and package
 
-## 1) Packager le hApp
+The repository contains two independent zome workspaces. The packaging script builds both and copies the resulting WASM modules into each DNA work directory before invoking `hc dna pack` and `hc app pack`.
 
 ```bash
-make build-happ
-# équivaut à :
-#   cd dnas/ainonymous-core
-#   cargo build --release --target wasm32-unknown-unknown
-#   hc dna pack dnas/inference-mesh/workdir
-#   hc dna pack dnas/agent-registry/workdir
-#   hc dna pack dnas/blackboard/workdir
-#   hc app pack .
+bash scripts/build-happ.sh release
 ```
 
-Sortie attendue : `dnas/ainonymous-core/ainonymous-core.happ`.
+Expected outputs:
 
-## 2) Lancer un conducteur de test (sandbox)
+```text
+dnas/ainonymous-core/ainonymous-core.happ
+dnas/hybridnode/hybridnode.happ
+```
+
+To compile without packaging:
 
 ```bash
-# Démarre un conducteur éphémère avec le hApp installé
-hc sandbox generate dnas/ainonymous-core/ainonymous-core.happ --run
-# Note le port de l'app websocket affiché (ex: ws://127.0.0.1:<port>)
+cargo build --manifest-path dnas/ainonymous-core/Cargo.toml \
+  --release --target wasm32-unknown-unknown
+cargo build --manifest-path dnas/hybridnode/Cargo.toml \
+  --release --target wasm32-unknown-unknown
 ```
 
-Pour deux agents (mesh local), lancer deux sandboxes sur des ports distincts.
+## Conductor 0.7 baseline
 
-## 3) Brancher le daemon sur le conducteur (à implémenter)
+Use a fresh data root and keep the admin interface on loopback. `scripts/testnet/conductor_t51.yaml` is the development baseline. Its `keystore.type: danger_test_keystore` and disabled durable sync are for disposable testnets only.
 
-Aujourd'hui `crates/ainonymous-daemon/src/holochain.rs` utilise un **pont REST
-factice** (`zome_call` POST vers le daemon lui-même) et le plan de contrôle
-**bootstrap statique** (cf. `peers`/`pipeline_stages` dans la config). Pour le
-mode Holochain réel :
+For a persistent deployment:
 
-1. Ajouter la dépendance `holochain_client` (≈ 0.8, à aligner sur le conducteur 0.6)
-   au crate `ainonymous-daemon`.
-2. Dans `holochain.rs`, remplacer `zome_call` par un appel
-   `AppWebsocket::call_zome(...)` :
-   - connexion au port app websocket du conducteur (cf. `holochain_conductor_url`/
-     port app dans `DaemonConfig`),
-   - authentification de l'app interface (token),
-   - signature des zome calls via le lair-keystore de l'agent.
-3. Conserver le **trait de plan de contrôle** : l'implémentation Holochain se
-   branche derrière la même API que le bootstrap statique (`negotiate_quic_session`,
-   `get_execution_plan`, `get_available_nodes`, blackboard…), de sorte que le
-   testnet loopback (mock) et le mode Holochain réel restent interchangeables.
-4. Câbler le signal `QuicListenerSignal` (émis par le zome `inference-mesh`) vers
-   `SessionRegistry::register` du listener QUIC (le pont REST actuel le fait déjà
-   pour le bootstrap statique).
+- configure a Lair keystore;
+- use `db_sync_level: Normal`;
+- set the intended private bootstrap and relay URLs;
+- protect bootstrap/relay auth material as secrets;
+- bind admin WebSockets to `127.0.0.1` or an isolated management namespace;
+- expose an app interface only where required.
 
-## Matrice de versions (référence)
+Holochain 0.7 uses Iroh as its network transport. Do not copy obsolete `transport_pool`, WebRTC or tx5 fields into the conductor configuration; unknown configuration fields are rejected.
 
-| Composant | Version |
-|---|---|
-| Holochain (conducteur) | 0.6.1 |
-| HDK (coordinator) | 0.6 |
-| HDI (integrity) | 0.7 |
-| holochain_serialized_bytes | 0.0.57 |
-| holochain_client (daemon, à ajouter) | ~0.8 |
+## Install
 
-## Dépannage
+Install with the 0.7 admin API or CLI. The app IDs configured in the daemons must match the installed IDs. A private role needs its membrane proof at install time through `RoleSettings::Provisioned`.
 
-| Symptôme | Cause / fix |
-|---|---|
-| `getrandom ... wasm32 not supported` | `.cargo/config.toml` manquant (backend custom) |
-| `cannot find holochain_serialized_bytes` | dépendance directe absente dans un zome |
-| `hc: command not found` | CLI non installée (cf. Option A/B) |
-| `libsodium-sys` build échoue | installer `libsodium-dev` ou utiliser Nix |
+The daemon helper `install_app_with_membrane_proof` accepts:
+
+- the app bundle path;
+- the target app ID;
+- the role name that requires admission;
+- the serialized proof bytes.
+
+It installs and enables the app. Ordinary zome calls never carry membrane proofs.
+
+## Application connection
+
+The native clients:
+
+1. connect to the loopback admin WebSocket;
+2. issue an app authentication token;
+3. connect to the app WebSocket with a `ClientAgentSigner`;
+4. select the provisioned cell and read its agent public key;
+5. sign zome calls through the Holochain client.
+
+Conductor mode fails closed. Use the explicit static backend only for isolated tests that do not claim Holochain identity.
+
+## Upgrade from 0.6
+
+Do not point Holochain 0.7 at a 0.6 database. Preserve the old directory, create a new data root, repack with `hc` 0.7.0 and reinstall all roles. See [Holochain 0.7 migration](HOLOCHAIN_0_7_MIGRATION.md).
+
+## Troubleshooting
+
+- **Manifest rejected:** confirm `hc --version`; this repository's manifests use version `0` and `path` references.
+- **No cell found:** verify the configured app ID, that the app is enabled and that its role is provisioned.
+- **Unauthorized app WebSocket:** issue a fresh auth token through the local admin interface.
+- **Genesis rejected:** confirm the proof agent key, network ID, signature and the DNA properties used when packing.
+- **Peers do not discover each other:** confirm identical DNA hashes, network seeds, bootstrap/relay endpoints and network auth material.

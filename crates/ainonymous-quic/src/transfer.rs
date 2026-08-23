@@ -1,10 +1,10 @@
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 use tracing::{debug, info};
 use wide::f32x8;
 
+use crate::{QuicError, QuicSession, COMPRESSION_THRESHOLD_BPS, MAX_ACTIVATION_SIZE};
 use ainonymous_types::inference::{ActivationHeader, GeneratedToken};
-use crate::{QuicError, QuicSession, MAX_ACTIVATION_SIZE, COMPRESSION_THRESHOLD_BPS};
 
 /// Transfert d'activations tensorielles via QUIC
 pub struct ActivationTransfer;
@@ -21,7 +21,9 @@ impl ActivationTransfer {
 
         // Décider de la compression selon la bande passante estimée
         let should_compress = session.config.compress
-            || session.config.bandwidth_bps
+            || session
+                .config
+                .bandwidth_bps
                 .map(|bw| bw < COMPRESSION_THRESHOLD_BPS)
                 .unwrap_or(false);
 
@@ -30,7 +32,8 @@ impl ActivationTransfer {
                 .map_err(|e| QuicError::CompressionFailed(e.to_string()))?;
             debug!(
                 "Activations compressées: {} → {} bytes ({:.0}%)",
-                original_size, encoded.len(),
+                original_size,
+                encoded.len(),
                 (1.0 - encoded.len() as f32 / original_size as f32) * 100.0
             );
             (encoded, true)
@@ -43,20 +46,30 @@ impl ActivationTransfer {
         final_header.compressed = compressed;
         let header_bytes = final_header.to_bytes();
 
-        let mut stream = session.connection.open_uni().await
+        let mut stream = session
+            .connection
+            .open_uni()
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
         // Header
-        stream.write_all(&header_bytes).await
+        stream
+            .write_all(&header_bytes)
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
         // Body (taille puis données)
         let size_bytes = (data.len() as u64).to_le_bytes();
-        stream.write_all(&size_bytes).await
+        stream
+            .write_all(&size_bytes)
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        stream.write_all(&data).await
+        stream
+            .write_all(&data)
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        stream.finish()
+        stream
+            .finish()
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
         let elapsed = start.elapsed();
@@ -71,7 +84,10 @@ impl ActivationTransfer {
 
     /// Recevoir un bloc d'activations depuis le nœud précédent
     pub async fn receive(session: &QuicSession) -> Result<(ActivationHeader, Vec<u8>), QuicError> {
-        let mut stream = session.connection.accept_uni().await
+        let mut stream = session
+            .connection
+            .accept_uni()
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
 
         // Lire header (64 bytes)
@@ -92,7 +108,9 @@ impl ActivationTransfer {
         let mut body = vec![0u8; body_size];
         let mut offset = 0;
         while offset < body_size {
-            let chunk = stream.read_chunk(body_size - offset, true).await
+            let chunk = stream
+                .read_chunk(body_size - offset, true)
+                .await
                 .map_err(|e| QuicError::StreamError(e.to_string()))?
                 .ok_or(QuicError::StreamError("stream fermé prématurément".into()))?;
             let n = chunk.bytes.len();
@@ -121,46 +139,66 @@ pub struct TokenStream {
 impl TokenStream {
     /// Créer un stream d'émission de tokens (côté nœud final)
     pub async fn sender(session: &QuicSession) -> Result<Self, QuicError> {
-        let stream = session.connection.open_uni().await
+        let stream = session
+            .connection
+            .open_uni()
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        Ok(Self { send_stream: Some(stream), recv_stream: None })
+        Ok(Self {
+            send_stream: Some(stream),
+            recv_stream: None,
+        })
     }
 
     /// Créer un stream de réception de tokens (côté coordinateur)
     pub async fn receiver(session: &QuicSession) -> Result<Self, QuicError> {
-        let stream = session.connection.accept_uni().await
+        let stream = session
+            .connection
+            .accept_uni()
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        Ok(Self { send_stream: None, recv_stream: Some(stream) })
+        Ok(Self {
+            send_stream: None,
+            recv_stream: Some(stream),
+        })
     }
 
     /// Envoyer un token généré
     pub async fn send_token(&mut self, token: &GeneratedToken) -> Result<(), QuicError> {
-        let stream = self.send_stream.as_mut()
+        let stream = self
+            .send_stream
+            .as_mut()
             .ok_or(QuicError::StreamError("pas de stream d'émission".into()))?;
 
-        let data = serde_json::to_vec(token)
-            .map_err(|e| QuicError::StreamError(e.to_string()))?;
+        let data = serde_json::to_vec(token).map_err(|e| QuicError::StreamError(e.to_string()))?;
         let len = (data.len() as u32).to_le_bytes();
-        stream.write_all(&len).await
+        stream
+            .write_all(&len)
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
-        stream.write_all(&data).await
+        stream
+            .write_all(&data)
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?;
         Ok(())
     }
 
     /// Recevoir le prochain token (retourne None si stream terminé)
     pub async fn recv_token(&mut self) -> Result<Option<GeneratedToken>, QuicError> {
-        let stream = self.recv_stream.as_mut()
+        let stream = self
+            .recv_stream
+            .as_mut()
             .ok_or(QuicError::StreamError("pas de stream de réception".into()))?;
 
         // Lire taille
         let mut len_buf = [0u8; 4];
-        match try_read_exact(stream, &mut len_buf).await? {
-            false => return Ok(None), // stream terminé
-            true => {}
+        if !try_read_exact(stream, &mut len_buf).await? {
+            return Ok(None); // stream terminé
         }
         let len = u32::from_le_bytes(len_buf) as usize;
-        if len == 0 { return Ok(None); }
+        if len == 0 {
+            return Ok(None);
+        }
 
         // Lire données
         let mut data = vec![0u8; len];
@@ -174,7 +212,8 @@ impl TokenStream {
     /// Fermer le stream d'émission
     pub async fn finish(&mut self) -> Result<(), QuicError> {
         if let Some(stream) = self.send_stream.as_mut() {
-            stream.finish()
+            stream
+                .finish()
                 .map_err(|e| QuicError::StreamError(e.to_string()))?;
         }
         Ok(())
@@ -189,7 +228,9 @@ async fn read_exact_from_stream(
 ) -> Result<(), QuicError> {
     let mut offset = 0;
     while offset < buf.len() {
-        let chunk = stream.read_chunk(buf.len() - offset, true).await
+        let chunk = stream
+            .read_chunk(buf.len() - offset, true)
+            .await
             .map_err(|e| QuicError::StreamError(e.to_string()))?
             .ok_or(QuicError::StreamError("stream fermé prématurément".into()))?;
         let n = chunk.bytes.len();
@@ -201,7 +242,9 @@ async fn read_exact_from_stream(
 
 /// Retourne false si le stream est terminé proprement, Err si erreur
 async fn try_read_exact(stream: &mut quinn::RecvStream, buf: &mut [u8]) -> Result<bool, QuicError> {
-    let first = stream.read_chunk(1, true).await
+    let first = stream
+        .read_chunk(1, true)
+        .await
         .map_err(|e| QuicError::StreamError(e.to_string()))?;
     match first {
         None => return Ok(false),
@@ -235,16 +278,24 @@ pub fn quantize_f32_to_i8(data: &[f32]) -> (Vec<i8>, f32) {
     while i + 8 <= data.len() {
         let v = f32x8::from(&data[i..i + 8]);
         for &x in v.as_array_ref() {
-            if x < min_val { min_val = x; }
-            if x > max_val { max_val = x; }
+            if x < min_val {
+                min_val = x;
+            }
+            if x > max_val {
+                max_val = x;
+            }
         }
         i += 8;
     }
 
     // Reste scalaire
     for &v in &data[i..] {
-        if v < min_val { min_val = v; }
-        if v > max_val { max_val = v; }
+        if v < min_val {
+            min_val = v;
+        }
+        if v > max_val {
+            max_val = v;
+        }
     }
 
     let abs_max = min_val.abs().max(max_val.abs());
@@ -297,8 +348,12 @@ pub fn quantize_f32_to_u8_asymmetric(data: &[f32]) -> (Vec<u8>, f32, u8) {
     let mut max_val = f32::MIN;
 
     for &v in data {
-        if v < min_val { min_val = v; }
-        if v > max_val { max_val = v; }
+        if v < min_val {
+            min_val = v;
+        }
+        if v > max_val {
+            max_val = v;
+        }
     }
 
     if (max_val - min_val).abs() < 1e-8 {
@@ -311,10 +366,7 @@ pub fn quantize_f32_to_u8_asymmetric(data: &[f32]) -> (Vec<u8>, f32, u8) {
 
     let quantized: Vec<u8> = data
         .iter()
-        .map(|&v| {
-            let q = ((v / scale) + zero_point as f32).round().clamp(0.0, 255.0) as u8;
-            q
-        })
+        .map(|&v| ((v / scale) + zero_point as f32).round().clamp(0.0, 255.0) as u8)
         .collect();
 
     (quantized, scale, zero_point)

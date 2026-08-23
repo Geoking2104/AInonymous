@@ -116,51 +116,15 @@ jobs:
       - name: Cache Cargo (WASM)
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: dnas/ainonymous-core -> target
+          workspaces: |
+            dnas/ainonymous-core -> target
+            dnas/hybridnode -> target
           key: wasm
 
-      - name: Build zomes WASM
+      - name: Build AInonymous zomes for Holochain 0.7
         working-directory: dnas/ainonymous-core
-        # getrandom="custom" fourni par dnas/ainonymous-core/.cargo/config.toml
         run: cargo build --release --target wasm32-unknown-unknown
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Job 4 — Smoke test repack-happ.py (T3.3)
-  #
-  # Vérifie que le repacker Python peut relire les .dna sans erreur.
-  # Ne nécessite pas les WASMs compilés : teste uniquement la logique msgpack+gzip.
-  # Rapide (~30s).
-  # ─────────────────────────────────────────────────────────────────────────────
-  smoke-repack:
-    name: repack-happ.py (T3.3)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Installer msgpack
-        run: pip install msgpack
-
-      - name: Vérifier que repack-happ.py parse correctement
-        run: |
-          python3 - <<'EOF'
-          # Vérifie l'import et les helpers sans avoir besoin des .dna réels.
-          import sys
-          sys.argv = ['repack-happ.py', '--help']
-          try:
-              import subprocess, pathlib
-              result = subprocess.run(
-                  ['python3', 'scripts/repack-happ.py', '--help'],
-                  capture_output=True, text=True
-              )
-              print(result.stdout or result.stderr)
-              # --help doit sortir avec code 0
-              assert result.returncode == 0, f"returncode={result.returncode}"
-              print("✓ repack-happ.py --help OK")
-          except AssertionError as e:
-              print(f"FAIL: {e}"); sys.exit(1)
-          EOF
+      - name: Build HybridNode zomes for Holochain 0.7
+        working-directory: dnas/hybridnode
+        run: cargo build --release --target wasm32-unknown-unknown

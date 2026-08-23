@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonConfig {
@@ -29,8 +29,8 @@ pub struct DaemonConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum HolochainBackendKind {
-    #[default]
     Static,
+    #[default]
     Conductor,
 }
 
@@ -47,11 +47,10 @@ pub struct HolochainConfig {
     #[serde(default)]
     pub lair_url: Option<String>,
 
-    /// Membrane Proof pour rejoindre un réseau privé / consortium (Palier F).
+    /// Membrane proof used while installing a private-network hApp.
     ///
-    /// Peut être fourni sous forme de bytes (base64 dans le TOML) ou via un fichier.
-    /// Utilisé lors de l'installation de l'app ou pour les appels de zome
-    /// qui exigent une preuve d'appartenance au réseau privé.
+    /// It can be supplied as base64 or read from a file. A membrane proof is a
+    /// genesis/install-time credential; it is not injected into ordinary zome calls.
     #[serde(default)]
     pub membrane_proof: Option<MembraneProofConfig>,
 }
@@ -71,17 +70,22 @@ impl MembraneProofConfig {
         match self {
             MembraneProofConfig::Base64(b64) => {
                 use base64::{engine::general_purpose, Engine as _};
-                general_purpose::STANDARD.decode(b64).map_err(|e| anyhow::anyhow!("invalid base64 membrane proof: {e}"))
+                general_purpose::STANDARD
+                    .decode(b64)
+                    .map_err(|e| anyhow::anyhow!("invalid base64 membrane proof: {e}"))
             }
-            MembraneProofConfig::File { path } => {
-                std::fs::read(path).map_err(|e| anyhow::anyhow!("failed to read membrane proof file: {e}"))
-            }
+            MembraneProofConfig::File { path } => std::fs::read(path)
+                .map_err(|e| anyhow::anyhow!("failed to read membrane proof file: {e}")),
         }
     }
 }
 
-fn default_admin_port() -> u16 { 8888 }
-fn default_conductor_app_port() -> u16 { 8890 }
+fn default_admin_port() -> u16 {
+    8888
+}
+fn default_conductor_app_port() -> u16 {
+    8890
+}
 
 impl Default for HolochainConfig {
     fn default() -> Self {

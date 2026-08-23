@@ -11,9 +11,11 @@ use serde_json::{json, Value};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use ainonymous_types::{ExecutionPlan, GeoLocation, ModelClaim, NodeHeartbeat, Warrant, WarrantType};
-use crate::config::DaemonConfig;
 use crate::conductor_client::ConductorClient;
+use crate::config::DaemonConfig;
+use ainonymous_types::{
+    ExecutionPlan, GeoLocation, ModelClaim, NodeHeartbeat, Warrant, WarrantType,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeSummary {
@@ -63,18 +65,23 @@ impl HolochainClient {
                 match tokio::time::timeout(Duration::from_secs(60), connect_fut).await {
                     Ok(Ok(c)) => Backend::Conductor(Arc::new(c)),
                     Ok(Err(e)) => {
-                        warn!("Conducteur Holochain injoignable ({e}) — repli sur bootstrap statique");
-                        Backend::Static
+                        return Err(anyhow::anyhow!(
+                            "Holochain conductor backend was requested but the connection failed: {e}"
+                        ));
                     }
                     Err(_elapsed) => {
-                        warn!("Conducteur Holochain — timeout 60s — repli sur bootstrap statique");
-                        Backend::Static
+                        return Err(anyhow::anyhow!(
+                            "Holochain conductor backend was requested but the connection timed out after 60 seconds"
+                        ));
                     }
                 }
             }
         };
 
-        let proof_bytes = membrane_proof.and_then(|p| p.to_bytes().ok());
+        let proof_bytes = match membrane_proof {
+            Some(proof) => Some(proof.to_bytes()?),
+            None => None,
+        };
 
         let client = Self {
             app_port: config.daemon_port,
@@ -109,7 +116,8 @@ impl HolochainClient {
     }
 
     fn peer_daemon_url(&self, agent_id: &str) -> Option<String> {
-        self.peers.iter()
+        self.peers
+            .iter()
             .find(|p| p.agent_id == agent_id)
             .map(|p| p.daemon_url.clone())
     }
@@ -129,17 +137,28 @@ impl HolochainClient {
         debug!("Zome call: {}::{}::{}", dna, zome, function);
 
         match &self.backend {
-            Backend::Conductor(c) => {
-                c.call_zome_json(dna, zome, function, payload)
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!("Holochain zome call failed [{}::{}::{}]: {}", dna, zome, function, e)
-                    })
-            }
+            Backend::Conductor(c) => c
+                .call_zome_json(dna, zome, function, payload)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Holochain zome call failed [{}::{}::{}]: {}",
+                        dna,
+                        zome,
+                        function,
+                        e
+                    )
+                }),
             Backend::Static => {
                 let resp = self
                     .http
-                    .post(format!("{}/zome/{}/{}/{}", self.base_url(), dna, zome, function))
+                    .post(format!(
+                        "{}/zome/{}/{}/{}",
+                        self.base_url(),
+                        dna,
+                        zome,
+                        function
+                    ))
                     .json(&payload)
                     .send()
                     .await
@@ -148,8 +167,14 @@ impl HolochainClient {
                 if !resp.status().is_success() {
                     let status = resp.status();
                     let body = resp.text().await.unwrap_or_default();
-                    anyhow::bail!("Static zome call failed [{}::{}::{}]: HTTP {} - {}",
-                        dna, zome, function, status, body);
+                    anyhow::bail!(
+                        "Static zome call failed [{}::{}::{}]: HTTP {} - {}",
+                        dna,
+                        zome,
+                        function,
+                        status,
+                        body
+                    );
                 }
 
                 resp.json::<Value>()
@@ -167,16 +192,42 @@ impl HolochainClient {
         let mut caps = detect_local_capabilities(config);
         caps.node_pubkey = node_pubkey_hex.map(|s| s.to_string());
 
+        let gpu_vendor = match &caps.gpu_vendor {
+            ainonymous_types::GpuVendor::AppleSilicon => "apple_silicon",
+            ainonymous_types::GpuVendor::Nvidia { .. } => "nvidia",
+            ainonymous_types::GpuVendor::Amd { .. } => "amd",
+            ainonymous_types::GpuVendor::Intel { .. } => "intel",
+            ainonymous_types::GpuVendor::CpuOnly => "cpu",
+        };
+        let transport_key = caps.node_pubkey.clone().ok_or_else(|| {
+            anyhow::anyhow!("a transport public key is required before announcing capabilities")
+        })?;
+        let payload = json!({
+            "vram_gb": caps.vram_gb,
+            "ram_gb": caps.ram_gb,
+            "gpu_vendor": gpu_vendor,
+            "compute_backends": caps.compute_backends,
+            "loaded_models": caps.loaded_models,
+            "max_concurrent_requests": caps.max_concurrent_requests,
+            "network_bandwidth_mbps": caps.network_bandwidth_mbps.map(|value| value as u32),
+            "region_hint": caps.region_hint,
+            "quic_endpoint": caps.quic_endpoint,
+            "node_pubkey": transport_key,
+        });
+
         self.zome_call(
             "agent-registry",
             "coordinator",
             "announce_capabilities",
-            serde_json::to_value(&caps)?,
-        ).await?;
+            payload,
+        )
+        .await?;
 
-        info!("Capacités annoncées: {:.1}GB VRAM, node_pubkey: {}",
+        info!(
+            "Capacités annoncées: {:.1}GB VRAM, node_pubkey: {}",
             caps.vram_gb,
-            node_pubkey_hex.unwrap_or("<non fournie>"));
+            node_pubkey_hex.unwrap_or("<non fournie>")
+        );
         Ok(())
     }
 
@@ -186,28 +237,33 @@ impl HolochainClient {
             "coordinator",
             "heartbeat",
             serde_json::to_value(&hb)?,
-        ).await?;
+        )
+        .await?;
         Ok(())
     }
 
     pub async fn get_execution_plan(&self, model_id: &str) -> Result<ExecutionPlan> {
-        let resp = self.zome_call(
-            "inference-mesh",
-            "coordinator",
-            "compute_execution_plan",
-            json!({ "model_id": model_id }),
-        ).await?;
+        let resp = self
+            .zome_call(
+                "inference-mesh",
+                "coordinator",
+                "compute_execution_plan",
+                json!({ "model_id": model_id }),
+            )
+            .await?;
 
         Ok(serde_json::from_value(resp)?)
     }
 
     pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
-        let resp = self.zome_call(
-            "agent-registry",
-            "coordinator",
-            "get_available_nodes",
-            json!(model_id),
-        ).await?;
+        let resp = self
+            .zome_call(
+                "agent-registry",
+                "coordinator",
+                "get_available_nodes",
+                json!(model_id),
+            )
+            .await?;
 
         Ok(serde_json::from_value(resp)?)
     }
@@ -257,10 +313,14 @@ impl HolochainClient {
             }
             Backend::Static => {
                 let daemon_url = self.peer_daemon_url(target_agent).ok_or_else(|| {
-                    anyhow::anyhow!("Pair '{}' introuvable dans la config bootstrap", target_agent)
+                    anyhow::anyhow!(
+                        "Pair '{}' introuvable dans la config bootstrap",
+                        target_agent
+                    )
                 })?;
 
-                let resp = self.http
+                let resp = self
+                    .http
                     .post(format!("{}/mesh/session/negotiate", daemon_url))
                     .json(&json!({
                         "layer_range": layer_range,
@@ -298,7 +358,8 @@ impl HolochainClient {
             next_agent,
             next_layer_range,
             requester_pubkey,
-        ).await
+        )
+        .await
     }
 
     /// Découverte P2P des nœuds disponibles via Holochain DHT
@@ -382,7 +443,11 @@ impl HolochainClient {
         }
 
         // Tri par score décroissant
-        nodes.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        nodes.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(nodes)
     }
@@ -392,8 +457,12 @@ impl HolochainClient {
         new_pubkey_hex: &str,
         config: &DaemonConfig,
     ) -> Result<()> {
-        self.announce_capabilities(config, Some(new_pubkey_hex)).await?;
-        info!("DHT : nouvelle clé publique annoncée après rotation : {}", new_pubkey_hex);
+        self.announce_capabilities(config, Some(new_pubkey_hex))
+            .await?;
+        info!(
+            "DHT : nouvelle clé publique annoncée après rotation : {}",
+            new_pubkey_hex
+        );
         Ok(())
     }
 
@@ -403,11 +472,17 @@ impl HolochainClient {
             "coordinator",
             "update_quic_endpoint",
             json!({ "endpoint": addr.to_string() }),
-        ).await?;
+        )
+        .await?;
         Ok(())
     }
 
-    pub async fn blackboard_post(&self, prefix: &str, content: &str, tags: Vec<String>) -> Result<()> {
+    pub async fn blackboard_post(
+        &self,
+        prefix: &str,
+        content: &str,
+        tags: Vec<String>,
+    ) -> Result<()> {
         self.zome_call(
             "blackboard",
             "coordinator",
@@ -418,7 +493,8 @@ impl HolochainClient {
                 "tags": tags,
                 "ttl_hours": 48,
             }),
-        ).await?;
+        )
+        .await?;
         Ok(())
     }
 
@@ -436,7 +512,8 @@ impl HolochainClient {
                 "prefix_filter": prefix_filter,
                 "limit": 20,
             }),
-        ).await
+        )
+        .await
     }
 
     // ── Warrants (Palier F) ─────────────────────────────────────────────────
@@ -449,8 +526,13 @@ impl HolochainClient {
             "coordinator",
             "emit_warrant",
             serde_json::to_value(warrant)?,
-        ).await?;
-        info!("Warrant émis: {:?} par {}", warrant.warrant_type, hex::encode(warrant.issuer));
+        )
+        .await?;
+        info!(
+            "Warrant émis: {:?} par {}",
+            warrant.warrant_type,
+            hex::encode(warrant.issuer)
+        );
         Ok(())
     }
 
@@ -461,7 +543,8 @@ impl HolochainClient {
             "coordinator",
             "emit_warrant_with_cleanup",
             serde_json::to_value(warrant)?,
-        ).await?;
+        )
+        .await?;
         info!("Warrant émis avec cleanup: {:?}", warrant.warrant_type);
         Ok(())
     }
@@ -481,24 +564,28 @@ impl HolochainClient {
 
     /// Vérifie un Warrant via le zome
     pub async fn verify_warrant(&self, warrant: &Warrant) -> Result<bool> {
-        let result = self.zome_call(
-            "warrants",
-            "coordinator",
-            "verify_warrant",
-            serde_json::to_value(warrant)?,
-        ).await?;
+        let result = self
+            .zome_call(
+                "warrants",
+                "coordinator",
+                "verify_warrant",
+                serde_json::to_value(warrant)?,
+            )
+            .await?;
 
         Ok(result["valid"].as_bool().unwrap_or(false))
     }
 
     /// Récupère les warrants valides d'un nœud
     pub async fn get_warrants_for_agent(&self, agent_id: &str) -> Result<Vec<Warrant>> {
-        let resp = self.zome_call(
-            "warrants",
-            "coordinator",
-            "get_warrants",
-            json!({ "agent_id": agent_id }),
-        ).await?;
+        let resp = self
+            .zome_call(
+                "warrants",
+                "coordinator",
+                "get_warrants",
+                json!({ "agent_id": agent_id }),
+            )
+            .await?;
 
         Ok(serde_json::from_value(resp)?)
     }
@@ -517,7 +604,11 @@ impl HolochainClient {
             model_hash: model_hash.to_string(),
             vram_required_gb: caps.vram_gb.max(8.0),
             max_context: 8192,
-            supported_backends: caps.compute_backends.iter().map(|b| format!("{:?}", b)).collect(),
+            supported_backends: caps
+                .compute_backends
+                .iter()
+                .map(|b| format!("{:?}", b))
+                .collect(),
         };
 
         let warrant = Warrant::new_signed(
@@ -561,7 +652,8 @@ impl HolochainClient {
             model_hash: model_hash.to_string(),
             vram_required_gb: caps.vram_gb.max(8.0),
             max_context: 8192,
-            supported_backends: caps.compute_backends
+            supported_backends: caps
+                .compute_backends
                 .iter()
                 .map(|b| format!("{:?}", b))
                 .collect(),
@@ -668,7 +760,10 @@ pub async fn validate_node_warrants(
     let warrants = match holochain.get_warrants_for_agent(agent_id).await {
         Ok(w) => w,
         Err(e) => {
-            warn!("Impossible de récupérer les warrants de {}: {}", agent_id, e);
+            warn!(
+                "Impossible de récupérer les warrants de {}: {}",
+                agent_id, e
+            );
             return Ok(false);
         }
     };
@@ -728,7 +823,9 @@ pub async fn validate_node_warrants(
     Ok(is_valid)
 }
 
-pub(crate) fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_types::NodeCapabilities {
+pub(crate) fn detect_local_capabilities(
+    config: &DaemonConfig,
+) -> ainonymous_types::NodeCapabilities {
     let (gpu_vendor, vram_gb) = detect_gpu();
 
     ainonymous_types::NodeCapabilities {
@@ -749,7 +846,9 @@ pub(crate) fn detect_local_capabilities(config: &DaemonConfig) -> ainonymous_typ
 
 /// Petit helper qui réutilise `detect_local_capabilities` — utilisé par les
 /// fonctions `emit_*`/`try_emit_*` ainsi que par `llama::LlamaManager::start`.
-pub(crate) fn detect_local_capabilities_from_config(config: &DaemonConfig) -> ainonymous_types::NodeCapabilities {
+pub(crate) fn detect_local_capabilities_from_config(
+    config: &DaemonConfig,
+) -> ainonymous_types::NodeCapabilities {
     detect_local_capabilities(config)
 }
 
@@ -763,7 +862,13 @@ fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
     #[cfg(not(target_os = "macos"))]
     {
         if let Some((vram_gb, compute_capability)) = detect_nvidia() {
-            return (ainonymous_types::GpuVendor::Nvidia { vram_gb, compute_capability }, vram_gb);
+            return (
+                ainonymous_types::GpuVendor::Nvidia {
+                    vram_gb,
+                    compute_capability,
+                },
+                vram_gb,
+            );
         }
         if let Some(vram_gb) = detect_amd() {
             return (ainonymous_types::GpuVendor::Amd { vram_gb }, vram_gb);
@@ -775,7 +880,10 @@ fn detect_gpu() -> (ainonymous_types::GpuVendor, f32) {
 #[cfg(not(target_os = "macos"))]
 fn detect_nvidia() -> Option<(f32, String)> {
     let out = std::process::Command::new("nvidia-smi")
-        .args(["--query-gpu=memory.total,compute_cap", "--format=csv,noheader,nounits"])
+        .args([
+            "--query-gpu=memory.total,compute_cap",
+            "--format=csv,noheader,nounits",
+        ])
         .output()
         .ok()?;
     if !out.status.success() {
@@ -830,7 +938,9 @@ fn get_total_ram_gb() -> f32 {
         if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
             for line in content.lines() {
                 if line.starts_with("MemTotal:") {
-                    let kb: u64 = line.split_whitespace().nth(1)
+                    let kb: u64 = line
+                        .split_whitespace()
+                        .nth(1)
                         .and_then(|s| s.parse().ok())
                         .unwrap_or(0);
                     return kb as f32 / (1024.0 * 1024.0);
@@ -858,7 +968,9 @@ fn get_total_ram_gb() -> f32 {
     8.0
 }
 
-fn detect_compute_backends(vendor: &ainonymous_types::GpuVendor) -> Vec<ainonymous_types::ComputeBackend> {
+fn detect_compute_backends(
+    vendor: &ainonymous_types::GpuVendor,
+) -> Vec<ainonymous_types::ComputeBackend> {
     use ainonymous_types::{ComputeBackend, GpuVendor};
     match vendor {
         GpuVendor::AppleSilicon => vec![ComputeBackend::Metal, ComputeBackend::Cpu],

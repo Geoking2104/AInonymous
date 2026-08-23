@@ -1,7 +1,7 @@
 ---
 manifest_version: "0"
 name: ainonymous-core
-description: "AInonymous — Inférence LLM décentralisée sur Holochain"
+description: "AInonymous decentralized LLM inference control plane for Holochain 0.7"
 roles:
   - name: inference-mesh
     provisioning:
@@ -10,7 +10,7 @@ roles:
     dna:
       path: dnas/inference-mesh/workdir/inference-mesh.dna
       modifiers:
-        network_seed: ~
+        network_seed: "ainonymous-core-hc07-v2"
         properties: ~
       installed_hash: ~
       clone_limit: 0
@@ -22,7 +22,7 @@ roles:
     dna:
       path: dnas/agent-registry/workdir/agent-registry.dna
       modifiers:
-        network_seed: ~
+        network_seed: "ainonymous-core-hc07-v2"
         properties: ~
       installed_hash: ~
       clone_limit: 0
@@ -34,7 +34,7 @@ roles:
     dna:
       path: dnas/blackboard/workdir/blackboard.dna
       modifiers:
-        network_seed: ~
+        network_seed: "ainonymous-core-hc07-v2"
         properties: ~
       installed_hash: ~
       clone_limit: 0

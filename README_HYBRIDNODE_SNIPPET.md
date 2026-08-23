@@ -1,36 +1,7 @@
-## HybridNode — Distributed Inference Architecture
+## HybridNode
 
-AInonymous uses a **HybridNode** architecture that combines three layers into a locality-aware inference scheduler:
+This project uses HybridNode's three-plane model: Holochain 0.7.0/Iroh for authenticated coordination, QUIC/TLS 1.3 for direct data transfer, and an optional SD-WAN adapter for topology and SLA input. Holochain agent keys stay in Lair; a separate QUIC Ed25519 key is published in an agent-authored capability record and verified during session negotiation.
 
-| Layer | Technology | Role |
-|-------|-----------|------|
-| Overlay | **Holochain 0.6.1** | DHT, identity (AgentPubKey ed25519), coordination |
-| Data plane | **QUIC/mTLS** | Tensor activation transfers, token streams |
-| Underlay | **SD-WAN** | Topology-aware routing, SLA enforcement, QoS |
+HybridNode is alpha software. Private deployments require network-bound membrane proofs at hApp installation. Public-network Sybil resistance, zero-knowledge inference and network anonymity are not implemented.
 
-### Quick Start
-
-```bash
-# Install from source
-cargo install --path crates/hybridnode-daemon --features mock-sdwan
-
-# Initialize a new project config
-bash scripts/hybridnode/init_project.sh myproject
-
-# Edit the config, then run
-hybridnode --config hybridnode/configs/myproject.hybridnode.yaml
-```
-
-### Architecture Docs
-
-- [`docs/HYBRIDNODE.md`](docs/HYBRIDNODE.md) — Concepts, use cases, SD-WAN policy
-- [`docs/HYBRIDNODE_ARCHITECTURE.md`](docs/HYBRIDNODE_ARCHITECTURE.md) — Component tree, request flow, security
-- [`docs/HYBRIDNODE_CARGO_PATCH.md`](docs/HYBRIDNODE_CARGO_PATCH.md) — Workspace integration guide
-- [`hybridnode/`](hybridnode/) — Configs, policies, schemas, specs
-
-### Key Security Properties
-
-- **Strict mTLS** — a separate, rotatable Ed25519 transport key is published in an agent-authored capability record; `PeerKeyVerifier` pins both peers
-- **Model attestation** — SHA-256 verified locally + cross-peer confirmation (≥2 peers)
-- **Warrant system** — Holochain DHT cryptographic proof of misbehavior; auto-excludes from scheduling
-- **Private bootstrap** — `PrivateNetworkProof` membrane for closed consortium deployments
+See [integration instructions](HYBRIDNODE_APPLY.md) and the [security model](docs/SECURITY.md).

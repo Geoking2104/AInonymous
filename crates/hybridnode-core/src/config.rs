@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeMode {
     Hybridnode,
@@ -34,6 +34,23 @@ pub struct HybridNodeConfig {
 impl HybridNodeConfig {
     /// Enforce security invariants that cannot safely be left to documentation.
     pub fn validate(&self) -> Result<()> {
+        if self.holochain.version != "0.7.0" {
+            bail!("holochain.version must be exactly 0.7.0");
+        }
+        if self.holochain.app_id.trim().is_empty() {
+            bail!("holochain.app_id must not be empty");
+        }
+        if self.holochain.admin_port == self.holochain.app_port {
+            bail!("holochain.admin_port and holochain.app_port must be different");
+        }
+        if !(self.holochain.conductor_url.starts_with("ws://127.0.0.1:")
+            || self.holochain.conductor_url.starts_with("ws://localhost:"))
+        {
+            bail!("holochain.conductor_url must use a loopback WebSocket endpoint");
+        }
+        if self.mode == NodeMode::SdwanOnly && self.security.private_network {
+            bail!("sdwan-only mode cannot claim Holochain private-network admission");
+        }
         if !self.quic.mtls_strict {
             bail!("quic.mtls_strict must be true");
         }
@@ -64,7 +81,9 @@ pub struct IdentityConfig {
 #[serde(deny_unknown_fields)]
 pub struct HolochainConfig {
     pub conductor_url: String,
+    pub admin_port: u16,
     pub app_port: u16,
+    pub app_id: String,
     pub version: String,
     #[serde(default = "default_bootstrap_mode")]
     pub bootstrap_mode: String,
@@ -301,8 +320,10 @@ mode: hybridnode
 identity: { backend: holochain, keystore: lair }
 holochain:
   conductor_url: ws://127.0.0.1:8888
+  admin_port: 8888
   app_port: 8889
-  version: "0.6.1"
+  app_id: test-app
+  version: "0.7.0"
   bootstrap_mode: private
   bootstrap_url: https://bootstrap.example.invalid
 sdwan: { provider: mock, tls_verify: true }
@@ -333,12 +354,33 @@ security: { private_network: true }
     }
 
     #[test]
+    fn rejects_incompatible_holochain_version() {
+        let mut config = valid_config();
+        config.holochain.version = "0.6.1".to_string();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_remote_admin_endpoint() {
+        let mut config = valid_config();
+        config.holochain.conductor_url = "ws://192.0.2.10:8888".to_string();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_private_admission_claim_in_sdwan_only_mode() {
+        let mut config = valid_config();
+        config.mode = NodeMode::SdwanOnly;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
     fn rejects_options_not_implemented_by_runtime() {
         let yaml = r#"
 version: "1.0"
 mode: hybridnode
 identity: { backend: holochain, keystore: lair }
-holochain: { conductor_url: "ws://127.0.0.1:8888", app_port: 8889, version: "0.6.1" }
+holochain: { conductor_url: "ws://127.0.0.1:8888", admin_port: 8888, app_port: 8889, app_id: test-app, version: "0.7.0" }
 sdwan: { provider: mock }
 quic: { mtls_strict: true, max_concurrent_sessions: 4 }
 "#;

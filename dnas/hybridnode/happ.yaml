@@ -1,15 +1,18 @@
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: hybridnode
-description: "HybridNode Holochain hApp — DHT overlay for SD-WAN/QUIC inference coordination"
+description: "HybridNode Holochain 0.7 hApp for SD-WAN/QUIC inference coordination"
 roles:
   - name: hybridnode-core
     provisioning:
       strategy: create
       deferred: false
     dna:
-      bundled: "./dnas/hybridnode-core/workdir/hybridnode-core.dna"
+      path: "./dnas/hybridnode-core/workdir/hybridnode-core.dna"
       modifiers:
-        network_seed: "ainonymous-hybridnode-v1"
-      properties:
-        private_network: false    # override per deployment
+        network_seed: "ainonymous-hybridnode-hc07-v2"
+        properties:
+          private_network: false
+          network_id: "ainonymous-hybridnode-public-v2"
+      installed_hash: ~
+      clone_limit: 0

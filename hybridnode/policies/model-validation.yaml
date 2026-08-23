@@ -1,11 +1,15 @@
-# HybridNode — Politique de validation des modèles
+# Target model-validation policy. Cross-peer attestation is not fully implemented yet.
 name: hybridnode-model-validation
 version: "1.0"
 
-manifest:
-  require_manifest: true              # ModelManifest dans le DHT obligatoire
+local_verification:
+  required: true
   hash_algorithm: sha256
-  fields_required:
+  verify_before_service: true
+  allow_unverified: false
+
+manifest:
+  required_fields:
     - model_name
     - version
     - sha256
@@ -14,27 +18,11 @@ manifest:
     - quant_format
     - num_layers
 
-local_verification:
-  enabled: true
-  on_startup: true                    # vérifier au démarrage du daemon
-  on_request: false                   # trop lent à la volée (fichier GB)
-  cache_valid_hours: 24
-
 cross_peer_verification:
-  enabled: true
-  min_peers: 2                        # au moins 2 pairs doivent confirmer le SHA256
-  timeout_ms: 5000
-  on_mismatch: reject                 # "reject" | "warn" | "quarantine"
+  status: planned
+  desired_minimum_peers: 2
+  on_mismatch: quarantine
 
-model_claim:
-  require_claim: true                 # ModelClaim dans le DHT obligatoire avant de servir
-  layer_range_check: true             # vérifier que layer_range ⊆ manifest.num_layers
-  max_claim_age_hours: 48             # reclaim si plus ancien
-
-automated_audit:
-  enabled: true
-  interval_hours: 6
-  actions_on_failure:
-    - log_warning
-    - publish_warrant
-    - suspend_model_service
+runtime:
+  isolate_untrusted_models: true
+  validate_layer_range: true

@@ -1,5 +1,4 @@
-# HybridNode — Template minimal pour un nouveau projet
-# Remplacez les valeurs entre <> par vos paramètres réels.
+# Minimal development template. Public mode and mock SD-WAN are not production-ready.
 version: "1.0"
 mode: hybridnode
 
@@ -8,13 +7,15 @@ identity:
   keystore: lair
 
 holochain:
-  conductor_url: "ws://localhost:8888"
+  conductor_url: "ws://127.0.0.1:8888"
+  admin_port: 8888
   app_port: 8889
-  version: "0.6.1"
+  app_id: "my-hybridnode-app"
+  version: "0.7.0"
   bootstrap_mode: public
 
 sdwan:
-  provider: mock                            # remplacer par "rest", "vmanage", etc.
+  provider: mock
   tls_verify: true
   poll_interval_seconds: 60
 
@@ -29,11 +30,13 @@ scheduler:
 
 inference:
   llama_server_port: 9337
+  llama_server_host: "127.0.0.1"
   api_port: 9337
   metrics_port: 9338
 
 observability:
   prometheus: true
+  prometheus_addr: "127.0.0.1:9338"
   log_level: info
 
 audit:
@@ -42,4 +45,6 @@ audit:
   auto_warrant: true
 
 security:
-  private_network: false                    # mettre à true pour réseau privé
+  private_network: false
+  pow_difficulty: 0
+  warrant_expiry_days: 30

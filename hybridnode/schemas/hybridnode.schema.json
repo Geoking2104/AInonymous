@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ainonymous.dev/schemas/hybridnode.schema.json",
   "title": "HybridNode Configuration",
-  "description": "Schema for hybridnode YAML configuration files. Stack: Holochain 0.6.1 (iroh, HDK 0.6.1) + QUIC/mTLS ed25519 (quinn 0.11) + SD-WAN.",
+  "description": "Schema for HybridNode YAML configuration files. Stack: Holochain 0.7.0 (Iroh-only, HDK 0.7.0, HDI 0.8.0) + QUIC/mTLS Ed25519 + SD-WAN.",
   "type": "object",
   "required": ["version", "mode", "identity", "holochain", "sdwan", "quic"],
   "properties": {
@@ -40,8 +40,8 @@
 
     "holochain": {
       "type": "object",
-      "description": "Holochain 0.6.1 conductor settings. Uses iroh as default P2P transport.",
-      "required": ["conductor_url", "app_port", "version"],
+      "description": "Holochain 0.7.0 conductor settings. Iroh over QUIC is the only Holochain network transport.",
+      "required": ["conductor_url", "admin_port", "app_port", "app_id", "version"],
       "properties": {
         "conductor_url": {
           "type": "string",
@@ -54,9 +54,21 @@
           "maximum": 65535,
           "description": "Holochain app port for zome calls (default: 8889)."
         },
+        "admin_port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "Loopback-only Holochain admin WebSocket port."
+        },
+        "app_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Installed Holochain application identifier used to issue an app authentication token."
+        },
         "version": {
           "type": "string",
-          "description": "Holochain version string, e.g. '0.6.1'."
+          "const": "0.7.0",
+          "description": "Pinned Holochain conductor version."
         },
         "bootstrap_mode": {
           "type": "string",
@@ -68,10 +80,6 @@
           "type": "string",
           "format": "uri",
           "description": "Bootstrap server URL. For private networks: internal SD-WAN server."
-        },
-        "network_seed": {
-          "type": "string",
-          "description": "DNA network seed — must match across all nodes in the same mesh."
         }
       },
       "additionalProperties": false
@@ -256,7 +264,7 @@
         "private_network": {
           "type": "boolean",
           "default": false,
-          "description": "Require PrivateNetworkProof membrane proof at genesis. Enables genesis_self_check with feature private-network."
+          "description": "Require a network-bound PrivateNetworkProof membrane proof at genesis. Admission validation is always compiled and is activated by the DNA properties."
         },
         "pow_difficulty": {
           "type": "integer",

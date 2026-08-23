@@ -9,12 +9,6 @@ license = "MIT OR Apache-2.0"
 name = "hybridnode"
 path = "src/main.rs"
 
-[features]
-default = ["mock-sdwan"]
-mock-sdwan = ["hybridnode-core/mock-sdwan"]
-vmanage = ["hybridnode-core/vmanage"]
-private-network = ["hybridnode-core/private-network"]
-
 [dependencies]
 hybridnode-core = { path = "../hybridnode-core" }
 

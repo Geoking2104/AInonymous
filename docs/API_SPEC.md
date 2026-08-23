@@ -1,412 +1,59 @@
-# Spécification API — AInonymous
+# API Reference
 
-> API OpenAI-compatible exposée localement, routée vers le mesh Holochain.
+## Stability
 
----
+The APIs are experimental and may change before a tagged release. Local HTTP endpoints are intended for loopback use. Holochain zome calls are the authoritative control-plane interface; QUIC is the authenticated data plane.
 
-## Endpoint Principal
+## Local HTTP surface
 
-```
-http://localhost:9337/v1
-```
+The proxy and daemons expose a subset of these routes depending on the selected binary and features:
 
-Authentification : `Bearer ainonymous-local` (token local, validé par le daemon uniquement).
-Pour l'accès réseau distant : membrane proof Holochain (clé cryptographique ed25519).
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | process health |
+| `GET` | `/metrics` | Prometheus metrics when enabled |
+| `GET` | `/v1/models` | locally visible model metadata |
+| `POST` | `/v1/chat/completions` | OpenAI-compatible local inference request |
+| `GET` | `/mesh/nodes` | discovered node summary |
+| `POST` | `/mesh/plan` | request or calculate an inference plan |
 
----
+Callers must inspect the actual router in the selected binary; the repository does not claim one consolidated, remotely hardened public API. Do not expose these endpoints directly to the Internet.
 
-## Endpoints Disponibles
+## Holochain roles
 
-### `GET /v1/models`
+### `agent-registry`
 
-Liste les modèles disponibles sur le mesh local et dans le réseau.
+`announce_capabilities` writes a capability entry authored by the caller. The payload includes compute backends, GPU/VRAM information, loaded model IDs, supported inference types, availability and the 32-byte QUIC public key encoded as 64 hexadecimal characters.
 
-**Réponse**
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "id": "gemma4-31b",
-      "object": "model",
-      "created": 1735000000,
-      "owned_by": "ainonymous-local",
-      "meta": {
-        "vram_required_gb": 20,
-        "context_length": 131072,
-        "multimodal": true,
-        "architecture": "dense",
-        "nodes_available": 2,
-        "avg_latency_ms": 340
-      }
-    },
-    {
-      "id": "gemma4-26b-moe",
-      "object": "model",
-      "created": 1735000000,
-      "owned_by": "ainonymous-mesh",
-      "meta": {
-        "vram_required_gb": 18,
-        "context_length": 262144,
-        "multimodal": true,
-        "architecture": "moe",
-        "active_params_b": 4,
-        "nodes_available": 3,
-        "avg_latency_ms": 210
-      }
-    },
-    {
-      "id": "gemma4-e4b",
-      "object": "model",
-      "created": 1735000000,
-      "owned_by": "ainonymous-local",
-      "meta": {
-        "vram_required_gb": 5,
-        "context_length": 131072,
-        "multimodal": true,
-        "architecture": "dense-edge",
-        "nodes_available": 1,
-        "avg_latency_ms": 45,
-        "speculative_draft": true
-      }
-    }
-  ]
-}
-```
+`get_node` and discovery functions return capability summaries. The authored transport key is used by inference-mesh negotiation to bind the direct session to Holochain provenance.
 
----
+### `inference-mesh`
 
-### `POST /v1/chat/completions`
+`negotiate_quic_session` accepts the requester's transport public key and session parameters. It derives the caller from `call_info().provenance`; the caller cannot select an arbitrary agent identity. Negotiation rejects a missing, malformed or non-matching announced key.
 
-Inférence principale — compatible OpenAI Chat Completions.
+Control-plane signals may advertise session offers, but a receiver must still perform strict TLS key verification before accepting data.
 
-**Requête (texte)**
-```json
-{
-  "model": "gemma4-31b",
-  "messages": [
-    {"role": "system", "content": "Tu es un assistant utile."},
-    {"role": "user", "content": "Explique le sharding MoE en 3 points."}
-  ],
-  "max_tokens": 1024,
-  "temperature": 0.7,
-  "top_p": 0.9,
-  "stream": true,
+### `blackboard`
 
-  // Extensions AInonymous (optionnel)
-  "ainonymous": {
-    "execution_mode": "auto",         // "auto" | "solo" | "pipeline" | "expert_shard" | "speculative"
-    "min_nodes": 1,
-    "prefer_region": "eu-west",
-    "speculative_draft_model": "gemma4-e4b",  // activer décodage spéculatif
-    "blackboard_context": true         // injecter contexte Blackboard récent
-  }
-}
-```
+Blackboard functions publish and query shared coordination entries. They are not suitable for prompts, raw activations, model weights or other large/private payloads.
 
-**Requête (multimodale — image)**
-```json
-{
-  "model": "gemma4-31b",
-  "messages": [
-    {
-      "role": "user",
-      "content": [
-        {"type": "text", "text": "Qu'est-ce que cette image représente ?"},
-        {
-          "type": "image_url",
-          "image_url": {
-            "url": "data:image/jpeg;base64,/9j/4AAQ...",
-            "detail": "high"
-          }
-        }
-      ]
-    }
-  ],
-  "max_tokens": 512,
-  "stream": false
-}
-```
+### `hybridnode-core`
 
-**Réponse (non-stream)**
-```json
-{
-  "id": "chatcmpl-ainon-abc123",
-  "object": "chat.completion",
-  "created": 1735000000,
-  "model": "gemma4-31b",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "Le sharding MoE consiste à distribuer..."
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 45,
-    "completion_tokens": 128,
-    "total_tokens": 173
-  },
+The reusable hApp publishes membership, capability and audit-related entries. Its integrity zome enforces author consistency and private-network genesis admission according to DNA properties.
 
-  // Extensions AInonymous dans la réponse
-  "ainonymous": {
-    "execution_mode": "pipeline_split",
-    "nodes_used": 2,
-    "node_ids": ["hCAk...ABC", "hCAk...DEF"],
-    "total_latency_ms": 340,
-    "tokens_per_second": 37.6,
-    "speculative_acceptance_rate": null
-  }
-}
-```
+## Error handling
 
-**Réponse (stream — Server-Sent Events)**
-```
-data: {"id":"chatcmpl-abc","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}
+Clients must treat these as terminal for the current operation:
 
-data: {"id":"chatcmpl-abc","object":"chat.completion.chunk","choices":[{"delta":{"content":"Le"}}]}
+- conductor or app WebSocket connection failure;
+- invalid app token or missing provisioned cell;
+- invalid membrane proof;
+- transport key/provenance mismatch;
+- TLS peer verification failure;
+- malformed frame or transfer integrity failure.
 
-data: {"id":"chatcmpl-abc","object":"chat.completion.chunk","choices":[{"delta":{"content":" sharding"}}]}
+Retry only idempotent discovery reads automatically. Installation, plan creation and inference submission require application-level idempotency keys before transparent retry is safe.
 
-data: [DONE]
-```
+## Serialization
 
----
-
-### `POST /v1/completions`
-
-Completion texte brut (legacy OpenAI).
-
-```json
-{
-  "model": "gemma4-31b",
-  "prompt": "def fibonacci(n):",
-  "max_tokens": 256,
-  "temperature": 0.2,
-  "stop": ["\n\n"]
-}
-```
-
----
-
-### `POST /v1/embeddings`
-
-Génération d'embeddings (si modèle embedding disponible dans le mesh).
-
-```json
-{
-  "model": "nomic-embed-text",
-  "input": ["Texte à encoder", "Autre texte"]
-}
-```
-
----
-
-## Endpoints AInonymous Natifs
-
-### `GET /v1/ainonymous/mesh/status`
-
-État complet du mesh local.
-
-```json
-{
-  "local_node": {
-    "agent_id": "hCAk...XYZ",
-    "status": "active",
-    "vram_available_gb": 18.2,
-    "loaded_models": ["gemma4-31b", "gemma4-e4b"],
-    "current_load": 0.35,
-    "requests_handled_24h": 142
-  },
-  "mesh": {
-    "peers_connected": 7,
-    "peers_active": 5,
-    "total_vram_gb": 112.4,
-    "requests_in_flight": 3,
-    "avg_latency_ms": 280,
-    "uptime_seconds": 86400
-  },
-  "blackboard": {
-    "posts_last_24h": 89,
-    "agents_active": 4
-  }
-}
-```
-
-### `GET /v1/ainonymous/mesh/nodes`
-
-Liste détaillée des nœuds du mesh.
-
-```json
-{
-  "nodes": [
-    {
-      "agent_id": "hCAk...ABC",
-      "region": "eu-west",
-      "vram_gb": 24.0,
-      "gpu": "NVIDIA RTX 4090",
-      "backend": "cuda",
-      "models": ["gemma4-31b"],
-      "load": 0.2,
-      "latency_ms": 12,
-      "uptime_hours": 48.5,
-      "requests_24h": 423
-    }
-  ]
-}
-```
-
-### `POST /v1/ainonymous/blackboard/post`
-
-Poster sur le Blackboard directement via API REST.
-
-```json
-{
-  "prefix": "STATUS",
-  "content": "Analyse de codebase en cours, 3 fichiers restants",
-  "tags": ["python", "analyse", "projet-x"],
-  "ttl_hours": 48
-}
-```
-
-### `GET /v1/ainonymous/blackboard/search`
-
-```
-GET /v1/ainonymous/blackboard/search?q=CUDA+OOM&prefix=FINDING&limit=10
-```
-
-**Réponse**
-```json
-{
-  "posts": [
-    {
-      "id": "uhCEk...123",
-      "prefix": "FINDING",
-      "content": "FINDING: CUDA OOM sur gemma4-31b avec batch_size > 4",
-      "tags": ["cuda", "oom", "gemma4"],
-      "author_id": "hCAk...DEF",  // anonymisé si privacy_mode
-      "created_at": 1735000000,
-      "expires_at": 1735172800
-    }
-  ],
-  "total": 1
-}
-```
-
-### `POST /v1/ainonymous/models/pull`
-
-Télécharger un modèle dans le mesh local.
-
-```json
-{
-  "model_id": "gemma4-31b",
-  "quantization": "q4_k_m",
-  "source": "huggingface"  // "huggingface" | "local" | "mesh"
-}
-```
-
-**Réponse (streaming du téléchargement)**
-```
-data: {"status": "downloading", "progress": 0.12, "speed_mbps": 45.2}
-data: {"status": "downloading", "progress": 0.65, "speed_mbps": 52.1}
-data: {"status": "verifying", "hash": "sha256:abc..."}
-data: {"status": "ready", "model_id": "gemma4-31b", "size_gb": 20.1}
-```
-
----
-
-## Codes d'Erreur
-
-| Code | Signification | Action |
-|---|---|---|
-| `400` | Requête malformée (model_id invalide, etc.) | Corriger les paramètres |
-| `404` | Modèle non disponible dans le mesh | `pull` le modèle ou attendre un nœud |
-| `429` | Mesh saturé, file d'attente pleine | Réessayer dans quelques secondes |
-| `503` | Aucun nœud disponible pour ce modèle | Vérifier `GET /v1/ainonymous/mesh/nodes` |
-| `507` | VRAM insuffisante pour ce modèle | Utiliser un modèle plus léger |
-
-**Format d'erreur**
-```json
-{
-  "error": {
-    "message": "Aucun nœud disponible pour gemma4-31b (VRAM requise: 20GB, disponible: 16GB max)",
-    "type": "mesh_unavailable",
-    "code": "NO_CAPABLE_NODE",
-    "ainonymous": {
-      "available_nodes": 3,
-      "max_available_vram_gb": 16.0,
-      "suggested_model": "gemma4-26b-moe"
-    }
-  }
-}
-```
-
----
-
-## Flux Interne : Requête → Holochain → Réponse
-
-```
-POST /v1/chat/completions
-        │
-        ▼
-┌──────────────────┐
-│  Proxy Local     │  Parse model_id, paramètres
-│  (Rust HTTP)     │  Construit InferenceRequest
-└────────┬─────────┘
-         │ WebSocket
-         ▼
-┌──────────────────┐
-│  Conducteur      │  call_zome("inference-mesh",
-│  Holochain       │            "coordinator",
-│  (local)         │            "compute_execution_plan")
-└────────┬─────────┘
-         │ DHT query
-         ▼
-┌──────────────────┐
-│  DNA             │  query_available_nodes()
-│  inference-mesh  │  → get_links(anchor("models","gemma4-31b"))
-│  zome: router    │  → retourne plan d'exécution
-└────────┬─────────┘
-         │ call_remote() vers nœuds sélectionnés
-         ▼
-┌───────────────────────────────────────┐
-│  Nœuds mesh                           │
-│  Nœud A: couches 0-23                 │
-│    └── llama-server :9337 local       │
-│  Nœud B: couches 24-47               │
-│    └── llama-server :9337 local       │
-└───────────────────┬───────────────────┘
-                    │ tokens + métriques
-                    ▼
-┌──────────────────┐
-│  Proxy Local     │  Agrège tokens
-│                  │  Stream SSE → client
-│                  │  Publie InferenceMetrics
-└──────────────────┘
-```
-
----
-
-## Rate Limiting
-
-Le mesh AInonymous gère le rate limiting de manière décentralisée :
-
-- Chaque nœud expose son `max_concurrent_requests` dans ses `NodeCapabilities`
-- Le routeur répartit les requêtes en fonction de la charge (`current_load`)
-- Si tous les nœuds sont saturés → HTTP 429 avec `Retry-After` en secondes
-- Les requêtes en attente peuvent être mises en file via `"queue": true` dans les extensions AInonymous
-
-```json
-// Requête avec mise en file acceptée
-{
-  "model": "gemma4-31b",
-  "messages": [...],
-  "ainonymous": {
-    "queue": true,
-    "queue_timeout_seconds": 300
-  }
-}
-```
+Zome payloads use Holochain's serialized-bytes representation. HTTP uses JSON. QUIC frames use the codec in `ainonymous-quic`; peers must enforce maximum frame and transfer sizes before allocating buffers.

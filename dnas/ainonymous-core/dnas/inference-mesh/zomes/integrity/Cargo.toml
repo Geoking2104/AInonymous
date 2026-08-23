@@ -9,6 +9,6 @@ name = "inference_mesh_integrity"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdi = "0.7"
+hdi = "=0.8.0"
 holochain_serialized_bytes = "0.0.57"
 serde = { version = "1", features = ["derive"] }

@@ -17,7 +17,7 @@ pub mod scheduler;
 pub mod sdwan;
 pub mod topology;
 
-pub use config::HybridNodeConfig;
+pub use config::{HybridNodeConfig, NodeMode};
 pub use error::HybridNodeError;
 pub use scheduler::{SchedulingContext, SchedulingDecision, SchedulingStrategy};
 pub use topology::{LinkSla, NodeTopology, SiteId};
@@ -45,20 +45,25 @@ impl HybridNode {
         // Start observability first so we can track startup failures
         observability::start_prometheus(&self.config.observability).await?;
 
-        // Connect to Holochain conductor
-        let _identity = identity::load_from_conductor(&self.config).await?;
-
-        // Poll SD-WAN topology
-        let _topology = sdwan::connect(&self.config.sdwan).await?;
+        match self.config.mode {
+            NodeMode::Hybridnode => {
+                let _identity = identity::load_from_conductor(&self.config).await?;
+                let _topology = sdwan::connect(&self.config.sdwan).await?;
+            }
+            NodeMode::HolochainOnly => {
+                let _identity = identity::load_from_conductor(&self.config).await?;
+                info!("SD-WAN integration disabled by holochain-only mode");
+            }
+            NodeMode::SdwanOnly => {
+                let _topology = sdwan::connect(&self.config.sdwan).await?;
+                warn!("Holochain identity disabled: sdwan-only mode cannot authenticate inference peers");
+            }
+        }
 
         info!("HybridNode ready");
 
-        // Attend SIGINT (Ctrl-C, dev) OU SIGTERM (arrêt conteneur OCI —
-        // `docker stop` / kubelet envoient SIGTERM au process PID 1, puis
-        // SIGKILL après le délai de grâce si le process n'a pas quitté).
-        // `ctrl_c()` seul n'intercepte QUE SIGINT sous Unix ; sans handler
-        // SIGTERM explicite, le process est tué par l'action par défaut du
-        // signal (pas d'unwind, ce code de nettoyage ne s'exécuterait jamais).
+        // Handle both interactive shutdown and the SIGTERM sent by container
+        // runtimes before their grace period expires.
         let ctrl_c = async {
             let _ = tokio::signal::ctrl_c().await;
         };
@@ -70,7 +75,9 @@ impl HybridNode {
                     sig.recv().await;
                 }
                 Err(e) => {
-                    warn!("Impossible d'installer le handler SIGTERM ({e}) — seul SIGINT sera intercepté");
+                    warn!(
+                        "Could not install the SIGTERM handler ({e}); only SIGINT will be handled"
+                    );
                     std::future::pending::<()>().await;
                 }
             }
@@ -80,8 +87,8 @@ impl HybridNode {
         let terminate = std::future::pending::<()>();
 
         tokio::select! {
-            _ = ctrl_c => info!("SIGINT reçu"),
-            _ = terminate => info!("SIGTERM reçu"),
+            _ = ctrl_c => info!("SIGINT received"),
+            _ = terminate => info!("SIGTERM received"),
         }
         warn!("Shutdown signal received");
         Ok(())

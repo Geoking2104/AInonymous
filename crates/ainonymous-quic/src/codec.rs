@@ -1,16 +1,15 @@
-/// Codec pour l'encodage/décodage des frames QUIC
-/// Format d'un frame :
-///   [4 bytes: type] [4 bytes: length] [N bytes: payload]
+//! Codec pour l'encodage/décodage des frames QUIC.
+//! Format d'un frame : `[4 bytes: type] [4 bytes: length] [N bytes: payload]`.
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[repr(u32)]
 pub enum FrameType {
     Activation = 0x01,
-    Token      = 0x02,
-    Control    = 0x03,
-    Metrics    = 0x04,
-    Ping       = 0xFF,
+    Token = 0x02,
+    Control = 0x03,
+    Metrics = 0x04,
+    Ping = 0xFF,
 }
 
 pub struct Frame {
@@ -28,16 +27,26 @@ impl Frame {
     }
 
     pub fn decode(buf: &mut impl Buf) -> Option<Self> {
-        if buf.remaining() < 8 { return None; }
+        if buf.remaining() < 8 {
+            return None;
+        }
         let frame_type = buf.get_u32_le();
         let length = buf.get_u32_le() as usize;
-        if buf.remaining() < length { return None; }
+        if buf.remaining() < length {
+            return None;
+        }
         let mut payload = vec![0u8; length];
         buf.copy_to_slice(&mut payload);
-        Some(Frame { frame_type, payload: Bytes::from(payload) })
+        Some(Frame {
+            frame_type,
+            payload: Bytes::from(payload),
+        })
     }
 
     pub fn ping() -> Self {
-        Frame { frame_type: FrameType::Ping as u32, payload: Bytes::new() }
+        Frame {
+            frame_type: FrameType::Ping as u32,
+            payload: Bytes::new(),
+        }
     }
 }

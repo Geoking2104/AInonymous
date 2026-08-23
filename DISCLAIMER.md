@@ -1,16 +1,9 @@
-# Avertissement important
+# Disclaimer
 
-**AInonymous est un projet open source en phase expérimentale (juillet 2026).**
+AInonymous is experimental open-source research software. Some components are functional for development and controlled testnets, while production SD-WAN adapters, robust public admission, native distributed inference coverage and adversarial end-to-end testing remain incomplete.
 
-- Le code est fonctionnel pour le développement et les tests (testnet 2 nœuds, mTLS, HybridNode scheduler).
-- De nombreuses fonctionnalités critiques sont encore en cours d'implémentation réelle (intégration Holochain complète, mTLS strict avec vérification ed25519, support llama.cpp GGUF end-to-end).
-- Les claims de conformité (GDPR, HIPAA, SOC 2, etc.) dans la documentation et le site sont **des objectifs d'architecture**, pas des certifications obtenues.
-- Les chiffres de ROI et d'économie sont **illustratifs** et basés sur des hypothèses internes. Ils ne constituent pas un engagement commercial.
+Any claims about GDPR, HIPAA, SOC 2 or other frameworks in historical site material are architectural goals, not certifications or legal assurances. Performance, ROI and cost figures are illustrative assumptions, not commercial commitments.
 
-**Ne pas déployer en production avec des données sensibles, réglementées ou critiques sans audit de sécurité complet, tests approfondis et validation par vos équipes.**
+Do not deploy this software with sensitive, regulated or critical data without an independent security review, extensive environment-specific testing and approval from the responsible security and compliance teams.
 
-Le projet est Apache 2.0. Vous êtes libres de l'utiliser, de le modifier et de l'auditer.
-
-Pour toute question : contact@gdelatournelle.fr ou via le formulaire du site.
-
-— Geoffroy de La Tournelle, juillet 2026
+The project is licensed under Apache-2.0. See [LICENSE](LICENSE).

@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::Path;
+use std::sync::Arc;
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -11,7 +13,9 @@ use holochain_client::{
     AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, CellInfo, ClientAgentSigner,
     ExternIO, ZomeCallTarget,
 };
-use holochain_types::prelude::Signal;
+use holochain_types::prelude::{
+    AppBundleSource, InstallAppPayload, RoleSettings, Signal, UnsafeBytes,
+};
 use holochain_zome_types::prelude::{FunctionName, RoleName, ZomeName};
 
 use crate::config::MembraneProofConfig;
@@ -86,7 +90,10 @@ impl ConductorClient {
             authorized
         );
 
-        let proof_bytes = membrane_proof.and_then(|cfg| cfg.to_bytes().ok());
+        let proof_bytes = match membrane_proof {
+            Some(cfg) => Some(cfg.to_bytes()?),
+            None => None,
+        };
 
         info!(
             "Conducteur Holochain connecté (app='{}', membrane_proof: {})",
@@ -106,24 +113,6 @@ impl ConductorClient {
 
     pub fn membrane_proof(&self) -> Option<&[u8]> {
         self.membrane_proof.as_deref()
-    }
-
-    /// Appelle un zome en injectant automatiquement la membrane_proof si elle existe
-    /// et que le payload ne la contient pas déjà.
-    pub async fn call_zome_with_proof(
-        &self,
-        role: &str,
-        zome: &str,
-        func: &str,
-        mut payload: Value,
-    ) -> Result<Value> {
-        if self.membrane_proof.is_some() && payload.get("membrane_proof").is_none() {
-            if let Some(proof) = &self.membrane_proof {
-                payload["membrane_proof"] = serde_json::to_value(proof)?;
-            }
-        }
-
-        self.call_zome_json(role, zome, func, payload).await
     }
 
     pub async fn call_zome_json(
@@ -161,33 +150,42 @@ impl ConductorClient {
         })
     }
 
-    /// Installe une happ avec un Membrane Proof (pour consortiums privés)
-    ///
-    /// TODO(holochain_client 0.8.3) : `InstallAppPayload` a changé de forme entre
-    /// l'écriture initiale de cette fonction (visait une API avec les champs
-    /// `bundle`/`membrane_proofs`) et la version actuellement épinglée dans le
-    /// workspace. `cargo check` confirme que les champs réels sont désormais
-    /// `source`, `roles_settings`, `ignore_genesis_failure` (vraisemblablement
-    /// `AppBundleSource` + une map de `RoleSettings` par rôle remplaçant la
-    /// liste plate de membrane proofs), mais je n'ai pas pu vérifier les types
-    /// exacts (holochain_conductor_api::admin_interface n'expose pas la
-    /// définition, et les sources complètes d'app.rs dépassent la limite de
-    /// récupération web). Fonction non appelée ailleurs dans le code
-    /// actuellement (`install_app_with_membrane_proof` n'a aucun appelant) :
-    /// stub explicite plutôt qu'une implémentation devinée à l'aveugle.
-    /// À réimplémenter avant tout usage réel, cf. ROADMAP.md / docs/PALIER_F.md.
+    /// Install and enable a Holochain 0.7 hApp, attaching a membrane proof to
+    /// the provisioned role that validates private-network admission.
     pub async fn install_app_with_membrane_proof(
         &self,
-        _admin: &mut AdminWebsocket,
+        admin: &AdminWebsocket,
         app_id: &str,
-        _bundle_path: &Path,
-        _membrane_proof: Option<Vec<u8>>,
+        bundle_path: &Path,
+        proof_role: &str,
+        membrane_proof: Option<Vec<u8>>,
     ) -> Result<()> {
-        anyhow::bail!(
-            "install_app_with_membrane_proof('{}'): non réimplémenté pour holochain_client 0.8.3 \
-             (InstallAppPayload::{{source,roles_settings,ignore_genesis_failure}} — cf. TODO dans le code)",
-            app_id
-        )
+        let roles_settings = membrane_proof.map(|proof| {
+            let mut settings = HashMap::new();
+            settings.insert(
+                RoleName::from(proof_role.to_string()),
+                RoleSettings::Provisioned {
+                    membrane_proof: Some(Arc::new(UnsafeBytes::from(proof).into())),
+                    modifiers: None,
+                    init_properties: None,
+                },
+            );
+            settings
+        });
+
+        admin
+            .install_app(InstallAppPayload {
+                source: AppBundleSource::Path(bundle_path.to_path_buf()),
+                agent_key: None,
+                installed_app_id: Some(app_id.to_string()),
+                network_seed: None,
+                roles_settings,
+                ignore_genesis_failure: false,
+                restore_from_dht: false,
+            })
+            .await?;
+        admin.enable_app(app_id.to_string()).await?;
+        Ok(())
     }
 
     pub async fn listen_quic_signals(

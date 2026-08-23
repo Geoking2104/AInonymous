@@ -45,6 +45,7 @@ cp "$TEMPLATE" "$DEST"
 
 # Inject project name into otel_service_name
 sed -i "s/otel_service_name: .*/otel_service_name: \"$PROJECT\"/" "$DEST" 2>/dev/null || true
+sed -i "s/app_id: .*/app_id: \"$PROJECT\"/" "$DEST" 2>/dev/null || true
 
 # Enable private-network if requested
 if [[ "$PRIVATE_NETWORK" == "true" ]]; then

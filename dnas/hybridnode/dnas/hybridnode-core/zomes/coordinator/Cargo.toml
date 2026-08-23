@@ -8,6 +8,6 @@ name = "hybridnode_coordinator"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdk = { version = "0.6.1", features = ["tracing"] }
+hdk = { version = "=0.7.0" }
 hybridnode_integrity = { path = "../integrity" }
 serde = { version = "1", features = ["derive"] }

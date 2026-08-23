@@ -5,22 +5,11 @@ edition = "2021"
 description = "HybridNode: SD-WAN + Holochain + QUIC/mTLS scheduling layer for AInonymous"
 license = "MIT OR Apache-2.0"
 
-[features]
-default = ["mock-sdwan"]
-mock-sdwan = []
-vmanage = ["reqwest"]
-velocloud = ["reqwest"]
-private-network = []
-
 [dependencies]
-# Holochain client — alignee sur ainonymous-daemon (0.8.3). La 0.6 (utilisee
-# hors-workspace, cf. HYBRIDNODE_APPLY.md) tire holochain_serialized_bytes
-# 0.0.55 qui epingle serde en =1.0.203, incompatible avec le reste du
-# workspace (serde 1.0.228 via holochain_types 0.6.3). Une fois dans le
-# meme workspace Cargo que ainonymous-daemon, un seul resolveur de deps
-# s'applique : les deux crates doivent partager la meme version.
-holochain_client = { version = "=0.8.3", default-features = false }
-hdk = { version = "0.6.1", optional = true }
+# Holochain 0.7-compatible client and HDK. Keep this aligned with the daemon
+# because both crates share the root Cargo resolver and lockfile.
+holochain_client = { version = "=0.9.0", default-features = false }
+hdk = { version = "=0.7.0", optional = true }
 
 # Networking — alignes sur workspace.dependencies pour eviter les conflits de
 # resolution (ex: derive_more entre iroh 0.26 et iroh-net 0.23 pin isole)
@@ -37,9 +26,6 @@ async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-
-# HTTP (for SD-WAN REST APIs)
-reqwest = { workspace = true, optional = true }
 
 # Observability
 prometheus-client = { workspace = true }

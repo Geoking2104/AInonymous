@@ -1,10 +1,9 @@
-# Holochain 0.6.2 — Configuration conducteur T5.1 (test signal QUIC)
-#
-# Lance avec : holochain -c scripts/testnet/conductor_t51.yaml
-# Répertoire depuis la racine du repo.
+# Holochain 0.7.0 local test conductor configuration.
+# Run from the repository root with:
+# holochain -c scripts/testnet/conductor_t51.yaml
 
-environment_path: /tmp/ainonymous-t51/conductor-data
-use_dangerous_test_keystore: true   # Pas de lair-keystore pour les tests
+data_root_path: /tmp/ainonymous-t51/conductor-data
+wasm_backend: ~
 
 keystore:
   type: danger_test_keystore
@@ -13,11 +12,19 @@ admin_interfaces:
   - driver:
       type: websocket
       port: 65000
+      danger_bind_addr: ~
       allowed_origins: "*"
 
 network:
-  bootstrap_service: https://bootstrap.holo.host
-  transport_pool:
-    - type: quic
+  base64_auth_material_bootstrap: ~
+  base64_auth_material_relay: ~
+  bootstrap_url: https://bootstrap.holo.host
+  relay_url: ~
+  request_timeout_s: 60
+  target_arc_factor: 1
+  report: none
+  advanced: ~
 
-db_sync_strategy: Fast              # O(sync) relaxé pour les tests locaux
+db_sync_level: Off
+tuning_params: ~
+tracing_scope: ~

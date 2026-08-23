@@ -15,9 +15,10 @@ on:
       - 'crates/hybridnode-core/**'
       - 'crates/hybridnode-daemon/**'
       - 'dnas/hybridnode/**'
+      - 'scripts/hybridnode/**'
 
 jobs:
-  # ── 1. Validate YAML configs against JSON Schema ──────────────────────────
+  # Validate YAML configs against JSON Schema and semantic security rules.
   validate-configs:
     name: Validate YAML configs
     runs-on: ubuntu-latest
@@ -31,9 +32,10 @@ jobs:
         run: |
           python scripts/hybridnode/validate_config.py \
             hybridnode/configs/ainonymous.hybridnode.yaml \
-            hybridnode/configs/generic-project.hybridnode.yaml
+            hybridnode/configs/generic-project.hybridnode.yaml \
+            hybridnode/specs/hybridnode.yaml
 
-  # ── 2. Rust lint + test for hybridnode-core ───────────────────────────────
+  # Lint and test the reusable Rust layer.
   rust-check:
     name: Rust check (hybridnode-core)
     runs-on: ubuntu-latest
@@ -49,15 +51,13 @@ jobs:
         run: |
           cargo clippy \
             --manifest-path crates/hybridnode-core/Cargo.toml \
-            --features mock-sdwan \
             -- -D warnings
       - name: Tests
         run: |
           cargo test \
-            --manifest-path crates/hybridnode-core/Cargo.toml \
-            --features mock-sdwan
+            --manifest-path crates/hybridnode-core/Cargo.toml
 
-  # ── 3. Check YAML policy files are well-formed ────────────────────────────
+  # Check YAML policy files are well-formed.
   lint-policies:
     name: Lint policy YAML files
     runs-on: ubuntu-latest
@@ -83,7 +83,7 @@ jobs:
               sys.exit(1)
           "
 
-  # ── 4. Security baseline checks ───────────────────────────────────────────
+  # Check security invariants that should never regress.
   security-checks:
     name: Security baseline
     runs-on: ubuntu-latest

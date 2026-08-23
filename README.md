@@ -1,144 +1,144 @@
 # AInonymous
 
-> Inférence LLM décentralisée à identité pseudonyme — architecture **HybridNode** : Holochain 0.6.1 (overlay DHT agent-centrique) + QUIC/mTLS ed25519 (data plane) + SD-WAN (underlay). Souveraineté agent-centrique, zéro serveur central, zéro token.
+AInonymous is an experimental, agent-centric control plane for distributed LLM inference. It combines Holochain for authenticated coordination, a direct QUIC/mTLS data plane for activations and model traffic, and an optional SD-WAN adapter for topology and SLA-aware scheduling.
 
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Holochain](https://img.shields.io/badge/Holochain-0.6.1-purple)](https://holochain.org)
-[![Rust](https://img.shields.io/badge/rust-stable-orange)](https://rustup.rs)
+> **Status:** alpha research software. The repository now targets Holochain **0.7.0** exclusively. It is suitable for development and controlled private pilots, not for anonymous public production workloads. The project does not currently provide zero-knowledge inference, traffic-flow anonymity, or a complete public-network Sybil defense.
 
-> ⚠️ **Projet expérimental (juillet 2026).** Avant toute évaluation technique ou déploiement, lire [`DISCLAIMER.md`](DISCLAIMER.md) — statut réel des fonctionnalités, ce qui est vérifié vs. ce qui reste architecture cible.
+## Architecture
 
-> Security review (English, 2026-08-23): [`docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md`](docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md). It distinguishes implemented controls from target architecture and documents the remaining production blockers.
+| Plane | Implementation | Purpose |
+| --- | --- | --- |
+| Control | Holochain 0.7.0 over Iroh | Agent identity, capabilities, scheduling coordination, audit records, membrane admission |
+| Data | QUIC + TLS 1.3/mTLS | Direct peer-to-peer inference traffic and activation transfer |
+| Underlay | SD-WAN adapter | Optional topology, QoS and link-health input |
+| Runtime | Rust daemons + llama.cpp/PyTorch adapters | Local execution and pipeline orchestration |
 
----
+Holochain and QUIC deliberately use different Ed25519 keys. A node publishes its QUIC public key in a capability entry authored by its Holochain agent. Session negotiation verifies that the supplied transport key matches the record authored by the caller. Private-network admission is enforced by DNA properties and a network-bound membrane proof during genesis.
 
-## Concept
+See [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), and [Holochain 0.7 migration](docs/HOLOCHAIN_0_7_MIGRATION.md) for the design and its boundaries.
 
-AInonymous est un réseau d'inférence distribué où chaque participant contribue et consomme de la puissance de calcul sans serveur ou compte central. Les AgentPubKeys, endpoints, horaires et volumes réseau restent corrélables : le système est pseudonyme, pas anonyme. Il adapte le principe **mesh-llm** (pooling P2P de ressources GPU/CPU pour exécuter des LLMs ouverts) via une architecture **HybridNode** en trois couches :
+## Version matrix
 
-| Couche | Technologie | Rôle |
-|--------|------------|------|
-| **Overlay** | Holochain 0.6.1 + iroh | DHT, identité ed25519, coordination, warrants |
-| **Data plane** | QUIC/mTLS ed25519 | Transfert d'activations tensorielles, token streams |
-| **Underlay** | SD-WAN | Topology-aware routing, QoS DSCP 46, SLA enforcement |
+| Component | Pinned version |
+| --- | --- |
+| Holochain conductor / `hc` | 0.7.0 |
+| Rust `holochain_client` | 0.9.0 |
+| HDK | 0.7.0 |
+| HDI | 0.8.0 |
+| Lair keystore | 0.7.1 |
 
----
+Holochain 0.7 is not database-compatible with 0.6. Create a new conductor data root and reinstall the hApps. The migrated manifests use new network seeds, so every peer must install the newly packed DNAs.
 
-## Ce qui différencie AInonymous sur le marché
+## Repository layout
 
-Le paysage de l'inférence LLM distribuée en 2026 se divise en deux familles, et AInonymous ne rentre dans aucune des deux telles qu'elles existent aujourd'hui.
-
-**Famille 1 — les mesh communautaires (Petals, Exo Labs, Kalavai, SharedLLM)** : pas de blockchain, mais un modèle de confiance qui repose soit sur un swarm public ouvert à l'abus (Petals — le projet est aujourd'hui en maintenance, son propre indicateur de santé réseau public est en panne), soit sur un LAN fermé (Exo, pas de couche réseau distribuée à proprement parler), soit sur un coordinateur central qui possède un registre de confiance et un secret partagé (Kalavai, SharedLLM). Aucun de ces projets ne modélise l'identité des nœuds de façon auto-certifiante ni ne publie de preuve cryptographique de comportement invalide consultable par tous les pairs.
-
-**Famille 2 — les marchés du calcul décentralisés sur blockchain (Bittensor, Gensyn, Ritual, io.net)** : confiance assurée par consensus on-chain, staking, preuves ZK ou TEE — avec un token natif à détenir, des frais réseau, et une volatilité de marché qui n'a rien à voir avec l'objectif d'usage (faire tourner un modèle). C'est un marché du calcul, pas un outil d'inférence anonyme.
-
-AInonymous se positionne différemment sur trois axes vérifiables dans le code de ce dépôt :
-
-| Axe | Ce que font les autres | Ce que fait AInonymous |
-|---|---|---|
-| **Identité et confiance** | Secret partagé/coordinateur central (mesh communautaires) *ou* token + consensus on-chain (DePIN blockchain) | Identité ed25519 auto-certifiante par nœud (aucun tiers), `Warrant` signé publié dans le DHT Holochain en cas de comportement invalide, expiration et réhabilitation automatiques — sans jamais dépendre d'un opérateur de registre central ni d'un token |
-| **Aucune financiarisation** | Bittensor/Gensyn/Ritual/io.net exigent un wallet et un token natif (coté, volatil) pour participer | Aucun token, aucun frais réseau, aucun compte — la clé ed25519 est générée localement au premier lancement |
-| **Conscience du réseau physique (WAN/QoS)** | Aucun des projets étudiés (mesh communautaire ou DePIN) n'intègre le réseau WAN sous-jacent | Couche **HybridNode** : SLA par lien (latence/bande passante/jitter), marquage QoS DSCP 46 pour le trafic d'inférence, scoring géographique Haversine, failover multi-sites — pensé pour des déploiements d'entreprise sur SD-WAN existant (Cisco vEdge, VMware VeloCloud, Fortinet) autant que pour un réseau public |
-
-**Sur le plan technique pur**, AInonymous partage un choix avec SharedLLM (le seul projet identifié qui fait le même pari) : backend **llama.cpp / GGUF** plutôt qu'un stack PyTorch custom (Petals) — accès immédiat à tous les formats de quantification et architectures déjà supportés par llama.cpp, sans maintenir un zoo de modèles parallèle. AInonymous va plus loin sur un point précis et vérifié dans ce dépôt (`patches/llama-cpp-pipeline-split/`, `docs/DEV_PLAN_TESTNET_2NODES.md`) : un patch natif de llama.cpp pour un pipeline-split par couche **sans passer par le mode RPC** ni par un pont Python, testé bit-exact sur une chaîne à 2 nœuds *et* à 3 nœuds (nœud du milieu compris, `layer_start>0` et `layer_end<n_layer` simultanément) — avec réduction mesurée du graphe de calcul (87→42 nœuds ggml). À titre de comparaison, SharedLLM (v0.1.0, avril 2026) documente elle-même que seuls ses modèles de test triviaux sont vérifiés de bout en bout, les modèles plus gros étant bloqués par un bug amont non résolu dans le RPC de llama.cpp.
-
-**Ce que ce comparatif ne dit pas** (honnêteté avant tout, cf. `DISCLAIMER.md`) : AInonymous est expérimental. Le support GPU et MoE pour le pipeline-split natif ne sont pas encore faits (`ROADMAP.md`, Palier G), l'intégration Holochain n'est pas encore mTLS-stricte de bout en bout (Palier H), et rien ici n'a l'ancienneté d'usage réel de Petals. Les axes ci-dessus sont des différences d'architecture vérifiables dans le code, pas des garanties de maturité produit équivalente.
-
----
-
-## Architecture HybridNode
-
-```
-COUCHE APPLICATION      Daemon AInonymous | Agents | API REST OpenAI-compat
-COUCHE OVERLAY          Holochain : identité ed25519, DHT, Warrants, Blackboard
-PLAN DE DONNÉES         QUIC/mTLS ed25519 : activations, tokens, embeddings
-COUCHE UNDERLAY         SD-WAN : routage WAN, QoS, failover, tunnels chiffrés
+```text
+crates/
+  ainonymous-daemon/      Holochain/QUIC orchestration daemon
+  ainonymous-quic/        direct data plane and peer-key verification
+  ainonymous-proxy/       HTTP compatibility proxy
+  ainonymous-cli/         operator CLI
+  ainonymous-mcp/         MCP integration
+  hybridnode-core/        reusable config, identity, topology and scheduler layer
+  hybridnode-daemon/      HybridNode identity/topology startup scaffold
+dnas/
+  ainonymous-core/        inference-mesh, agent-registry and blackboard hApp
+  hybridnode/             HybridNode membership/audit hApp
+hybridnode/               configuration schema, examples and policies
+scripts/                  build, validation and two-node testnet tooling
+docs/                     maintained architecture and operating documentation
 ```
 
-Principe dual-canal : Holochain transporte uniquement le plan de contrôle (découverte, capacités, métriques, warrants) — jamais le volume de données. Les activations tensorielles et les tokens circulent en direct entre nœuds via QUIC/mTLS, avec authentification mutuelle ed25519 à chaque connexion (pas de secret partagé, pas de CA tierce). Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) et [`docs/HYBRIDNODE.md`](docs/HYBRIDNODE.md).
+## Prerequisites
 
----
+- Rust stable (the workspace declares Rust 1.80 as its minimum)
+- `wasm32-unknown-unknown`
+- Holochain 0.7.0 and `hc` 0.7.0
+- Lair keystore 0.7.1
+- Python 3 with `PyYAML` and `jsonschema` for configuration validation
+- Bash for packaging and testnet scripts (WSL or Git Bash on Windows)
 
-## Mode privé : réseau fermé par Membrane Proofs
-
-Le mode par défaut d'AInonymous est un mesh public pseudonyme : n'importe quel nœud peut rejoindre le DHT sans autorisation et les métadonnées réseau restent observables. À l'opposé, HybridNode permet un mode **privé** : un réseau fermé où l'admission est conditionnée à une preuve cryptographique signée par un administrateur du réseau — pensé pour un consortium d'entreprise multi-sites, un groupement de recherche ou tout déploiement où le contrôle d'accès prime sur l'ouverture publique.
-
-**Comment ça marche** : `MembraneProofConfig` (`Base64` ou fichier) porte la preuve d'admission dans la configuration du daemon et s'injecte automatiquement dans les appels de zome (`call_zome_with_proof`). Côté HybridNode, la feature Cargo `private-network` active un contrôle d'admission dans le zome d'intégrité : un nœud sans preuve est rejeté à l'entrée. `HolochainConfig::bootstrap_mode` permet de pointer vers un bootstrap privé plutôt que le réseau public par défaut.
-
-**Statut réel (pas d'enjolivement — cf. [`DISCLAIMER.md`](DISCLAIMER.md))** :
-
-| Composant | Statut |
-|---|---|
-| `MembraneProofConfig` + injection automatique dans les appels de zome | ✅ codé et fonctionnel |
-| Feature `private-network` + admission gate dans le zome d'intégrité | ✅ `genesis_self_check` désérialise la preuve (`PrivateNetworkProof`) et vérifie sa signature ed25519 via `hdi::prelude::verify_signature` contre la clé d'administrateur réseau lue dans les propriétés de la DNA (`dna.yaml` → `network_admin_pubkey`, baked into le hash de la DNA) — un nœud dont la preuve est absente, mal signée, ou adressée à une autre clé d'agent est rejeté |
-| `install_app_with_membrane_proof` (installation d'une hApp avec preuve, côté conducteur) | ❌ non fonctionnel actuellement — l'API `holochain_client` a changé de forme depuis l'écriture initiale ; la fonction est volontairement stubbée (erreur explicite) plutôt que de deviner une implémentation non vérifiée |
-| Expiration / anti-rejeu de la preuve (`issued_at`) | ❌ le champ existe dans `PrivateNetworkProof` mais n'est pas encore vérifié — `genesis_self_check` n'a pas d'accès horloge vérifié dans HDI 0.7.1, disclosed plutôt que deviné |
-| Configuration de la clé admin dans `dna.yaml` | 🟡 fonctionnelle mais peu ergonomique — tableau brut de 36 octets, pas encore le format lisible `uhCAk...` |
-| Proof-of-work à l'admission, liste blanche d'agents de confiance | ❌ pas implémenté — présents uniquement comme architecture cible dans `docs/ARCHITECTURE.md`, pas dans le code |
-
-Le mode privé a donc désormais une vérification cryptographique réelle de l'admission (signature ed25519 contre la clé d'administrateur réseau), mais reste incomplet pour un déploiement production : pas d'expiration de preuve, configuration de clé peu ergonomique, et le chemin d'installation `install_app_with_membrane_proof` côté conducteur est toujours stubbé.
-
----
-
-## Statut du Projet (Juillet 2026)
-
-**Palier F — Intégration Holochain + Warrants** : Largement terminé
-
-- Membrane Proofs pour réseaux privés
-- Zome `warrants` complet (émission, vérification Ed25519ctx, liens, cleanup)
-- `NodeCapabilities` avec estimation VRAM réaliste
-- Scoring intelligent des nœuds (VRAM + charge + géolocalisation via Haversine)
-- Découverte P2P dynamique + cache
-- Sécurité renforcée (`zeroize`, Domain Separation, validation stricte)
-- Optimisations QUIC (compression zstd, quantification INT8 SIMD avec `wide`)
-
-**Palier G — Moteur d'Inférence Réel (llama.cpp)** : En cours
-
-- `LlamaManager` robuste (GPU detection, VRAM estimation, auto-réduction `n_gpu_layers`, `mlock`, KV-cache q8_0)
-- Pipeline-split natif llama.cpp vérifié bit-exact (2 et 3 nœuds, voir tableau comparatif ci-dessus)
-- Restent : MoE, GPU sur le pipeline natif, decoding spéculatif, quantification du KV-cache
-
-**Packaging & déploiement** : conteneurs OCI-compliant pour `ainonymous-daemon` et `hybridnode-daemon` (`docker/`, `docker-compose.yml`) — voir [`docs/OCI_RUNTIME_SPEC_COMPLIANCE.md`](docs/OCI_RUNTIME_SPEC_COMPLIANCE.md) pour le détail de conformité vis-à-vis d'[opencontainers/runtime-spec](https://github.com/opencontainers/runtime-spec).
-
----
-
-## Installation rapide
+Install the Rust target and confirm that the Holochain tools are the pinned versions:
 
 ```bash
-# macOS / Linux
-git clone https://github.com/Geoking2104/AInonymous.git
-cd AInonymous
-
-# Build
-cargo build --workspace --release
-
-# Lancer le daemon
-./target/release/ainonymous-daemon
+rustup target add wasm32-unknown-unknown
+hc --version
+holochain --version
 ```
 
-### Via Docker
+On x86_64 Linux or WSL2, `bash scripts/setup_holochain_wsl.sh` installs the pinned release assets after verifying their published SHA-256 digests.
+
+Do not package this repository with an older `hc`; manifest validation and bundle formats are version-sensitive.
+
+## Build and test
 
 ```bash
-docker compose up --build
+# Native crates
+cargo check --workspace
+cargo test --workspace
+
+# Both Holochain zome workspaces
+cargo build --manifest-path dnas/ainonymous-core/Cargo.toml \
+  --release --target wasm32-unknown-unknown
+cargo build --manifest-path dnas/hybridnode/Cargo.toml \
+  --release --target wasm32-unknown-unknown
+
+# Validate reference configurations
+python scripts/hybridnode/validate_config.py \
+  hybridnode/configs/ainonymous.hybridnode.yaml \
+  hybridnode/configs/generic-project.hybridnode.yaml
+
+# Package both hApps with hc 0.7.0
+bash scripts/build-happ.sh release
 ```
 
-Voir [`docs/OCI_RUNTIME_SPEC_COMPLIANCE.md`](docs/OCI_RUNTIME_SPEC_COMPLIANCE.md) pour la configuration runtime (utilisateur non-root, capacités Linux réduites, rootfs en lecture seule).
+For a private deployment, also run validation with `--production`. The reference development configuration intentionally uses a mock SD-WAN adapter and is not a production profile.
 
----
+## Running with a conductor
+
+1. Start a Holochain 0.7.0 conductor using a fresh data root and loopback-only admin WebSocket.
+2. Pack and install `dnas/ainonymous-core/ainonymous-core.happ` and `dnas/hybridnode/hybridnode.happ`.
+3. Configure distinct loopback admin and app ports plus the installed app ID.
+4. For a private DNA, generate a `PrivateNetworkProof` for the target agent and network ID, then supply it in the role settings when installing the app.
+5. Start the daemon. Conductor connection failures are fatal; the runtime no longer silently falls back to static discovery.
+
+The exact commands and conductor configuration are in [Holochain build and operations](docs/HOLOCHAIN_BUILD.md).
+
+## Reuse in another project
+
+Generate a project-specific configuration and validate it:
+
+```bash
+bash scripts/hybridnode/init_project.sh my-project
+python scripts/hybridnode/validate_config.py my-project/hybridnode.yaml
+```
+
+Integration requires more than copying YAML: install the HybridNode hApp, connect through a loopback admin interface, announce the node's QUIC public key through the authenticated agent registry, and pin that key before opening a data-plane session. Follow [HybridNode integration](HYBRIDNODE_APPLY.md).
+
+## Security defaults
+
+- Conductor is the default discovery backend; explicit connection failures fail closed.
+- The admin WebSocket is required to be loopback-only.
+- QUIC strict peer verification cannot be disabled by accepted configuration.
+- SD-WAN controller TLS verification cannot be disabled by accepted configuration.
+- Private-network mode requires a matching private bootstrap mode and bootstrap URL.
+- Membrane proofs are installation/genesis credentials, never ordinary zome-call fields.
+- Transport private keys are stored in the OS keyring when the secure-keyring feature is enabled; Holochain agent keys remain in Lair.
+
+The public-network mode remains experimental because its advertised proof-of-work admission is not implemented. See [Security](docs/SECURITY.md) before exposing any service.
 
 ## Documentation
 
-- [`DISCLAIMER.md`](DISCLAIMER.md) — statut réel du projet, à lire avant tout déploiement
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture technique complète
-- [`docs/HYBRIDNODE.md`](docs/HYBRIDNODE.md) — spécification SD-WAN + Holochain + QUIC/mTLS
-- [`docs/PALIER_F.md`](docs/PALIER_F.md) — résumé complet de Palier F
-- [`docs/NODE_SCORING.md`](docs/NODE_SCORING.md) — système de scoring des nœuds
-- [`docs/OCI_RUNTIME_SPEC_COMPLIANCE.md`](docs/OCI_RUNTIME_SPEC_COMPLIANCE.md) — packaging conteneur et conformité OCI
-- `zomes/warrants/README.md` — documentation du zome Warrants
-- `site/ainonymous.html` — site web autonome (FR/EN)
+Start with the [documentation index](docs/README.md). The most important documents are:
 
----
+- [Architecture](docs/ARCHITECTURE.md)
+- [Security and threat model](docs/SECURITY.md)
+- [Holochain 0.7 migration](docs/HOLOCHAIN_0_7_MIGRATION.md)
+- [Holochain build and operations](docs/HOLOCHAIN_BUILD.md)
+- [API reference](docs/API_SPEC.md)
+- [Network/data plane](docs/NETWORK.md)
+- [Two-node testnet](docs/TESTNET_2NODES.md)
+- [Original architecture review](docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md)
 
-## Licence
+## License
 
-Apache 2.0
+Apache-2.0. See [LICENSE](LICENSE) and [DISCLAIMER](DISCLAIMER.md).

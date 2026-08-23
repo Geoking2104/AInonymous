@@ -37,25 +37,11 @@ pub async fn connect(config: &SdwanConfig) -> Result<Box<dyn SdwanProvider>> {
             info!("SD-WAN: using mock provider");
             Ok(Box::new(MockSdwan::new()))
         }
-        "rest" | "vmanage" | "velocloud" => {
-            #[cfg(feature = "vmanage")]
-            {
-                info!("SD-WAN: connecting to {}", config.provider);
-                // TODO: implement REST client using reqwest
-                Err(HybridNodeError::Sdwan(format!(
-                    "Provider '{}' not yet implemented — build with 'mock-sdwan' for dev",
-                    config.provider
-                ))
-                .into())
-            }
-            #[cfg(not(feature = "vmanage"))]
-            {
-                Err(HybridNodeError::Sdwan(format!(
-                    "Provider '{}' requires feature 'vmanage'. Enable it in Cargo.toml or use 'mock'.",
-                    config.provider
-                )).into())
-            }
-        }
+        "rest" | "vmanage" | "velocloud" => Err(HybridNodeError::Sdwan(format!(
+            "SD-WAN provider '{}' is not implemented; use 'mock' only for development",
+            config.provider
+        ))
+        .into()),
         other => Err(HybridNodeError::Sdwan(format!("Unknown SD-WAN provider: {other}")).into()),
     }
 }

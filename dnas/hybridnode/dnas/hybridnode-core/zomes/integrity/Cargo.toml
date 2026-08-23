@@ -8,5 +8,6 @@ name = "hybridnode_integrity"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdi = { version = "0.7.1", features = ["tracing"] }
+hdi = { version = "=0.8.0", features = ["trace"] }
+holochain_serialized_bytes = "=0.0.57"
 serde = { version = "1", features = ["derive"] }

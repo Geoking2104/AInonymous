@@ -1,21 +1,10 @@
-# AInonymous Node Scoring Visualizer (React + D3)
+# Node-Scoring Visualizer
 
-Version React moderne du dashboard de scoring des nœuds.
-
-## Lancer le projet
+This React/Vite application visualizes experimental HybridNode scheduling scores.
 
 ```bash
-cd visualizer
 npm install
 npm run dev
 ```
 
-Ouvre http://localhost:5173
-
-## Stack
-
-- React 18
-- Vite
-- D3.js v7
-
-Tu peux facilement ajouter des graphiques D3 plus complexes (grouped bars, radar, etc.) dans `App.jsx`.
+Open the local URL printed by Vite. The current data is illustrative and must not be treated as live network telemetry or a production scheduling decision.

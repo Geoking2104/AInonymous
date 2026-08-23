@@ -1,29 +1,23 @@
-# Politique SD-WAN pour trafic AInonymous / HybridNode
-# À importer dans votre contrôleur SD-WAN (vManage, VeloCloud, etc.)
-
+# Illustrative SD-WAN policy. Translate it to the target vendor's audited format.
 name: ainonymous-hybridnode-policy
 version: "1.0"
-description: "Priorisation et QoS pour les flux d'inférence distribuée AInonymous"
+description: "QoS example for distributed inference and Holochain control traffic"
 
 traffic-classes:
-  - name: inference-data            # flux QUIC d'activations tensorielles
-    dscp: 46                         # EF — Expedited Forwarding
+  - name: inference-data
+    dscp: 46
     priority: high
     bandwidth-guarantee-percent: 40
     latency-target-ms: 20
-    drop-policy: tail-drop
-
-  - name: holochain-control          # flux Holochain DHT / conductor
-    dscp: 10                         # AF11 — Assured Forwarding
+  - name: holochain-control
+    dscp: 10
     priority: medium
     bandwidth-guarantee-percent: 5
     latency-target-ms: 100
-
-  - name: llama-api                  # API REST locale OpenAI-compat
+  - name: local-api
     dscp: 0
     priority: normal
     bandwidth-guarantee-percent: 5
-
   - name: best-effort
     dscp: 0
     priority: low
@@ -36,31 +30,10 @@ classifiers:
       port-range: 49152-65535
       dscp: 46
     assign-class: inference-data
-
-  - name: holochain-conductor
+  - name: holochain-app
     match:
       protocol: tcp
-      destination-port: [8888, 8889]
+      destination-port: [8889]
     assign-class: holochain-control
 
-  - name: llama-server
-    match:
-      protocol: tcp
-      destination-port: [9337, 9338]
-    assign-class: llama-api
-
-path-policies:
-  - name: inference-prefer-mpls
-    traffic-class: inference-data
-    prefer:
-      - link-type: mpls
-      - link-type: private-wan
-    fallback:
-      - link-type: internet
-        condition: "latency < 50ms AND packet-loss < 0.5%"
-
-  - name: control-any-path
-    traffic-class: holochain-control
-    prefer:
-      - link-type: any
-    load-balance: true
+# Never route the loopback-only conductor admin port through SD-WAN.

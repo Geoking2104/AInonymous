@@ -309,6 +309,12 @@ pub struct Ed25519ClientVerifier {
     algs: WebPkiSupportedAlgorithms,
 }
 
+impl Default for Ed25519ClientVerifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ed25519ClientVerifier {
     pub fn new() -> Self {
         Self {

@@ -1,39 +1,28 @@
-# HybridNode — Baseline de sécurité
+# Deployment policy example. Items marked "operator" are not enforced by this file.
 name: hybridnode-security-baseline
 version: "1.0"
 
 network:
-  quic_mtls_strict: true             # mTLS ed25519 obligatoire, pas de certificat auto-signé
+  quic_mtls_strict: true
   min_tls_version: "1.3"
-  allowed_ciphers:
-    - TLS_AES_256_GCM_SHA384
-    - TLS_CHACHA20_POLY1305_SHA256
-  session_token_length_bytes: 32
-  session_token_expiry_seconds: 30
+  conductor_admin_scope: loopback
 
 identity:
-  key_algorithm: ed25519
-  keystore: lair                     # lair-keystore Holochain uniquement
-  key_rotation_days: 0               # 0 = jamais (clé persistante = identité DHT)
+  holochain_keystore: lair
+  transport_keystore: os-keyring
+  bind_transport_key_to_holochain_provenance: true
 
 holochain:
-  validate_all_entries: true
-  warrant_auto_publish: true
-  warrant_expiry_days: 30
-  reputation_exclusion_threshold: 0.5
+  version: "0.7.0"
+  private_network_required: true
+  network_bound_membrane_proof: true
+  private_bootstrap_and_relay: true # operator responsibility
 
 sdwan:
   api_tls_verify: true
-  api_token_rotation_days: 90
-  site_authentication: certificate   # "certificate" | "psk"
+  credentials_from_environment: true
 
-models:
-  hash_verification: required        # SHA256 vérifié localement avant tout service
-  cross_peer_verification: true      # >= 2 pairs doivent confirmer le hash
-  allow_unverified: false            # refuser de servir un modèle non attesté
-
-audit:
-  enabled: true
-  log_all_requests: false            # ne logger que les métadonnées, jamais les prompts
-  log_metrics_only: true
-  warrant_notification: true
+application:
+  public_http_enabled: false
+  prompts_in_logs: false
+  independent_security_review: required-before-production

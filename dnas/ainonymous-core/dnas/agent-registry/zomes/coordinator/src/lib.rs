@@ -1,5 +1,5 @@
-use hdk::prelude::*;
 use agent_registry_integrity::*;
+use hdk::prelude::*;
 
 /// Annoncer les capacités de ce nœud dans le DHT
 #[hdk_extern]
@@ -8,14 +8,17 @@ pub fn announce_capabilities(caps: NodeCapabilities) -> ExternResult<ActionHash>
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Lier l'agent à ses capacités
-    create_link(agent.clone(), hash.clone(), LinkTypes::AgentToCapabilities, ())?;
+    create_link(
+        agent.clone(),
+        hash.clone(),
+        LinkTypes::AgentToCapabilities,
+        (),
+    )?;
 
     // Lier chaque modèle chargé à cet agent (pour recherche par modèle)
-    for model in &caps.loaded_models {
-        if model.ready {
-            let model_anchor = anchor(LinkTypes::PathLinks, "models".to_string(), model.model_id.clone())?;
-            create_link(model_anchor, agent.clone(), LinkTypes::ModelToAgents, ())?;
-        }
+    for model_id in &caps.loaded_models {
+        let model_anchor = anchor(LinkTypes::PathLinks, "models".to_string(), model_id.clone())?;
+        create_link(model_anchor, agent.clone(), LinkTypes::ModelToAgents, ())?;
     }
 
     // Lier la région à cet agent
@@ -42,22 +45,26 @@ pub fn update_quic_endpoint(input: UpdateQuicInput) -> ExternResult<ActionHash> 
     // Récupérer les capacités actuelles et les mettre à jour
     let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        LinkQuery::try_new(agent, LinkTypes::AgentToCapabilities)?,
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToCapabilities)?,
         GetStrategy::default(),
     )?;
 
-    if let Some(last_link) = links.last() {
-        if let Some(hash) = last_link.target.clone().into_action_hash() {
+    if let Some(latest_link) = links.into_iter().max_by_key(|link| link.timestamp) {
+        if let Some(hash) = latest_link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Ok(Some(mut caps)) = record.entry().to_app_option::<NodeCapabilities>() {
                     caps.quic_endpoint = Some(input.endpoint);
-                    return update_entry(hash, EntryTypes::NodeCapabilities(caps));
+                    let updated = update_entry(hash, EntryTypes::NodeCapabilities(caps))?;
+                    create_link(agent, updated.clone(), LinkTypes::AgentToCapabilities, ())?;
+                    return Ok(updated);
                 }
             }
         }
     }
 
-    Err(wasm_error!(WasmErrorInner::Guest("Capacités non trouvées".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Capacités non trouvées".into()
+    )))
 }
 
 /// Récupérer les nœuds disponibles pour un modèle donné
@@ -83,12 +90,18 @@ pub fn get_available_nodes(model_id: String) -> ExternResult<Vec<NodeSummary>> {
                 GetStrategy::default(),
             )?;
 
-            let recent_hb = hb_links.iter().rev().find_map(|l| {
-                let age_ms = now_ms as i64 - l.timestamp.as_millis() as i64;
-                if age_ms < 60_000 { // heartbeat < 60 secondes
-                    l.target.clone().into_action_hash()
-                } else { None }
-            });
+            let recent_hb = hb_links
+                .iter()
+                .max_by_key(|link| link.timestamp)
+                .and_then(|l| {
+                    let age_ms = now_ms as i64 - l.timestamp.as_millis() as i64;
+                    if age_ms < 60_000 {
+                        // heartbeat < 60 secondes
+                        l.target.clone().into_action_hash()
+                    } else {
+                        None
+                    }
+                });
 
             if let Some(hb_hash) = recent_hb {
                 if let Some(hb_record) = get(hb_hash, GetOptions::default())? {
@@ -102,6 +115,7 @@ pub fn get_available_nodes(model_id: String) -> ExternResult<Vec<NodeSummary>> {
                                 current_load: hb.current_load,
                                 available_slots: hb.available_slots,
                                 quic_endpoint: caps.quic_endpoint.clone(),
+                                node_pubkey: caps.node_pubkey.clone(),
                                 region_hint: caps.region_hint.clone(),
                                 score: compute_score(&caps, &hb),
                             });
@@ -113,7 +127,11 @@ pub fn get_available_nodes(model_id: String) -> ExternResult<Vec<NodeSummary>> {
     }
 
     // Trier par score décroissant
-    summaries.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    summaries.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(summaries)
 }
 
@@ -129,10 +147,15 @@ fn get_node_capabilities_inner(agent: &AgentPubKey) -> ExternResult<Option<NodeC
         GetStrategy::default(),
     )?;
 
-    if let Some(last_link) = links.last() {
-        if let Some(hash) = last_link.target.clone().into_action_hash() {
+    if let Some(latest_link) = links.into_iter().max_by_key(|link| link.timestamp) {
+        if let Some(hash) = latest_link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                return record.entry().to_app_option::<NodeCapabilities>()
+                if record.action().author() != agent {
+                    return Ok(None);
+                }
+                return record
+                    .entry()
+                    .to_app_option::<NodeCapabilities>()
                     .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)));
             }
         }
@@ -141,10 +164,10 @@ fn get_node_capabilities_inner(agent: &AgentPubKey) -> ExternResult<Option<NodeC
 }
 
 fn compute_score(caps: &NodeCapabilities, hb: &NodeHeartbeat) -> f32 {
-    let vram_score  = (caps.vram_gb / 80.0).min(1.0) * 30.0;
-    let load_score  = (1.0 - hb.current_load) * 40.0;
+    let vram_score = (caps.vram_gb / 80.0).min(1.0) * 30.0;
+    let load_score = (1.0 - hb.current_load) * 40.0;
     let slots_score = (hb.available_slots as f32 / 8.0).min(1.0) * 20.0;
-    let mem_score   = (1.0 - hb.memory_pressure) * 10.0;
+    let mem_score = (1.0 - hb.memory_pressure) * 10.0;
     vram_score + load_score + slots_score + mem_score
 }
 
@@ -157,6 +180,7 @@ pub struct NodeSummary {
     pub current_load: f32,
     pub available_slots: u8,
     pub quic_endpoint: Option<String>,
+    pub node_pubkey: String,
     pub region_hint: Option<String>,
     pub score: f32,
 }

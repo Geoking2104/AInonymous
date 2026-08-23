@@ -1,4 +1,5 @@
 use hdk::prelude::*;
+use hybridnode_integrity::Warrant as HybridNodeWarrant;
 use hybridnode_integrity::*;
 
 // ---------------------------------------------------------------------------
@@ -20,19 +21,22 @@ pub fn publish_attestation(attestation: NodeAttestation) -> ExternResult<ActionH
 #[hdk_extern]
 pub fn get_node_attestation(agent: AgentPubKey) -> ExternResult<Option<NodeAttestation>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToAttestation)?.build(),
+        LinkQuery::try_new(agent, LinkTypes::AgentToAttestation)?,
+        GetStrategy::default(),
     )?;
-    let latest = links.into_iter()
-        .max_by_key(|l| l.timestamp);
+    let latest = links.into_iter().max_by_key(|l| l.timestamp);
     if let Some(link) = latest {
-        let hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("invalid link target".to_string()))
-        })?;
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("invalid link target".to_string())))?;
         let record = get(hash, GetOptions::default())?;
         if let Some(r) = record {
-            let attestation: NodeAttestation = r.entry().to_app_option()
+            let attestation: NodeAttestation = r
+                .entry()
+                .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("missing entry".to_string())))?;
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "missing entry".to_string()
+                )))?;
             return Ok(Some(attestation));
         }
     }
@@ -82,7 +86,7 @@ pub fn claim_model(input: ClaimModelInput) -> ExternResult<ActionHash> {
 // ---------------------------------------------------------------------------
 
 #[hdk_extern]
-pub fn publish_warrant(warrant: Warrant) -> ExternResult<ActionHash> {
+pub fn publish_warrant(warrant: HybridNodeWarrant) -> ExternResult<ActionHash> {
     let hash = create_entry(EntryTypes::Warrant(warrant.clone()))?;
     create_link(
         warrant.accused.clone(),
@@ -94,19 +98,23 @@ pub fn publish_warrant(warrant: Warrant) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-pub fn get_active_warrants(agent: AgentPubKey) -> ExternResult<Vec<Warrant>> {
+pub fn get_active_warrants(agent: AgentPubKey) -> ExternResult<Vec<HybridNodeWarrant>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToWarrants)?.build(),
+        LinkQuery::try_new(agent, LinkTypes::AgentToWarrants)?,
+        GetStrategy::default(),
     )?;
     let mut warrants = Vec::new();
     for link in links {
-        let hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("invalid link target".to_string()))
-        })?;
+        let hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("invalid link target".to_string())))?;
         if let Some(record) = get(hash, GetOptions::default())? {
-            let warrant: Warrant = record.entry().to_app_option()
+            let warrant: HybridNodeWarrant = record
+                .entry()
+                .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("missing entry".to_string())))?;
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "missing entry".to_string()
+                )))?;
             warrants.push(warrant);
         }
     }
@@ -146,7 +154,9 @@ pub fn verify_node_attestation(agent: AgentPubKey) -> ExternResult<AttestationSt
 
     let warrants = get_active_warrants(agent)?;
     if !warrants.is_empty() {
-        return Ok(AttestationStatus::Sanctioned { warrant_count: warrants.len() });
+        return Ok(AttestationStatus::Sanctioned {
+            warrant_count: warrants.len(),
+        });
     }
 
     Ok(AttestationStatus::Valid)

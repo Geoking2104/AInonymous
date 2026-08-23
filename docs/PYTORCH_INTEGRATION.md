@@ -240,4 +240,4 @@ Tests cover:
 | `verify_gguf()` | `model_export` | SHA-256 integrity check |
 | `ModelManifest` | `model_export` | Dataclass matching Holochain entry |
 
-See also: [HYBRIDNODE.md](HYBRIDNODE.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [HOLOCHAIN_ZOMES.md](HOLOCHAIN_ZOMES.md)
+See also: [documentation index](README.md) · [architecture](ARCHITECTURE.md) · [Holochain build guide](HOLOCHAIN_BUILD.md)
