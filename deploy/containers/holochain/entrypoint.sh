@@ -62,7 +62,10 @@ install_app() {
     app_port=$3
 
     if ! app_is_installed "$app_id"; then
-        agent_key=$(hc client call --port "$ADMIN_PORT" new-agent | tr -d '"[:space:]')
+        agent_output=$(hc client call --port "$ADMIN_PORT" new-agent)
+        agent_key=$(printf '%s\n' "$agent_output" \
+            | grep -o 'uhCAk[A-Za-z0-9_-]*' \
+            | head -n 1 || true)
         case "$agent_key" in
             uhCAk*) ;;
             *) echo "ERROR: failed to generate an agent key for $app_id" >&2; exit 1 ;;
