@@ -14,7 +14,7 @@ RUN cargo build --locked --release \
       --package hybridnode-daemon \
     && install -d /out \
     && install -m 0755 target/release/ainonymous-daemon /out/ainonymous-daemon \
-    && install -m 0755 target/release/hybridnode-daemon /out/hybridnode-daemon
+    && install -m 0755 target/release/hybridnode /out/hybridnode-daemon
 
 FROM debian:bookworm-slim AS runtime
 
