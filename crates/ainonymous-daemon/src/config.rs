@@ -84,7 +84,7 @@ fn default_admin_port() -> u16 {
     8888
 }
 fn default_conductor_app_port() -> u16 {
-    8890
+    8889
 }
 
 impl Default for HolochainConfig {
@@ -238,5 +238,21 @@ impl DaemonConfig {
 
     pub fn models_dir(&self) -> &PathBuf {
         &self.models_dir
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_ports_do_not_overlap() {
+        let config = DaemonConfig::default();
+
+        assert_eq!(config.holochain.admin_port, 8888);
+        assert_eq!(config.holochain.app_port, 8889);
+        assert_eq!(config.daemon_port, 8890);
+        assert_ne!(config.holochain.admin_port, config.holochain.app_port);
+        assert_ne!(config.holochain.app_port, config.daemon_port);
     }
 }
