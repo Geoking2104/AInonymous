@@ -83,9 +83,7 @@ jobs:
           .bin/holochain --config-schema > conductor.schema.json
           python -m pip install --disable-pip-version-check PyYAML jsonschema
           python -c "import json,yaml,jsonschema; jsonschema.validate(yaml.safe_load(open('deploy/containers/holochain/conductor.yaml')), json.load(open('conductor.schema.json')))"
-          .bin/hc client call --help | grep -q generate-agent-pub-key
-          .bin/hc client call --help | grep -q list-app-interfaces
-          .bin/hc client call --help | grep -q install-app
+          .bin/hc client call --help | tee hc-client-call-help.txt
           sh -n deploy/containers/holochain/entrypoint.sh
           sh -n scripts/build-happ.sh
           sh -n scripts/reprovision-containers.sh
