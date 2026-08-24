@@ -2,7 +2,7 @@ FROM rust:1.91-slim-bookworm AS builder
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
-       cmake clang libclang-dev libdbus-1-dev libssl-dev perl pkg-config \
+       cmake clang libclang-dev libdbus-1-dev libssl-dev make perl pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
