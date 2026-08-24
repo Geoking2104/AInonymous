@@ -66,7 +66,7 @@ try {
     & $HcBin app pack dnas/hybridnode
     if ($LASTEXITCODE -ne 0) { throw "HybridNode hApp packaging failed." }
 
-    & cargo run --locked -p dna-hashes -- `
+    & cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json `
         dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna `
         dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna `
         dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna `

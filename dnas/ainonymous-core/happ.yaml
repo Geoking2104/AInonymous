@@ -12,7 +12,7 @@ roles:
       modifiers:
         network_seed: "ainonymous-core-hc07-v3-20260823"
         properties: ~
-      installed_hash: ~
+      installed_hash: "uhC0kYFyQtLQaaKs--WrpAQdNh44E0SXDX8Kk409Tan7Us4QLU5Q_"
       clone_limit: 0
 
   - name: agent-registry
@@ -24,7 +24,7 @@ roles:
       modifiers:
         network_seed: "ainonymous-core-hc07-v3-20260823"
         properties: ~
-      installed_hash: ~
+      installed_hash: "uhC0kF5tmjLHIMwemHJ7efEd-HlZxl2P77_LJoQM_PYmeYkGft9Ap"
       clone_limit: 0
 
   - name: blackboard
@@ -36,5 +36,5 @@ roles:
       modifiers:
         network_seed: "ainonymous-core-hc07-v3-20260823"
         properties: ~
-      installed_hash: ~
+      installed_hash: "uhC0k7wOBmtXg_cY2UwORA_Q5yG37Wmc551T582wgG1nlFWezcZuB"
       clone_limit: 0

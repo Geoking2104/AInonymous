@@ -14,5 +14,5 @@ roles:
         properties:
           private_network: false
           network_id: "ainonymous-hybridnode-public-v3"
-      installed_hash: ~
+      installed_hash: "uhC0k-sq0wS1opMFIrNzZKb2r94Uynr84xdUWg0Y9ix3WJc9zDLNw"
       clone_limit: 0

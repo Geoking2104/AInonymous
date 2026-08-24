@@ -29,6 +29,8 @@ See [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), and [Hol
 
 Holochain 0.7 is not database-compatible with 0.6. Create a new conductor data root and reinstall the hApps. The current DNA epoch uses `ainonymous-core-hc07-v3-20260823` and `ainonymous-hybridnode-hc07-v3-20260823`; every peer must install bundles built from this epoch.
 
+The four canonical effective hashes are pinned in the hApp manifests and listed in the [DNA hash registry](docs/DNA_HASHES.md).
+
 ## Repository layout
 
 ```text
@@ -94,7 +96,7 @@ bash scripts/build-happ.sh release
 Print the effective hashes from the packed Holochain 0.7 bundles:
 
 ```bash
-cargo run --locked -p dna-hashes -- \
+cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json \
   dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna \
   dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna \
   dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna \

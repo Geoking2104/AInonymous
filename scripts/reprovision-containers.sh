@@ -36,7 +36,7 @@ fi
 
 cd "$PROJECT_ROOT"
 HC_BIN="$HC_BIN" "$SCRIPT_DIR/build-happ.sh" release
-cargo run --locked -p dna-hashes -- \
+cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json \
     dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna \
     dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna \
     dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna \

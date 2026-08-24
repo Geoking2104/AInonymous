@@ -1,0 +1,14 @@
+{
+  "holochain_version": "0.7.0",
+  "dna_epoch": "v3-20260823",
+  "network_seeds": {
+    "ainonymous-core": "ainonymous-core-hc07-v3-20260823",
+    "hybridnode": "ainonymous-hybridnode-hc07-v3-20260823"
+  },
+  "dnas": {
+    "dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna": "uhC0kYFyQtLQaaKs--WrpAQdNh44E0SXDX8Kk409Tan7Us4QLU5Q_",
+    "dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna": "uhC0kF5tmjLHIMwemHJ7efEd-HlZxl2P77_LJoQM_PYmeYkGft9Ap",
+    "dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna": "uhC0k7wOBmtXg_cY2UwORA_Q5yG37Wmc551T582wgG1nlFWezcZuB",
+    "dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna": "uhC0k-sq0wS1opMFIrNzZKb2r94Uynr84xdUWg0Y9ix3WJc9zDLNw"
+  }
+}

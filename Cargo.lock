@@ -1561,6 +1561,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "holochain_types",
+ "serde_json",
  "tokio",
 ]
 

@@ -8,6 +8,7 @@ This directory contains the maintained documentation for the Holochain 0.7 gener
 - [Security](SECURITY.md) — threat model, enforced invariants and known gaps
 - [Holochain 0.7 migration](HOLOCHAIN_0_7_MIGRATION.md) — compatibility matrix and upgrade procedure
 - [Holochain build and operations](HOLOCHAIN_BUILD.md) — build, pack, install and conductor configuration
+- [DNA hash registry](DNA_HASHES.md) — canonical epoch-v3 seeds and effective Holochain hashes
 - [Container deployment](../deploy/containers/README.md) — reproducible Holochain 0.7 provisioning and reset procedure
 - [HybridNode integration](../HYBRIDNODE_APPLY.md) — reuse in another application
 - [API reference](API_SPEC.md) — supported local HTTP and zome boundaries
