@@ -84,9 +84,14 @@ jobs:
           python -m pip install --disable-pip-version-check PyYAML jsonschema
           python -c "import json,yaml,jsonschema; jsonschema.validate(yaml.safe_load(open('deploy/containers/holochain/conductor.yaml')), json.load(open('conductor.schema.json')))"
           .bin/hc client call --help | tee hc-client-call-help.txt
+          grep -q new-agent hc-client-call-help.txt
+          grep -q list-app-ws hc-client-call-help.txt
+          grep -q install-app hc-client-call-help.txt
+          .bin/hc client call --port 1 install-app --help | grep -q -- --agent-key
+          .bin/hc client call --port 1 add-app-ws --help | grep -q -- --installed-app-id
           sh -n deploy/containers/holochain/entrypoint.sh
-          sh -n scripts/build-happ.sh
-          sh -n scripts/reprovision-containers.sh
+          bash -n scripts/build-happ.sh
+          bash -n scripts/reprovision-containers.sh
 
       - name: Build and pack both hApps
         env:

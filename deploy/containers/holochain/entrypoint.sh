@@ -62,7 +62,7 @@ install_app() {
     app_port=$3
 
     if ! app_is_installed "$app_id"; then
-        agent_key=$(hc client call --port "$ADMIN_PORT" generate-agent-pub-key | tr -d '"[:space:]')
+        agent_key=$(hc client call --port "$ADMIN_PORT" new-agent | tr -d '"[:space:]')
         case "$agent_key" in
             uhCAk*) ;;
             *) echo "ERROR: failed to generate an agent key for $app_id" >&2; exit 1 ;;
@@ -75,7 +75,7 @@ install_app() {
 
     hc client call --port "$ADMIN_PORT" enable-app "$app_id" >/dev/null
 
-    if ! hc client call --port "$ADMIN_PORT" list-app-interfaces 2>/dev/null \
+    if ! hc client call --port "$ADMIN_PORT" list-app-ws 2>/dev/null \
         | grep -Eq "(^|[^0-9])${app_port}([^0-9]|$)"; then
         hc client call --port "$ADMIN_PORT" add-app-ws "$app_port" \
             --allowed-origins "*" \
