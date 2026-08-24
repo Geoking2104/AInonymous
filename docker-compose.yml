@@ -50,6 +50,10 @@ services:
     depends_on:
       holochain:
         condition: service_healthy
+    environment:
+      AINON_CONFIG: /data/config/config.toml
+      XDG_CONFIG_HOME: /data/config
+      XDG_DATA_HOME: /data/local/share
     volumes:
       - ainonymous-runtime-hc07-v3:/data
       - ainonymous-models:/data/models
