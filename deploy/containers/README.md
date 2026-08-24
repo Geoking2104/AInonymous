@@ -20,7 +20,7 @@ The conductor image downloads official Holochain and `hc` 0.7.0 Linux release as
 ## Prerequisites
 
 - Docker Engine with Compose v2
-- Rust 1.88 or newer
+- Rust 1.91 or newer
 - the `wasm32-unknown-unknown` Rust target
 - `hc` 0.7.0 available locally or selected through `HC_BIN`/`-HcBin`
 - OpenSSL for the Bash workflow

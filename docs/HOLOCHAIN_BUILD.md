@@ -2,7 +2,7 @@
 
 ## Required toolchain
 
-Use Rust 1.88 or newer, Holochain and `hc` 0.7.0, and Lair 0.7.1. The Rust crates are pinned separately: HDK 0.7.0, HDI 0.8.0 and `holochain_client` 0.9.0.
+Use Rust 1.91 or newer, Holochain and `hc` 0.7.0, and Lair 0.7.1. Holochain's zome types use `str::floor_char_boundary`, which stabilized in Rust 1.91. The Rust crates are pinned separately: HDK 0.7.0, HDI 0.8.0 and `holochain_client` 0.9.0.
 
 ```bash
 rustup target add wasm32-unknown-unknown

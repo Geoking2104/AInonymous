@@ -50,7 +50,7 @@ docs/                     maintained architecture and operating documentation
 
 ## Prerequisites
 
-- Rust 1.88 or newer (the workspace minimum required by the Holochain 0.7 dependency graph)
+- Rust 1.91 or newer (`holochain_zome_types` 0.7.0 uses an API stabilized in Rust 1.91)
 - `wasm32-unknown-unknown`
 - Holochain 0.7.0 and `hc` 0.7.0
 - Lair keystore 0.7.1
