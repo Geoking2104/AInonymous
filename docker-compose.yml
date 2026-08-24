@@ -44,7 +44,8 @@ services:
     <<: *runtime-security
     build:
       context: .
-      dockerfile: docker/ainonymous-daemon.Dockerfile
+      dockerfile: docker/daemons.Dockerfile
+      target: ainonymous-daemon
     network_mode: service:holochain
     depends_on:
       holochain:
@@ -61,7 +62,8 @@ services:
     <<: *runtime-security
     build:
       context: .
-      dockerfile: docker/hybridnode-daemon.Dockerfile
+      dockerfile: docker/daemons.Dockerfile
+      target: hybridnode-daemon
     network_mode: service:holochain
     depends_on:
       holochain:

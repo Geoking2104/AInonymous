@@ -113,6 +113,21 @@ jobs:
           printf '%s' 'ci-only-placeholder' > deploy/secrets/holochain_keystore_password
           docker compose --project-name ainonymous-hc07-v3 config --quiet
 
+      - name: Reprovision ephemeral container stack
+        run: |
+          docker compose --project-name ainonymous-hc07-v3-ci build --pull
+          docker compose --project-name ainonymous-hc07-v3-ci up \
+            --detach --wait --wait-timeout 240
+          docker compose --project-name ainonymous-hc07-v3-ci ps
+
+      - name: Print container logs on failure
+        if: failure()
+        run: docker compose --project-name ainonymous-hc07-v3-ci logs --no-color || true
+
+      - name: Remove ephemeral container stack
+        if: always()
+        run: docker compose --project-name ainonymous-hc07-v3-ci down --volumes --remove-orphans || true
+
       - name: Upload bundles and hash report
         uses: actions/upload-artifact@v4
         with:
