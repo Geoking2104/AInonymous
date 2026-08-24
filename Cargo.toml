@@ -7,20 +7,19 @@ members = [
     "crates/ainonymous-daemon",
     "crates/ainonymous-cli",
     "crates/ainonymous-mcp",
-    # HybridNode (SD-WAN + Holochain + QUIC/mTLS scheduling layer, cf. docs/HYBRIDNODE_CARGO_PATCH.md)
+    # HybridNode (SD-WAN + Holochain + QUIC/mTLS scheduling layer)
     "crates/hybridnode-core",
     "crates/hybridnode-daemon",
+    "tools/dna-hashes",
 ]
-# Les zomes Holochain sont dans leur propre workspace : dnas/ainonymous-core/
-# (profil WASM distinct: opt-level=z, panic=abort)
-# Idem pour les zomes HybridNode : dnas/hybridnode/
+# Holochain zomes use separate workspaces and WASM-specific release profiles.
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["AInonymous Contributors"]
 license = "Apache-2.0"
-rust-version = "1.80"
+rust-version = "1.88"
 
 [workspace.dependencies]
 # Async runtime
@@ -37,12 +36,12 @@ reqwest = { version = "0.12", features = ["json", "stream"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
-# Sérialisation
+# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
 
-# QUIC / réseau
+# QUIC / networking
 quinn = "0.11"
 iroh = "0.26"
 iroh-net = "0.26"
@@ -66,8 +65,8 @@ sha2 = "0.10"
 base64 = "0.22"
 hex = "0.4"
 ed25519-dalek = { version = "2", features = ["pkcs8", "rand_core", "digest"] }
-# Keyring OS natif (macOS Keychain, Windows Credential Manager, Linux libsecret)
-# Utilisé par la feature `secure-keyring` d'ainonymous-quic pour chiffrer la seed.
+# Native OS keyring (macOS Keychain, Windows Credential Manager, Linux libsecret).
+# Used by ainonymous-quic's `secure-keyring` feature to encrypt the seed.
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 x509-parser = "0.16"
 rand = "0.8"

@@ -9,18 +9,19 @@ HYBRID_ROOT="$PROJECT_ROOT/dnas/hybridnode"
 TARGET_WASM="wasm32-unknown-unknown"
 BUILD_MODE="${1:-release}"
 CARGO_BIN="${CARGO:-cargo}"
+HC_BIN="${HC_BIN:-${HC:-hc}}"
 
 if [[ "$BUILD_MODE" != "release" && "$BUILD_MODE" != "dev" ]]; then
     echo "Usage: $0 [release|dev]" >&2
     exit 2
 fi
 
-if ! command -v hc >/dev/null 2>&1; then
+if ! command -v "$HC_BIN" >/dev/null 2>&1; then
     echo "ERROR: hc 0.7.0 is required to validate and package the hApps." >&2
     exit 1
 fi
 
-HC_VERSION="$(hc --version 2>&1)"
+HC_VERSION="$("$HC_BIN" --version 2>&1)"
 if [[ "$HC_VERSION" != *"0.7.0"* ]]; then
     echo "ERROR: expected hc 0.7.0, found: $HC_VERSION" >&2
     exit 1
@@ -65,13 +66,13 @@ cp "$HYBRID_WASM/hybridnode_coordinator.wasm" \
     "$HYBRID_ROOT/dnas/hybridnode-core/zomes/hybridnode-coordinator.wasm"
 
 echo "==> Packing DNAs and hApps with $HC_VERSION"
-hc dna pack "$AIN_ROOT/dnas/inference-mesh/workdir"
-hc dna pack "$AIN_ROOT/dnas/agent-registry/workdir"
-hc dna pack "$AIN_ROOT/dnas/blackboard/workdir"
-hc app pack "$AIN_ROOT"
+"$HC_BIN" dna pack "$AIN_ROOT/dnas/inference-mesh/workdir"
+"$HC_BIN" dna pack "$AIN_ROOT/dnas/agent-registry/workdir"
+"$HC_BIN" dna pack "$AIN_ROOT/dnas/blackboard/workdir"
+"$HC_BIN" app pack "$AIN_ROOT"
 
-hc dna pack "$HYBRID_ROOT/dnas/hybridnode-core/workdir"
-hc app pack "$HYBRID_ROOT"
+"$HC_BIN" dna pack "$HYBRID_ROOT/dnas/hybridnode-core/workdir"
+"$HC_BIN" app pack "$HYBRID_ROOT"
 
 echo "Built:"
 ls -lh "$AIN_ROOT/ainonymous-core.happ" "$HYBRID_ROOT/hybridnode.happ"

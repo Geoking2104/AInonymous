@@ -1,11 +1,8 @@
 name: CI
 
-# Déclencheurs :
-#   - push sur main et toutes branches feat/**
-#   - PR ciblant main
 on:
   push:
-    branches: [main, 'feat/**']
+    branches: [main, 'feat/**', 'codex/**']
   pull_request:
     branches: [main]
 
@@ -14,117 +11,126 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Job 1 — Vérification rapide (~3 min avec cache)
-  #
-  # cargo check : valide la compilation sans linker — suffit pour valider les
-  # types, les imports et la logique Serde sans avoir à attendre le link.
-  # cargo test ainonymous-quic : 3 tests mTLS handshake (rapide, pure Rust).
-  # clippy : informatif (continue-on-error), pas bloquant.
-  #
-  # Dépendance C : aws-lc-sys nécessite cmake + clang même en `check` (build.rs).
-  # cmake est pré-installé sur ubuntu-latest ; on ajoute clang pour être sûr.
-  # ─────────────────────────────────────────────────────────────────────────────
   check:
-    name: check + tests QUIC
+    name: Native checks and tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Rust stable + clippy
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.88 with Clippy
+        uses: dtolnay/rust-toolchain@1.88
         with:
           components: clippy
 
-      - name: Cache Cargo (check)
+      - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Dépendances C (aws-lc-sys + keyring dbus)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake clang libclang-dev libdbus-1-dev pkg-config
-
-      - name: cargo check --workspace
-        run: cargo check --workspace
-
-      - name: cargo test ainonymous-quic (mTLS handshake)
-        run: cargo test --package ainonymous-quic --verbose
-
-      - name: clippy --workspace (informatif)
-        run: cargo clippy --workspace -- -A dead_code -A unused
-        continue-on-error: true
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Job 2 — Build + tests daemon (~15 min première run, ~3 min avec cache)
-  #
-  # Nécessite le link complet → libsqlite3-dev pour holochain_sqlite/rusqlite,
-  # pkg-config pour openssl/reqwest, perl pour le build aws-lc-sys.
-  #
-  # Inclut cargo test --package ainonymous-daemon : 4 tests unitaires sur
-  # QuicListenerSignal (T3.1/T3.2) — signal parsing + offer.client_pubkey wiring.
-  #
-  # Ce job tourne après `check` (si check ✓).
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-daemon:
-    name: build daemon + signal tests
-    runs-on: ubuntu-latest
-    needs: check
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Dépendances C (link complet)
+      - name: Install native dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            cmake clang libclang-dev \
-            libsqlite3-dev pkg-config \
-            perl libssl-dev libdbus-1-dev
+            cmake clang libclang-dev libdbus-1-dev pkg-config libssl-dev
 
-      - name: Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check workspace
+        run: cargo check --locked --workspace
 
-      - name: Cache Cargo (daemon — clé séparée pour éviter collision avec check)
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          key: daemon
+      - name: Test workspace
+        run: cargo test --locked --workspace
 
-      - name: cargo build --package ainonymous-daemon
-        run: cargo build --package ainonymous-daemon
+      - name: Run Clippy
+        run: cargo clippy --locked --workspace -- -A dead_code -A unused
 
-      - name: cargo test --package ainonymous-daemon (signal parsing)
-        run: cargo test --package ainonymous-daemon
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Job 3 — Build WASM zomes (~10 min première run, ~1 min avec cache)
-  #
-  # Workspace séparé : dnas/ainonymous-core (Cargo.lock indépendant).
-  # Pure Rust vers wasm32-unknown-unknown — pas de C deps.
-  # Valide que les zomes compilent après les changements T3.1 (QuicListenerSignal).
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-wasm:
-    name: zomes → wasm32
+  bundles:
+    name: Holochain 0.7 bundles and hashes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Rust stable + cible wasm32
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.88 and WASM target
+        uses: dtolnay/rust-toolchain@1.88
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Cache Cargo (WASM)
+      - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
+            . -> target
             dnas/ainonymous-core -> target
             dnas/hybridnode -> target
-          key: wasm
+          key: hc07-bundles
 
-      - name: Build AInonymous zomes for Holochain 0.7
-        working-directory: dnas/ainonymous-core
-        run: cargo build --release --target wasm32-unknown-unknown
+      - name: Install Holochain 0.7.0 tools with checksum verification
+        run: |
+          install -d .bin
+          curl --fail --location --silent --show-error \
+            https://github.com/holochain/holochain/releases/download/holochain-0.7.0/hc-x86_64-unknown-linux-gnu \
+            --output .bin/hc
+          echo "f1eca56b97bc2261324e00e0e86a274f7dc8363f73264e697fd0c0216b2aac23  .bin/hc" \
+            | sha256sum --check --strict
+          chmod 0755 .bin/hc
+          .bin/hc --version
+          curl --fail --location --silent --show-error \
+            https://github.com/holochain/holochain/releases/download/holochain-0.7.0/holochain-x86_64-unknown-linux-gnu \
+            --output .bin/holochain
+          echo "ffa40a0c6fab5ce062c4af76328dfe2de143256ddf791a504d72bca698a9ba20  .bin/holochain" \
+            | sha256sum --check --strict
+          chmod 0755 .bin/holochain
+          .bin/holochain --version
 
-      - name: Build HybridNode zomes for Holochain 0.7
-        working-directory: dnas/hybridnode
-        run: cargo build --release --target wasm32-unknown-unknown
+      - name: Validate conductor and provisioning CLI surface
+        run: |
+          .bin/holochain --config-schema > conductor.schema.json
+          python -m pip install --disable-pip-version-check PyYAML jsonschema
+          python -c "import json,yaml,jsonschema; jsonschema.validate(yaml.safe_load(open('deploy/containers/holochain/conductor.yaml')), json.load(open('conductor.schema.json')))"
+          .bin/hc client call --help | grep -q generate-agent-pub-key
+          .bin/hc client call --help | grep -q list-app-interfaces
+          .bin/hc client call --help | grep -q install-app
+          sh -n deploy/containers/holochain/entrypoint.sh
+          sh -n scripts/build-happ.sh
+          sh -n scripts/reprovision-containers.sh
+
+      - name: Build and pack both hApps
+        env:
+          HC_BIN: ${{ github.workspace }}/.bin/hc
+        run: bash scripts/build-happ.sh release
+
+      - name: Print effective DNA hashes
+        run: |
+          cargo run --locked -p dna-hashes -- \
+            dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna \
+            dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna \
+            dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna \
+            dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna \
+            | tee dna-hashes.txt
+
+      - name: Stage Compose secret and validate configuration
+        run: |
+          install -d -m 0700 deploy/secrets
+          printf '%s' 'ci-only-placeholder' > deploy/secrets/holochain_keystore_password
+          docker compose --project-name ainonymous-hc07-v3 config --quiet
+
+      - name: Upload bundles and hash report
+        uses: actions/upload-artifact@v4
+        with:
+          name: holochain-0.7-v3-bundles
+          if-no-files-found: error
+          path: |
+            dnas/ainonymous-core/ainonymous-core.happ
+            dnas/hybridnode/hybridnode.happ
+            dna-hashes.txt
+
+  configuration:
+    name: Configuration schemas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: pip install --disable-pip-version-check PyYAML jsonschema
+      - name: Validate reference configurations
+        run: |
+          python scripts/hybridnode/validate_config.py \
+            hybridnode/configs/ainonymous.hybridnode.yaml \
+            hybridnode/configs/generic-project.hybridnode.yaml

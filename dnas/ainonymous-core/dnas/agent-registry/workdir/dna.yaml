@@ -2,7 +2,7 @@
 manifest_version: "0"
 name: agent-registry
 integrity:
-  network_seed: ~
+  network_seed: "ainonymous-core-hc07-v3-20260823"
   properties: ~
   zomes:
     - name: agent-registry-integrity

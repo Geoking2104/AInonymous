@@ -32,6 +32,8 @@ The local operator trusts the machine, Lair process and conductor. Holochain pee
 | Private admission is not compile-time optional | genesis validation always reads DNA properties |
 | A membrane proof is scoped to an agent and network | signed agent key plus `network_id` checked at genesis |
 | Membrane proof is installed at genesis | admin API role settings; no zome-call injection |
+| Container admin/app sockets stay host-inaccessible | conductor and daemons share one network namespace; ports 8888, 8889 and 8891 are not published |
+| Release binaries are supply-chain pinned | conductor image verifies the official Holochain and `hc` SHA-256 digests before installation |
 
 ## Known limitations
 
@@ -50,6 +52,14 @@ Genesis cannot safely trust the joining machine's local wall clock. Proof expiry
 ### Application authorization
 
 The Holochain admin interface is powerful and must remain on loopback or an equivalently isolated management namespace. App authentication tokens should be short-lived and never logged. Local HTTP endpoints should remain loopback-only or be placed behind authenticated access control.
+
+The Compose topology uses the conductor container's network namespace for both daemons. This preserves their loopback-only client validation without exposing the admin/app ports to the Docker bridge or host. Any change that publishes ports 8888, 8889 or 8891 changes the threat model and requires authenticated mediation.
+
+### Container secrets and state
+
+The reprovision scripts create `deploy/secrets/holochain_keystore_password`, which is excluded from Git and mounted read-only. Back it up through an approved secret manager for persistent deployments. Losing it makes the Lair state unusable; disclosing it compromises the local agent keys if the data volume is also obtained.
+
+The v3 reprovision command deliberately deletes the stack's named volumes. It is appropriate for the mandatory 0.6-to-0.7 reset and DNA epoch rotation, but application data must be exported first. Production operators should replace local Compose secrets and named volumes with managed equivalents and tested encrypted backups.
 
 ### Data-plane authorization
 

@@ -27,7 +27,7 @@ See [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), and [Hol
 | HDI | 0.8.0 |
 | Lair keystore | 0.7.1 |
 
-Holochain 0.7 is not database-compatible with 0.6. Create a new conductor data root and reinstall the hApps. The migrated manifests use new network seeds, so every peer must install the newly packed DNAs.
+Holochain 0.7 is not database-compatible with 0.6. Create a new conductor data root and reinstall the hApps. The current DNA epoch uses `ainonymous-core-hc07-v3-20260823` and `ainonymous-hybridnode-hc07-v3-20260823`; every peer must install bundles built from this epoch.
 
 ## Repository layout
 
@@ -50,7 +50,7 @@ docs/                     maintained architecture and operating documentation
 
 ## Prerequisites
 
-- Rust stable (the workspace declares Rust 1.80 as its minimum)
+- Rust 1.88 or newer (the workspace minimum required by the Holochain 0.7 dependency graph)
 - `wasm32-unknown-unknown`
 - Holochain 0.7.0 and `hc` 0.7.0
 - Lair keystore 0.7.1
@@ -91,13 +91,39 @@ python scripts/hybridnode/validate_config.py \
 bash scripts/build-happ.sh release
 ```
 
+Print the effective hashes from the packed Holochain 0.7 bundles:
+
+```bash
+cargo run --locked -p dna-hashes -- \
+  dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna \
+  dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna \
+  dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna \
+  dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna
+```
+
 For a private deployment, also run validation with `--production`. The reference development configuration intentionally uses a mock SD-WAN adapter and is not a production profile.
+
+## Reprovision the container stack
+
+The Compose stack runs one Holochain 0.7.0 conductor and both daemons in a shared, isolated loopback namespace. The admin and app WebSockets are not published to the host. Official Holochain Linux artifacts are SHA-256 pinned in the conductor image, Lair runs in-process with a persistent encrypted keystore, and the conductor volume is versioned for DNA epoch v3.
+
+Reprovisioning intentionally deletes only the `ainonymous-hc07-v3` Compose project's named volumes, rebuilds both hApps, and installs fresh cells:
+
+```powershell
+.\scripts\reprovision-containers.ps1 -ConfirmReset -HcBin C:\path\to\hc.exe
+```
+
+```bash
+HC_BIN=/path/to/hc ./scripts/reprovision-containers.sh --confirm-reset
+```
+
+Both commands require `hc 0.7.0` and refuse any other version. Docker is not required for normal native development. See [Container deployment](deploy/containers/README.md) for ports, secrets, lifecycle and production boundaries.
 
 ## Running with a conductor
 
-1. Start a Holochain 0.7.0 conductor using a fresh data root and loopback-only admin WebSocket.
+1. Start a Holochain 0.7.0 conductor using a fresh data root and a loopback-only admin WebSocket.
 2. Pack and install `dnas/ainonymous-core/ainonymous-core.happ` and `dnas/hybridnode/hybridnode.happ`.
-3. Configure distinct loopback admin and app ports plus the installed app ID.
+3. Configure app ID `ainonymous` on port 8889 and app ID `hybridnode` on port 8891; admin remains on port 8888.
 4. For a private DNA, generate a `PrivateNetworkProof` for the target agent and network ID, then supply it in the role settings when installing the app.
 5. Start the daemon. Conductor connection failures are fatal; the runtime no longer silently falls back to static discovery.
 

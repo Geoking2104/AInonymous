@@ -10,7 +10,7 @@ roles:
     dna:
       path: dnas/inference-mesh/workdir/inference-mesh.dna
       modifiers:
-        network_seed: "ainonymous-core-hc07-v2"
+        network_seed: "ainonymous-core-hc07-v3-20260823"
         properties: ~
       installed_hash: ~
       clone_limit: 0
@@ -22,7 +22,7 @@ roles:
     dna:
       path: dnas/agent-registry/workdir/agent-registry.dna
       modifiers:
-        network_seed: "ainonymous-core-hc07-v2"
+        network_seed: "ainonymous-core-hc07-v3-20260823"
         properties: ~
       installed_hash: ~
       clone_limit: 0
@@ -34,7 +34,7 @@ roles:
     dna:
       path: dnas/blackboard/workdir/blackboard.dna
       modifiers:
-        network_seed: "ainonymous-core-hc07-v2"
+        network_seed: "ainonymous-core-hc07-v3-20260823"
         properties: ~
       installed_hash: ~
       clone_limit: 0

@@ -1,0 +1,12 @@
+[package]
+name = "dna-hashes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+holochain_types = { version = "=0.7.0", default-features = false }

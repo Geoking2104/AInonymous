@@ -1,0 +1,16 @@
+tracing_override: null
+data_root_path: /var/lib/holochain
+device_seed_lair_tag: null
+danger_generate_throwaway_device_seed: false
+keystore:
+  type: lair_server_in_proc
+  lair_root: /var/lib/holochain/keystore
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins: "*"
+network:
+  bootstrap_service: null
+  network_type: quic_bootstrap
+db_sync_strategy: Resilient

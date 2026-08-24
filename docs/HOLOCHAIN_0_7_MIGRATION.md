@@ -21,7 +21,7 @@ The repository targets Holochain 0.7.0 end to end. Native clients, zomes, manife
 - Both WASM workspaces select HDK's Holochain-compatible custom `getrandom` backend.
 - App installation supplies membrane proofs through per-role `RoleSettings::Provisioned`.
 - HybridNode obtains its real agent identity from an authenticated app WebSocket instead of deriving or exporting a private key.
-- All hApp and DNA manifests use manifest version `0` and `path` bundle references accepted by the pinned CLI.
+- All hApp and DNA manifests use manifest version `0` and `path` bundle references accepted by `hc` 0.7.0.
 - Conductor examples use the 0.7 Iroh-only network configuration.
 
 ## Security corrections made during migration
@@ -46,7 +46,14 @@ Holochain 0.7 does not migrate a 0.6 conductor database. Before upgrading:
 6. Install fresh hApps and generate fresh app authentication tokens.
 7. Join every peer using the new bundle and network seed.
 
-The migration intentionally changes the network seeds to `*-hc07-v2`; old and new peers cannot share one DHT.
+The deployment epoch intentionally rotates the network identifiers to:
+
+- `ainonymous-core-hc07-v3-20260823` for inference mesh, agent registry and blackboard;
+- `ainonymous-hybridnode-hc07-v3-20260823` with network ID `ainonymous-hybridnode-public-v3` for HybridNode.
+
+The seeds are present in both the DNA work manifests and the hApp modifiers. This makes the packed DNA hash auditable before installation. Old and new peers cannot share one DHT.
+
+The Compose deployment uses project name `ainonymous-hc07-v3` and volume `holochain-data-hc07-v3`. It never mounts a 0.6 or earlier 0.7 epoch database into the new conductor. Run one of the guarded `reprovision-containers` scripts to rebuild bundles, display their effective hashes, remove the old v3 local volumes and install fresh cells.
 
 ## Verification gates
 
@@ -62,7 +69,7 @@ python scripts/hybridnode/validate_config.py \
   hybridnode/configs/generic-project.hybridnode.yaml
 ```
 
-Pack-validation must be performed with `hc` 0.7.0. An older locally installed CLI is not a valid test.
+Pack-validation must be performed with `hc` 0.7.0. `scripts/build-happ.sh` accepts `HC_BIN=/absolute/path/to/hc` and checks its version, preventing an older global CLI from silently producing incompatible bundles. The `dna-hashes` utility decodes the result with `holochain_types` 0.7.0 and prints the effective hashes.
 
 ## Upstream references
 

@@ -10,9 +10,9 @@ roles:
     dna:
       path: "./dnas/hybridnode-core/workdir/hybridnode-core.dna"
       modifiers:
-        network_seed: "ainonymous-hybridnode-hc07-v2"
+        network_seed: "ainonymous-hybridnode-hc07-v3-20260823"
         properties:
           private_network: false
-          network_id: "ainonymous-hybridnode-public-v2"
+          network_id: "ainonymous-hybridnode-public-v3"
       installed_hash: ~
       clone_limit: 0

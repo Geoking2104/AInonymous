@@ -1,37 +1,23 @@
-# Contexte de build Docker — voir docker/*.Dockerfile.
-# Objectif : ne faire entrer dans le contexte que ce qui est réellement
-# nécessaire à `cargo build` (Cargo.toml/Cargo.lock + crates/), pour un
-# contexte de build léger et pour éviter d'invalider le cache Docker à
-# chaque modification de doc/scripts sans rapport avec le code.
+**
 
-target/
-**/target/
+!Cargo.toml
+!Cargo.lock
 
-.git/
-.github/
-.testnet-run/
+!crates/
+!crates/**
 
-# Zomes Holochain : workspaces Cargo séparés, pas nécessaires pour builder
-# ainonymous-daemon / hybridnode-daemon (cf. commentaire dans Cargo.toml
-# racine : "Les zomes Holochain sont dans leur propre workspace").
-dnas/
+!tools/
+!tools/**
 
-docs/
-examples/
-patches/
-qwen3-codegen/
-site/
-scripts/
-hybridnode/
-logs/
-*.log
+!docker/
+!docker/**
 
-# Fichiers de scratch/debug locaux (cf. .gitignore)
-check_err.txt
-check_output.txt
-check_result.txt
-pr_e_body.md
-scratch_probe.tmp
+!deploy/
+!deploy/containers/
+!deploy/containers/**
 
-*.md
-!README.md
+deploy/secrets/**
+**/target/**
+**/*.dna
+**/*.happ
+**/*.wasm

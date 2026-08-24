@@ -2,10 +2,10 @@
 manifest_version: "0"
 name: hybridnode-core
 integrity:
-  network_seed: "ainonymous-hybridnode-hc07-v2"
+  network_seed: "ainonymous-hybridnode-hc07-v3-20260823"
   properties:
     private_network: false
-    network_id: "ainonymous-hybridnode-public-v2"
+    network_id: "ainonymous-hybridnode-public-v3"
     # Raw 36-byte ed25519 admin public key (32-byte key + 4-byte DHT location,
     # NOT the "uhCAk..." string form) of the network administrator trusted to
     # sign PrivateNetworkProofs. Required if private_network is true.

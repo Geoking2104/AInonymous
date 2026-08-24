@@ -1,60 +1,28 @@
-# syntax=docker/dockerfile:1.7
-#
-# Image OCI pour `hybridnode` (crate hybridnode-daemon).
-#
-# Conformité opencontainers/runtime-spec : voir
-# docs/OCI_RUNTIME_SPEC_COMPLIANCE.md.
-#
-# Build (depuis la racine du repo) :
-#   docker build -f docker/hybridnode-daemon.Dockerfile -t hybridnode-daemon .
+FROM rust:1.88-slim-bookworm AS builder
 
-# ---- Stage 1 : build -------------------------------------------------------
-FROM rust:1.80-slim-bookworm AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        pkg-config \
-        libssl-dev \
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+       cmake clang libclang-dev libdbus-1-dev libssl-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY tools ./tools
+RUN cargo build --locked --release --package hybridnode-daemon
 
-# Feature par défaut = mock-sdwan (cf. hybridnode-daemon/Cargo.toml). Pour
-# une image en conditions réelles avec un contrôleur SD-WAN, passer
-# --build-arg FEATURES=vmanage et adapter la ligne cargo build ci-dessous.
-RUN cargo build --release --locked -p hybridnode-daemon
-
-# ---- Stage 2 : runtime ------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        libssl3 \
-        wget \
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl libdbus-1-3 libssl3 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10002 hybridnode \
-    && useradd --uid 10002 --gid hybridnode --no-create-home --shell /usr/sbin/nologin hybridnode \
-    && mkdir -p /config \
-    && chown -R hybridnode:hybridnode /config
+    && useradd --uid 10002 --gid 10002 --create-home --shell /usr/sbin/nologin hybridnode
 
-COPY --from=builder /build/target/release/hybridnode /usr/local/bin/hybridnode
+COPY --from=builder /build/target/release/hybridnode-daemon /usr/local/bin/hybridnode-daemon
 
-USER hybridnode:hybridnode
-WORKDIR /config
-
-ENV RUST_LOG=info
-
-# Endpoint Prometheus (ObservabilityConfig::default(), hybridnode-core/config.rs)
-# lié sur 0.0.0.0:9338 par défaut -> réellement joignable depuis l'extérieur
-# du conteneur, contrairement au REST d'ainonymous-daemon.
+USER 10002:10002
+WORKDIR /home/hybridnode
 EXPOSE 9338/tcp
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-    CMD wget -q -O- http://127.0.0.1:9338/metrics || exit 1
-
-ENTRYPOINT ["/usr/local/bin/hybridnode"]
-# Chemin par défaut du CLI (Cli::config dans main.rs) ; à monter via un
-# volume ou à surcharger avec `docker run ... --config /config/other.yaml`.
-CMD ["--config", "/config/ainonymous.hybridnode.yaml"]
+ENTRYPOINT ["/usr/local/bin/hybridnode-daemon"]

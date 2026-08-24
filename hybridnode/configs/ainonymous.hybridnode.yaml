@@ -1,5 +1,5 @@
-# Private-network template. Mock SD-WAN keeps it runnable for local Holochain testing.
-# Replace the bootstrap endpoint and SD-WAN provider before a controlled pilot.
+# Public development template used by the container stack.
+# Replace public admission and the mock SD-WAN provider before a controlled pilot.
 version: "1.0"
 mode: hybridnode
 
@@ -10,11 +10,10 @@ identity:
 holochain:
   conductor_url: "ws://127.0.0.1:8888"
   admin_port: 8888
-  app_port: 8889
-  app_id: "ainonymous"
+  app_port: 8891
+  app_id: "hybridnode"
   version: "0.7.0"
-  bootstrap_mode: private
-  bootstrap_url: "https://bootstrap.internal.example"
+  bootstrap_mode: public
 
 sdwan:
   provider: mock
@@ -51,7 +50,7 @@ observability:
   prometheus: true
   prometheus_addr: "127.0.0.1:9338"
   otel_endpoint: ""
-  otel_service_name: "ainonymous"
+  otel_service_name: "ainonymous-hybridnode"
   log_level: info
 
 audit:
@@ -60,6 +59,6 @@ audit:
   auto_warrant: true
 
 security:
-  private_network: true
+  private_network: false
   pow_difficulty: 0
   warrant_expiry_days: 30

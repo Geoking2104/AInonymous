@@ -90,7 +90,7 @@ fn default_conductor_app_port() -> u16 {
 impl Default for HolochainConfig {
     fn default() -> Self {
         Self {
-            backend: HolochainBackendKind::Static,
+            backend: HolochainBackendKind::Conductor,
             admin_port: default_admin_port(),
             app_port: default_conductor_app_port(),
             identity_path: None,

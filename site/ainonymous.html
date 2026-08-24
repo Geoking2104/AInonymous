@@ -589,7 +589,7 @@ hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
       <tbody>
         <tr><td><code>MembraneProofConfig</code> + automatic injection into zome calls</td><td class="col ok">✓ coded and working</td></tr>
         <tr><td>Admission gate in the integrity zome (<code>private-network</code> feature)</td><td class="col ok">✓ verifies the proof's ed25519 signature against the network admin key configured in <code>dna.yaml</code></td></tr>
-        <tr><td>Installing a hApp with a proof, conductor-side</td><td class="no">✗ currently non-functional (holochain_client API changed)</td></tr>
+        <tr><td>Installing a hApp with a proof, conductor-side</td><td class="yes">✓ implemented with Holochain 0.7 role settings</td></tr>
         <tr><td>Proof expiration / replay protection</td><td class="no">✗ field present, not yet checked — no verified clock access in HDI</td></tr>
         <tr><td>Proof-of-work at admission, trusted-agent allowlist</td><td class="no">✗ not implemented — target architecture only</td></tr>
       </tbody>

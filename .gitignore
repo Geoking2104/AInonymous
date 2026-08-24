@@ -16,7 +16,7 @@ __pycache__/
 venv/
 .env
 
-# Models (trop volumineux pour git)
+# Models (too large for Git)
 *.gguf
 *.bin
 *.safetensors
@@ -24,12 +24,14 @@ venv/
 *.ckpt
 .models/
 
-# Config locale (peut contenir des secrets)
+# Local configuration (may contain secrets)
 config.toml
 !.cargo/config.toml
 !dnas/**/.cargo/config.toml
 *.key
 *.pem
+deploy/secrets/*
+!deploy/secrets/.gitkeep
 
 # IDE
 .vscode/
@@ -45,14 +47,14 @@ Thumbs.db
 *.log
 logs/
 
-# Temporaires
+# Temporary files
 tmp/
 temp/
 
-# Artefacts d'ex�cution du testnet loopback
+# Loopback testnet runtime artifacts
 .testnet-run/
 
-# Scratch / debug local (build & diagnostics WSL, non partages)
+# Local scratch/debug files (build and WSL diagnostics)
 check_err.txt
 check_output.txt
 check_result.txt

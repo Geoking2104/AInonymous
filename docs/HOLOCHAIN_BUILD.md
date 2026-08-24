@@ -2,7 +2,7 @@
 
 ## Required toolchain
 
-Use Holochain and `hc` 0.7.0 with Lair 0.7.1. The Rust crates are pinned separately: HDK 0.7.0, HDI 0.8.0 and `holochain_client` 0.9.0.
+Use Rust 1.88 or newer, Holochain and `hc` 0.7.0, and Lair 0.7.1. The Rust crates are pinned separately: HDK 0.7.0, HDI 0.8.0 and `holochain_client` 0.9.0.
 
 ```bash
 rustup target add wasm32-unknown-unknown
@@ -16,6 +16,12 @@ The repository contains two independent zome workspaces. The packaging script bu
 
 ```bash
 bash scripts/build-happ.sh release
+```
+
+If multiple CLI versions are installed, select the correct binary explicitly:
+
+```bash
+HC_BIN=/absolute/path/to/hc bash scripts/build-happ.sh release
 ```
 
 Expected outputs:
@@ -36,18 +42,31 @@ cargo build --manifest-path dnas/hybridnode/Cargo.toml \
 
 ## Conductor 0.7 baseline
 
-Use a fresh data root and keep the admin interface on loopback. `scripts/testnet/conductor_t51.yaml` is the development baseline. Its `keystore.type: danger_test_keystore` and disabled durable sync are for disposable testnets only.
+Use a fresh data root and keep the admin interface on loopback. `scripts/testnet/conductor_t51.yaml` is the disposable testnet baseline. Its `keystore.type: danger_test_keystore` is not suitable for persistent identities.
 
 For a persistent deployment:
 
 - configure a Lair keystore;
-- use `db_sync_level: Normal`;
+- use `db_sync_strategy: Resilient`;
 - set the intended private bootstrap and relay URLs;
 - protect bootstrap/relay auth material as secrets;
 - bind admin WebSockets to `127.0.0.1` or an isolated management namespace;
 - expose an app interface only where required.
 
-Holochain 0.7 uses Iroh as its network transport. Do not copy obsolete `transport_pool`, WebRTC or tx5 fields into the conductor configuration; unknown configuration fields are rejected.
+Holochain 0.7 uses Iroh as its network transport. Generate and validate configuration with the pinned binary; unknown configuration fields are rejected.
+
+## Container provisioning
+
+`docker-compose.yml` provides a reproducible development and controlled-pilot topology:
+
+- official Holochain and `hc` 0.7.0 release assets with pinned SHA-256 digests;
+- an in-process Lair keystore encrypted by an untracked Docker secret;
+- a versioned conductor data volume for DNA epoch v3;
+- loopback-only admin/app WebSockets shared with the daemons through `network_mode: service:holochain`;
+- distinct restricted app interfaces for `ainonymous` (8889) and `hybridnode` (8891);
+- non-root, read-only containers with all Linux capabilities dropped.
+
+Use `scripts/reprovision-containers.ps1 -ConfirmReset` on PowerShell or `scripts/reprovision-containers.sh --confirm-reset` on Bash. The confirmation flag is mandatory because the operation removes the stack's named volumes. Full lifecycle details are in [Container deployment](../deploy/containers/README.md).
 
 ## Install
 
