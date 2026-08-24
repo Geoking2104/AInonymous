@@ -15,7 +15,7 @@ The `holochain` service owns the network namespace. `ainonymous-daemon` and `hyb
 | AInonymous QUIC | 9000/UDP | all host interfaces by default |
 | HybridNode metrics | 9338/TCP | none; query from the shared namespace |
 
-The conductor image downloads official Holochain and `hc` 0.7.0 Linux release assets and verifies their pinned SHA-256 digests. It runs as UID/GID 10000 with a read-only root filesystem, no Linux capabilities and `no-new-privileges`. The data root and in-process Lair keystore live in `holochain-data-hc07-v3`. A small `socat` listener bridges host-loopback port 8890 to the daemon's internal loopback socket; no Holochain socket is bridged.
+The conductor image downloads official Holochain and `hc` 0.7.0 Linux release assets and verifies their pinned SHA-256 digests. It runs as UID/GID 10000 with a read-only root filesystem, no Linux capabilities and `no-new-privileges`. The data root and in-process Lair keystore live in `holochain-data-hc07-v3`. A small `socat` listener bridges host-loopback port 8890 to the daemon's internal loopback socket; no Holochain socket is bridged. The reference config inherits Holochain's public bootstrap/relay defaults; replace the complete `network` block with authenticated operator-controlled services for a private multi-host deployment.
 
 ## Prerequisites
 

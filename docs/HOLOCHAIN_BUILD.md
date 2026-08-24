@@ -47,7 +47,7 @@ Use a fresh data root and keep the admin interface on loopback. `scripts/testnet
 For a persistent deployment:
 
 - configure a Lair keystore;
-- use `db_sync_strategy: Resilient`;
+- keep the Holochain 0.7 database synchronization defaults unless load testing justifies a supported override;
 - set the intended private bootstrap and relay URLs;
 - protect bootstrap/relay auth material as secrets;
 - bind admin WebSockets to `127.0.0.1` or an isolated management namespace;
