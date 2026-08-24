@@ -27,7 +27,8 @@ FROM runtime AS ainonymous-daemon
 
 RUN groupadd --gid 10001 ainonymous \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin ainonymous \
-    && install -d -o ainonymous -g ainonymous -m 0750 /data/models
+    && install -d -o ainonymous -g ainonymous -m 0750 \
+       /data /data/config /data/local/share /data/models
 COPY --from=builder /out/ainonymous-daemon /usr/local/bin/ainonymous-daemon
 USER 10001:10001
 WORKDIR /data

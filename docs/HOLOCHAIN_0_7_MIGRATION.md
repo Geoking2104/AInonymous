@@ -55,7 +55,7 @@ The seeds are present in both the DNA work manifests and the hApp modifiers. Thi
 
 See the [DNA hash registry](DNA_HASHES.md) for the four canonical v3 hashes and the verification command.
 
-The Compose deployment uses project name `ainonymous-hc07-v3` and volume `holochain-data-hc07-v3`. It never mounts a 0.6 or earlier 0.7 epoch database into the new conductor. Run one of the guarded `reprovision-containers` scripts to rebuild bundles, display their effective hashes, remove the old v3 local volumes and install fresh cells.
+The Compose deployment uses project name `ainonymous-hc07-v3`. Holochain state is stored in `holochain-data-hc07-v3`; AInonymous runtime state and model payloads use `ainonymous-runtime-hc07-v3` and `ainonymous-models`. It never mounts a 0.6 or earlier 0.7 epoch database into the new conductor. Run one of the guarded `reprovision-containers` scripts to rebuild bundles, display their effective hashes, remove the old v3 local volumes and install fresh cells.
 
 ## Verification gates
 

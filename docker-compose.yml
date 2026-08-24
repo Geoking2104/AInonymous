@@ -50,7 +50,12 @@ services:
     depends_on:
       holochain:
         condition: service_healthy
+    environment:
+      AINON_CONFIG: /data/config/config.toml
+      XDG_CONFIG_HOME: /data/config
+      XDG_DATA_HOME: /data/local/share
     volumes:
+      - ainonymous-runtime-hc07-v3:/data
       - ainonymous-models:/data/models
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8890/health"]
@@ -79,6 +84,7 @@ services:
 
 volumes:
   holochain-data-hc07-v3:
+  ainonymous-runtime-hc07-v3:
   ainonymous-models:
 
 secrets:
