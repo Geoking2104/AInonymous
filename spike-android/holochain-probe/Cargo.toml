@@ -1,0 +1,19 @@
+[package]
+name = "holochain-android-probe"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+# Projet autonome (hors workspace racine) : sonde de compilation croisée.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Conducteur Holochain embarqué, même version que le reste du dépôt.
+holochain = { version = "=0.7.0" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+sodoken = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

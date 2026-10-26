@@ -1,0 +1,7 @@
+APK signé : 39110919 octets
+apksigner : OK
+apksigner : APK altéré REFUSÉ
+relay-release : APK altéré REFUSÉ (Error: hash d'artefact incorrect: attendu 2ea27e4ab62a590bcd28896ec40d559f990403e8799c310c35cdff17517d0499, obtenu be405760ab7cc469061f08818b872bd033cc90d7ab704d082a245b2b98eea40d)
+installé 0.0.1
+relay-release : APK intègre installé
+relay-release : rejeu REFUSÉ (Error: rejeu refusé: séquence 1 <= dernière séquence acceptée 1)

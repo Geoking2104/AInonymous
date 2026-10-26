@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>AInonymous Relay — spike S1</title></head>
+<body><h1>AInonymous Relay</h1>
+<p id="s">Spike S1 : shell Tauri 2 Android.</p><p id="h"></p>
+<script>
+  const inv = (c) => window.__TAURI__.core.invoke(c);
+  const t0 = performance.now();
+  inv('startup_info').then(i => {
+    document.getElementById('s').textContent = JSON.stringify(i) + ' — webview prête à ' + Math.round(t0) + ' ms';
+    if (i.holochain_embedded) {
+      document.getElementById('h').textContent = 'Démarrage du conducteur Holochain…';
+      inv('holochain_start').then(r => document.getElementById('h').textContent = 'Conducteur : ' + JSON.stringify(r))
+        .catch(e => document.getElementById('h').textContent = 'ÉCHEC conducteur : ' + e);
+    }
+  });
+</script></body></html>
