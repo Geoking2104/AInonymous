@@ -9,6 +9,12 @@
 !tools/
 !tools/**
 
+# Membres du workspace Cargo (spikes Phase 0) : requis pour charger le workspace
+!spike-release/
+!spike-release/**
+!spike-quic/
+!spike-quic/**
+
 !docker/
 !docker/**
 

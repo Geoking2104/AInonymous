@@ -9,6 +9,9 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY tools ./tools
+# Membres du workspace (spikes Phase 0), nécessaires au chargement du workspace Cargo
+COPY spike-release ./spike-release
+COPY spike-quic ./spike-quic
 RUN cargo build --locked --release \
       --package ainonymous-daemon \
       --package hybridnode-daemon \
