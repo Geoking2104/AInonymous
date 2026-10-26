@@ -244,22 +244,22 @@ Le tableau ci-dessous est la réponse directe à la demande « vérifie sur le d
 
 | # | Bloc | Emplacement / preuve | Usage dans Relay | Niveau |
 |---|---|---|---|---|
-| R1 | **Types de plans et d'activations** | [`ainonymous-types/inference.rs`](AInonymous/crates/ainonymous-types/src/inference.rs#L125-L214) : `ExecutionPlan`, `ActivationHeader` 64 octets, `DType` ; [`node.rs`](AInonymous/crates/ainonymous-types/src/node.rs#L138-L182) : `Solo`, `PipelineSplit`, `ExpertShard`, `Speculative` | Schéma commun entre gateway, scheduler et worker ; en-tête binaire stable pour les transferts | **R** |
-| R2 | **Identité de transport et mTLS** | [`ainonymous-quic/mtls.rs`](AInonymous/crates/ainonymous-quic/src/mtls.rs) : certificat Ed25519 auto-signé, `PeerKeyVerifier`, `Ed25519ClientVerifier` ; [`lib.rs`](AInonymous/crates/ainonymous-quic/src/lib.rs#L30-L61) : endpoint serveur strict | Authentification mutuelle des nœuds, pinning de clé, séparation des clés Holochain/QUIC | **R** |
-| R3 | **Session et token éphémère** | [`session.rs`](AInonymous/crates/ainonymous-quic/src/session.rs#L10-L165) : `SessionOffer`, token 32 octets, TTL 30 s, `connect` avec pinning ; [`listener.rs`](AInonymous/crates/ainonymous-quic/src/listener.rs#L95-L172) : vérification token + clé client | Poignée de main d'un job, à étendre avec `lease_id` et portée | **A** |
-| R4 | **Transfert d'activations** | [`transfer.rs`](AInonymous/crates/ainonymous-quic/src/transfer.rs#L14-L131) : envoi/réception, taille bornée 512 Mo, zstd ; [`codec.rs`](AInonymous/crates/ainonymous-quic/src/codec.rs) : frames typées | Transport des hidden states et des tokens entre étages | **A** |
-| R5 | **Registre d'agents** | [`agent-registry/coordinator`](AInonymous/dnas/ainonymous-core/dnas/agent-registry/zomes/coordinator/src/lib.rs#L6-L136) : `announce_capabilities`, `heartbeat`, `get_available_nodes` ; [`integrity`](AInonymous/dnas/ainonymous-core/dnas/agent-registry/zomes/integrity/src/lib.rs#L5-L146) : validation auteur, liens, clé transport | Découverte des nœuds, capacités, modèles, endpoints, heartbeat | **A** |
-| R6 | **Négociation de session via Holochain** | [`inference-mesh/coordinator`](AInonymous/dnas/ainonymous-core/dnas/inference-mesh/zomes/coordinator/src/lib.rs#L57-L194) : `negotiate_quic_session`, `request_remote_session`, vérification de la clé annoncée par la provenance ; plan [`compute_execution_plan`](AInonymous/dnas/ainonymous-core/dnas/inference-mesh/zomes/coordinator/src/lib.rs#L226-L327) | Liaison identité Holochain ↔ session QUIC, négociation distante | **P** pour le plan, **R** pour la négociation |
-| R7 | **Blackboard** | [`blackboard`](AInonymous/dnas/ainonymous-core/dnas/blackboard) : posts typés, TTL, tags, filtrage PII | Coordination légère, annonces, journal de bord ; **pas** pour les prompts ni les heartbeats haute fréquence | **A** |
-| R8 | **Admission privée, attestations, warrants** | [`hybridnode/integrity`](AInonymous/dnas/hybridnode/dnas/hybridnode-core/zomes/integrity/src/lib.rs#L6-L99) : `NodeAttestation`, `ModelManifest`, `ModelClaim`, `Warrant`, `WarrantRefutation` ; [`coordinator`](AInonymous/dnas/hybridnode/dnas/hybridnode-core/zomes/coordinator/src/lib.rs#L10-L163) : publication, claim, warrants, statut | Confiance, réputation, sanctions, preuve de modèle | **A** |
-| R9 | **Membrane proof** | [`hybridnode/integrity`](AInonymous/dnas/hybridnode/dnas/hybridnode-core/zomes/integrity/src/lib.rs#L296-L431) : `HybridNodeDnaProperties`, `PrivateNetworkProof`, `genesis_self_check` | Admission d'un appareil dans un mesh privé | **A** (expiration à concevoir) |
-| R10 | **Scheduler et topologie** | [`hybridnode-core/scheduler.rs`](AInonymous/crates/hybridnode-core/src/scheduler.rs#L50-L185) : `LocalFirst`, `LowestLatency`, `HighestBandwidth`, `RoundRobin` ; [`topology.rs`](AInonymous/crates/hybridnode-core/src/topology.rs#L17-L96) : SLA, liens, pairs ; [`model.rs`](AInonymous/crates/hybridnode-core/src/model.rs#L29-L75) : SHA-256, transfert | Base du futur scheduler, à brancher sur les offres et leases | **A** |
-| R11 | **Orchestration pipeline et spéculatif** | [`conductor.rs`](AInonymous/crates/ainonymous-daemon/src/conductor.rs#L58-L418) : chaîne de nœuds, KV-cache, passes prefill/decode, décodage spéculatif | Cœur du mode pipeline et du mode spéculatif | **P** |
-| R12 | **Gestion llama.cpp et VRAM** | [`llama.rs`](AInonymous/crates/ainonymous-daemon/src/llama.rs#L140-L386) : détection GPU, `n_gpu_layers`, estimation VRAM, lancement `llama-server` | Backend principal Windows ; à porter sur Android via JNI | **A** |
-| R13 | **Gateway OpenAI** | [`ainonymous-proxy`](AInonymous/crates/ainonymous-proxy/src/handlers/chat.rs) : `/v1/chat/completions`, SSE, routage mesh ; [`api.rs`](AInonymous/crates/ainonymous-types/src/api.rs) : DTO | Point d'entrée local pour les applications utilisateur | **A** |
-| R14 | **Pipeline Python / PyTorch** | [`scripts/pipeline_server.py`](AInonymous/scripts/pipeline_server.py) ; [`examples/pytorch`](AInonymous/examples/pytorch) : `PipelineSplit`, `pack_activation`, format binaire sans pickle | Prototype de référence pour le pipeline, utile en Phase 0/3 | **P** |
-| R15 | **Patch llama.cpp layer-range** | [`patches/llama-cpp-pipeline-split`](AInonymous/patches/llama-cpp-pipeline-split) : early exit, injection d'état, test 3 étages | Chemin natif pour le pipeline Windows, à rebaser et durcir | **P** |
-| R16 | **Configuration, validation, CI, ops** | [`hybridnode/schemas`](AInonymous/hybridnode/schemas/hybridnode.schema.json), [`validate_config.py`](AInonymous/scripts/hybridnode/validate_config.py), workflows CI, scripts testnet, Docker | Modèle de validation et de packaging à étendre | **A** |
+| R1 | **Types de plans et d'activations** | [`ainonymous-types/inference.rs`](../crates/ainonymous-types/src/inference.rs#L125-L214) : `ExecutionPlan`, `ActivationHeader` 64 octets, `DType` ; [`node.rs`](../crates/ainonymous-types/src/node.rs#L138-L182) : `Solo`, `PipelineSplit`, `ExpertShard`, `Speculative` | Schéma commun entre gateway, scheduler et worker ; en-tête binaire stable pour les transferts | **R** |
+| R2 | **Identité de transport et mTLS** | [`ainonymous-quic/mtls.rs`](../crates/ainonymous-quic/src/mtls.rs) : certificat Ed25519 auto-signé, `PeerKeyVerifier`, `Ed25519ClientVerifier` ; [`lib.rs`](../crates/ainonymous-quic/src/lib.rs#L30-L61) : endpoint serveur strict | Authentification mutuelle des nœuds, pinning de clé, séparation des clés Holochain/QUIC | **R** |
+| R3 | **Session et token éphémère** | [`session.rs`](../crates/ainonymous-quic/src/session.rs#L10-L165) : `SessionOffer`, token 32 octets, TTL 30 s, `connect` avec pinning ; [`listener.rs`](../crates/ainonymous-quic/src/listener.rs#L95-L172) : vérification token + clé client | Poignée de main d'un job, à étendre avec `lease_id` et portée | **A** |
+| R4 | **Transfert d'activations** | [`transfer.rs`](../crates/ainonymous-quic/src/transfer.rs#L14-L131) : envoi/réception, taille bornée 512 Mo, zstd ; [`codec.rs`](../crates/ainonymous-quic/src/codec.rs) : frames typées | Transport des hidden states et des tokens entre étages | **A** |
+| R5 | **Registre d'agents** | [`agent-registry/coordinator`](../dnas/ainonymous-core/dnas/agent-registry/zomes/coordinator/src/lib.rs#L6-L136) : `announce_capabilities`, `heartbeat`, `get_available_nodes` ; [`integrity`](../dnas/ainonymous-core/dnas/agent-registry/zomes/integrity/src/lib.rs#L5-L146) : validation auteur, liens, clé transport | Découverte des nœuds, capacités, modèles, endpoints, heartbeat | **A** |
+| R6 | **Négociation de session via Holochain** | [`inference-mesh/coordinator`](../dnas/ainonymous-core/dnas/inference-mesh/zomes/coordinator/src/lib.rs#L57-L194) : `negotiate_quic_session`, `request_remote_session`, vérification de la clé annoncée par la provenance ; plan [`compute_execution_plan`](../dnas/ainonymous-core/dnas/inference-mesh/zomes/coordinator/src/lib.rs#L226-L327) | Liaison identité Holochain ↔ session QUIC, négociation distante | **P** pour le plan, **R** pour la négociation |
+| R7 | **Blackboard** | [`blackboard`](../dnas/ainonymous-core/dnas/blackboard) : posts typés, TTL, tags, filtrage PII | Coordination légère, annonces, journal de bord ; **pas** pour les prompts ni les heartbeats haute fréquence | **A** |
+| R8 | **Admission privée, attestations, warrants** | [`hybridnode/integrity`](../dnas/hybridnode/dnas/hybridnode-core/zomes/integrity/src/lib.rs#L6-L99) : `NodeAttestation`, `ModelManifest`, `ModelClaim`, `Warrant`, `WarrantRefutation` ; [`coordinator`](../dnas/hybridnode/dnas/hybridnode-core/zomes/coordinator/src/lib.rs#L10-L163) : publication, claim, warrants, statut | Confiance, réputation, sanctions, preuve de modèle | **A** |
+| R9 | **Membrane proof** | [`hybridnode/integrity`](../dnas/hybridnode/dnas/hybridnode-core/zomes/integrity/src/lib.rs#L296-L431) : `HybridNodeDnaProperties`, `PrivateNetworkProof`, `genesis_self_check` | Admission d'un appareil dans un mesh privé | **A** (expiration à concevoir) |
+| R10 | **Scheduler et topologie** | [`hybridnode-core/scheduler.rs`](../crates/hybridnode-core/src/scheduler.rs#L50-L185) : `LocalFirst`, `LowestLatency`, `HighestBandwidth`, `RoundRobin` ; [`topology.rs`](../crates/hybridnode-core/src/topology.rs#L17-L96) : SLA, liens, pairs ; [`model.rs`](../crates/hybridnode-core/src/model.rs#L29-L75) : SHA-256, transfert | Base du futur scheduler, à brancher sur les offres et leases | **A** |
+| R11 | **Orchestration pipeline et spéculatif** | [`conductor.rs`](../crates/ainonymous-daemon/src/conductor.rs#L58-L418) : chaîne de nœuds, KV-cache, passes prefill/decode, décodage spéculatif | Cœur du mode pipeline et du mode spéculatif | **P** |
+| R12 | **Gestion llama.cpp et VRAM** | [`llama.rs`](../crates/ainonymous-daemon/src/llama.rs#L140-L386) : détection GPU, `n_gpu_layers`, estimation VRAM, lancement `llama-server` | Backend principal Windows ; à porter sur Android via JNI | **A** |
+| R13 | **Gateway OpenAI** | [`ainonymous-proxy`](../crates/ainonymous-proxy/src/handlers/chat.rs) : `/v1/chat/completions`, SSE, routage mesh ; [`api.rs`](../crates/ainonymous-types/src/api.rs) : DTO | Point d'entrée local pour les applications utilisateur | **A** |
+| R14 | **Pipeline Python / PyTorch** | [`scripts/pipeline_server.py`](../scripts/pipeline_server.py) ; [`examples/pytorch`](../examples/pytorch) : `PipelineSplit`, `pack_activation`, format binaire sans pickle | Prototype de référence pour le pipeline, utile en Phase 0/3 | **P** |
+| R15 | **Patch llama.cpp layer-range** | [`patches/llama-cpp-pipeline-split`](../patches/llama-cpp-pipeline-split) : early exit, injection d'état, test 3 étages | Chemin natif pour le pipeline Windows, à rebaser et durcir | **P** |
+| R16 | **Configuration, validation, CI, ops** | [`hybridnode/schemas`](../hybridnode/schemas/hybridnode.schema.json), [`validate_config.py`](../scripts/hybridnode/validate_config.py), workflows CI, scripts testnet, Docker | Modèle de validation et de packaging à étendre | **A** |
 
 ### 2.4 Écarts bloquants et majeurs
 
@@ -269,11 +269,11 @@ Le tableau ci-dessous est la réponse directe à la demande « vérifie sur le d
 | G2 | **Aucune application Android** | Aucune cible, aucun JNI, aucun manifeste, aucun service de premier plan | **Bloquant** | Tauri 2 Android ou Kotlin + JNI, spike Phase 0 |
 | G3 | **Pas de partage GPU** | Aucune notion d'offre, de politique, de lease, de quota, de reçu | **Bloquant** | Nouveau DNA `relay-market` + agent local |
 | G4 | **Pas de relais NAT** | `quic_relay_fallback` en config seulement ; aucun code de relais applicatif | **Bloquant hors LAN/VPN** | Phase 1 : LAN/VPN assumé ; Phase 2 : relais applicatif |
-| G5 | **Détection matérielle non portable** | [`holochain.rs`](AInonymous/crates/ainonymous-daemon/src/holochain.rs#L855-L982) : `nvidia-smi`, `rocm-smi`, `wmic` ; Android tombe en `CpuOnly` | **Majeur** | Abstraction `PlatformProbe` Windows/Android |
-| G6 | **Heartbeat inadapté** | [`heartbeat.rs`](AInonymous/crates/ainonymous-daemon/src/heartbeat.rs#L8-L53) : 30 s, lecture `/proc`, aucun thermique Android | **Majeur** | Heartbeat adaptatif 2–5 min + liveness QUIC |
-| G7 | **Planificateur Holochain naïf** | [`compute_execution_plan`](AInonymous/dnas/ainonymous-core/dnas/inference-mesh/zomes/coordinator/src/lib.rs#L226-L360) : `min(4)`, couches codées en dur, pas de VRAM/charge/warrant | **Majeur** | Scheduler Rust hors zome, plan signé |
-| G8 | **Pipeline natif non fiable** | [`patches/llama-cpp-pipeline-split/README.md`](AInonymous/patches/llama-cpp-pipeline-split/README.md#L49-L56) : non upstreamé, pas de protocole stable, pas de backpressure | **Majeur** | Durcir ou passer par RPC encapsulé |
-| G9 | **Streaming mesh simulé** | [`chat.rs`](AInonymous/crates/ainonymous-proxy/src/handlers/chat.rs#L199-L212) : découpage de la réponse finale en mots | **Moyen** | Vrai streaming token par token |
+| G5 | **Détection matérielle non portable** | [`holochain.rs`](../crates/ainonymous-daemon/src/holochain.rs#L855-L982) : `nvidia-smi`, `rocm-smi`, `wmic` ; Android tombe en `CpuOnly` | **Majeur** | Abstraction `PlatformProbe` Windows/Android |
+| G6 | **Heartbeat inadapté** | [`heartbeat.rs`](../crates/ainonymous-daemon/src/heartbeat.rs#L8-L53) : 30 s, lecture `/proc`, aucun thermique Android | **Majeur** | Heartbeat adaptatif 2–5 min + liveness QUIC |
+| G7 | **Planificateur Holochain naïf** | [`compute_execution_plan`](../dnas/ainonymous-core/dnas/inference-mesh/zomes/coordinator/src/lib.rs#L226-L360) : `min(4)`, couches codées en dur, pas de VRAM/charge/warrant | **Majeur** | Scheduler Rust hors zome, plan signé |
+| G8 | **Pipeline natif non fiable** | [`patches/llama-cpp-pipeline-split/README.md`](../patches/llama-cpp-pipeline-split/README.md#L49-L56) : non upstreamé, pas de protocole stable, pas de backpressure | **Majeur** | Durcir ou passer par RPC encapsulé |
+| G9 | **Streaming mesh simulé** | [`chat.rs`](../crates/ainonymous-proxy/src/handlers/chat.rs#L199-L212) : découpage de la réponse finale en mots | **Moyen** | Vrai streaming token par token |
 | G10 | **Pas de distribution de modèles** | `ModelManifest` existe, mais aucun téléchargement/vérification/résolution | **Majeur** | Model store local + hash + licence |
 | G11 | **Pas de comptabilité** | Aucun reçu, quota, crédit, usage | **Moyen** | `JobReceipt`, `UsageCounter`, quotas locaux |
 | G12 | **Pas de tests multi-plateformes** | CI Ubuntu ; testnet bash/WSL | **Majeur** | CI Windows + Android + tests E2E |
@@ -2019,22 +2019,22 @@ Une fonctionnalité est « done » si :
 
 | Sujet | Fichier |
 |---|---|
-| Architecture | [`docs/ARCHITECTURE.md`](AInonymous/docs/ARCHITECTURE.md) |
-| Sécurité | [`docs/SECURITY.md`](AInonymous/docs/SECURITY.md) |
-| Réseau | [`docs/NETWORK.md`](AInonymous/docs/NETWORK.md) |
-| API | [`docs/API_SPEC.md`](AInonymous/docs/API_SPEC.md) |
-| Intégration PyTorch | [`docs/PYTORCH_INTEGRATION.md`](AInonymous/docs/PYTORCH_INTEGRATION.md) |
-| Roadmap | [`ROADMAP.md`](AInonymous/ROADMAP.md) |
-| Types | [`crates/ainonymous-types/src/`](AInonymous/crates/ainonymous-types/src) |
-| QUIC | [`crates/ainonymous-quic/src/`](AInonymous/crates/ainonymous-quic/src) |
-| Daemon | [`crates/ainonymous-daemon/src/`](AInonymous/crates/ainonymous-daemon/src) |
-| Proxy | [`crates/ainonymous-proxy/src/`](AInonymous/crates/ainonymous-proxy/src) |
-| Scheduler | [`crates/hybridnode-core/src/scheduler.rs`](AInonymous/crates/hybridnode-core/src/scheduler.rs) |
-| Zomes cœur | [`dnas/ainonymous-core/`](AInonymous/dnas/ainonymous-core) |
-| Zomes membership | [`dnas/hybridnode/`](AInonymous/dnas/hybridnode) |
-| Pipeline Python | [`scripts/pipeline_server.py`](AInonymous/scripts/pipeline_server.py) |
-| Patch llama.cpp | [`patches/llama-cpp-pipeline-split/`](AInonymous/patches/llama-cpp-pipeline-split) |
-| Config HybridNode | [`hybridnode/`](AInonymous/hybridnode) |
+| Architecture | [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) |
+| Sécurité | [`docs/SECURITY.md`](../docs/SECURITY.md) |
+| Réseau | [`docs/NETWORK.md`](../docs/NETWORK.md) |
+| API | [`docs/API_SPEC.md`](../docs/API_SPEC.md) |
+| Intégration PyTorch | [`docs/PYTORCH_INTEGRATION.md`](../docs/PYTORCH_INTEGRATION.md) |
+| Roadmap | [`ROADMAP.md`](../ROADMAP.md) |
+| Types | [`crates/ainonymous-types/src/`](../crates/ainonymous-types/src) |
+| QUIC | [`crates/ainonymous-quic/src/`](../crates/ainonymous-quic/src) |
+| Daemon | [`crates/ainonymous-daemon/src/`](../crates/ainonymous-daemon/src) |
+| Proxy | [`crates/ainonymous-proxy/src/`](../crates/ainonymous-proxy/src) |
+| Scheduler | [`crates/hybridnode-core/src/scheduler.rs`](../crates/hybridnode-core/src/scheduler.rs) |
+| Zomes cœur | [`dnas/ainonymous-core/`](../dnas/ainonymous-core) |
+| Zomes membership | [`dnas/hybridnode/`](../dnas/hybridnode) |
+| Pipeline Python | [`scripts/pipeline_server.py`](../scripts/pipeline_server.py) |
+| Patch llama.cpp | [`patches/llama-cpp-pipeline-split/`](../patches/llama-cpp-pipeline-split) |
+| Config HybridNode | [`hybridnode/`](../hybridnode) |
 
 ### B. Surface HTTP existante
 
