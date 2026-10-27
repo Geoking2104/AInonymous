@@ -106,7 +106,7 @@ async fn main() -> Result<()> {
             eprintln!("worker pubkey = {}", id.public_key_hex());
             let client = parse_key(&client_key)?;
             let mut worker = Worker::start(bind, id).await?;
-            eprintln!("écoute sur {} (annoncé {advertise})", worker.addr);
+            eprintln!("écoute sur {bind} (annoncé {advertise})");
             loop {
                 let offer = worker.offer_for(client, Some((0, 1)), advertise);
                 let tmp = offer_out.with_extension("tmp");
