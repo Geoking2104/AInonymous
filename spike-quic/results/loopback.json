@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-27",
+  "machine": "box de dev, 8 vCPU Intel Xeon, Linux, sans GPU",
+  "commande": "quic-spike loopback (release)",
+  "runs": [
+    {
+      "mode": "loopback (127.0.0.1, non représentatif d'un LAN)",
+      "peer": "127.0.0.1:33236",
+      "session_setup_ms": 1.356131,
+      "rtt_samples": 200,
+      "rtt_p50_ms": 0.042723,
+      "rtt_p95_ms": 0.28460300000000005,
+      "transfer_bytes": 104857600,
+      "transfer_ms": 260.795954,
+      "throughput_mbit_s": 3216.540698326938
+    },
+    {
+      "mode": "loopback (127.0.0.1, non représentatif d'un LAN)",
+      "peer": "127.0.0.1:44748",
+      "session_setup_ms": 1.266302,
+      "rtt_samples": 200,
+      "rtt_p50_ms": 0.040071,
+      "rtt_p95_ms": 0.093406,
+      "transfer_bytes": 104857600,
+      "transfer_ms": 267.934457,
+      "throughput_mbit_s": 3130.8433017258394
+    },
+    {
+      "mode": "loopback (127.0.0.1, non représentatif d'un LAN)",
+      "peer": "127.0.0.1:41017",
+      "session_setup_ms": 1.610631,
+      "rtt_samples": 200,
+      "rtt_p50_ms": 0.048813,
+      "rtt_p95_ms": 0.063717,
+      "transfer_bytes": 104857600,
+      "transfer_ms": 276.05499100000003,
+      "throughput_mbit_s": 3038.7452766611996
+    }
+  ]
+}

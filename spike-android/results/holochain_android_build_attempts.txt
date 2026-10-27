@@ -1,0 +1,22 @@
+--- tentative 1 (NDK seul) : échec openssl-src, aarch64-linux-android-ranlib introuvable
+  /bin/sh: 1: aarch64-linux-android-ranlib: not found
+  /bin/sh: 1: aarch64-linux-android-ranlib: not found
+  /bin/sh: 1: aarch64-linux-android-ranlib: not found
+--- tentative 2 (alias ranlib, résolution libre des dépendances) : échec de compilation de holochain 0.7.0
+error[E0004]: non-exhaustive patterns: `holochain_conductor_api::AdminRequest::GrantDirectSignalCapability { .. }` not covered
+error[E0027]: pattern does not mention field `cap_secret`
+error[E0599]: no method named `signer` found for reference `&holochain_zome_types::prelude::Action` in the current scope
+error[E0308]: `?` operator has incompatible types
+error[E0308]: mismatched types
+error[E0433]: cannot find type `DesensitizedZomeCallCapGrant` in this scope
+error[E0423]: cannot find function, tuple struct or tuple variant `DirectSignal` in this scope
+error[E0599]: no method named `signer` found for reference `&holochain_zome_types::prelude::Action` in the current scope
+error[E0609]: no field `0` on type `holochain_types::prelude::DirectSignal`
+error[E0063]: missing field `from_agent` in initializer of `holochain_types::prelude::Signal`
+error[E0599]: no associated function or constant named `ChainAuthor` found for struct `holochain_zome_types::prelude::CapGrant` in the current scope
+error: could not compile `holochain` (lib) due to 11 previous errors
+--- tentative 3 (alias ranlib + Cargo.lock publié avec holochain 0.7.0)
+real	4m12.397s
+user	27m6.848s
+sys	1m57.566s
+HC_EXIT 0

@@ -1,0 +1,4 @@
+tauri-min/node_modules/
+tauri-min/src-tauri/target/
+tauri-min/src-tauri/gen/
+holochain-probe/target/

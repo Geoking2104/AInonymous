@@ -1,0 +1,30 @@
+[package]
+name = "relay-quic-spike"
+description = "Spike S4 (Phase 0) : deux nœuds QUIC mTLS, transfert d'activations et mesures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "relay_quic_spike"
+path = "src/lib.rs"
+
+[[bin]]
+name = "quic-spike"
+path = "src/main.rs"
+
+[dependencies]
+ainonymous-quic = { path = "../crates/ainonymous-quic" }
+ainonymous-types = { path = "../crates/ainonymous-types" }
+tokio = { workspace = true }
+quinn = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

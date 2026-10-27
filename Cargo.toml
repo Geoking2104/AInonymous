@@ -11,6 +11,9 @@ members = [
     "crates/hybridnode-core",
     "crates/hybridnode-daemon",
     "tools/dna-hashes",
+    # Phase 0 — spikes Relay GPU (voir docs/plan-phase-0-relay-gpu.md)
+    "spike-release",
+    "spike-quic",
 ]
 # Holochain zomes use separate workspaces and WASM-specific release profiles.
 

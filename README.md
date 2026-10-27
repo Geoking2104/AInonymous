@@ -154,6 +154,27 @@ Integration requires more than copying YAML: install the HybridNode hApp, connec
 
 The public-network mode remains experimental because its advertised proof-of-work admission is not implemented. See [Security](docs/SECURITY.md) before exposing any service.
 
+## AInonymous Relay — Phase 0 spikes
+
+AInonymous Relay is a planned GPU compute-relay module for local LLMs (Windows and Android nodes orchestrated through the Holochain mesh). Before any build commitment, Phase 0 validates its riskiest assumptions with throwaway spikes. Requirements and plan (French):
+
+- [Cahier des charges — AInonymous Relay](docs/cahier-des-charges-relay-gpu.md)
+- [Plan d'exécution — Phase 0 « Spikes »](docs/plan-phase-0-relay-gpu.md)
+- Tracking: [milestone “Phase 0 — Spikes Relay GPU”](https://github.com/Geoking2104/AInonymous/milestone/1); box environment in [docs/phase-0-env.md](docs/phase-0-env.md)
+
+Spikes are standalone and not production code. Status reflects only results actually measured so far (Linux x86_64 box, no GPU, no phone):
+
+| Folder | Spike | Current status |
+| --- | --- | --- |
+| [`spike-android/`](spike-android/README.md) | S1 — Tauri + embedded Holochain 0.7.0 on Android | aarch64 APK built with the NDK (no Nix): 5,662,875 B minimal, 39,049,571 B with Holochain (< 200 MB gate). On-device runtime not yet measured (needs a phone). |
+| [`spike-android-gpu/`](spike-android-gpu/README.md) | S2 — llama.cpp GPU inference on Android | Build/bench scripts and protocol only; no measurements yet (needs a phone). |
+| [`spike-windows/`](spike-windows/README.md) | S3 — Windows GPU detection, llama.cpp build, installer | PowerShell scripts only; not run yet (needs a Windows GPU PC). |
+| [`spike-pipeline/`](spike-pipeline/README.md) | S4 — pipeline-parallel equivalence | Split vs single-node: max abs logit diff 0, relative L2 0; two-process chain produced 16 tokens identical to single node. TTFT/tok/s on real nodes pending. |
+| [`spike-quic/`](spike-quic/README.md) | S4 — QUIC activation transport | 6 tests pass. Loopback only (not LAN-representative): setup 1.27–1.61 ms, RTT p50 0.040–0.049 ms, 100 MiB at 3039–3217 Mb/s. LAN/Tailscale pending. |
+| [`spike-release/`](spike-release/README.md) | S5 — signed release manifest and APK verification | 21 tests pass; tampered APK and replayed manifest are rejected. |
+
+Draft PR: [#38](https://github.com/Geoking2104/AInonymous/pull/38). The core-platform roadmap remains in [ROADMAP.md](ROADMAP.md).
+
 ## Documentation
 
 Start with the [documentation index](docs/README.md). The most important documents are:

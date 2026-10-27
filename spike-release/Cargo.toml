@@ -1,0 +1,29 @@
+[package]
+name = "relay-release-spike"
+description = "Spike S5 (Phase 0) : manifeste de release signé, vérification d'artefact, anti-rejeu et rollback"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "relay_release"
+path = "src/lib.rs"
+
+[[bin]]
+name = "relay-release"
+path = "src/main.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ed25519-dalek = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

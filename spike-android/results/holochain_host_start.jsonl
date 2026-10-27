@@ -1,0 +1,3 @@
+{"ok":true,"premier_demarrage":true,"report":{"conductor_start_ms":1968,"data_dir":"/tmp/relay-s1-conductor","holochain_version":"0.7.0"}}
+{"ok":true,"premier_demarrage":false,"report":{"conductor_start_ms":1567,"data_dir":"/tmp/relay-s1-conductor","holochain_version":"0.7.0"}}
+{"ok":true,"premier_demarrage":false,"report":{"conductor_start_ms":1639,"data_dir":"/tmp/relay-s1-conductor","holochain_version":"0.7.0"}}

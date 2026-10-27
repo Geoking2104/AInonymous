@@ -17,6 +17,12 @@ This directory contains the maintained documentation for the Holochain 0.7 gener
 - [PyTorch integration](PYTORCH_INTEGRATION.md) — experimental Python adapter
 - [Architecture review](ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md) — consolidated findings and disposition
 
+## AInonymous Relay (Phase 0)
+
+- [Cahier des charges — AInonymous Relay](cahier-des-charges-relay-gpu.md) — requirements for the GPU compute-relay module (French)
+- [Plan d'exécution — Phase 0 « Spikes »](plan-phase-0-relay-gpu.md) — spike plan, gates and acceptance criteria (French)
+- [Phase 0 environment](phase-0-env.md) — toolchain actually installed for the spikes
+
 ## Documentation policy
 
 The source code and executable schemas are authoritative. Documentation must distinguish implemented behavior from planned work. In particular, “anonymous”, “zero knowledge”, public-network Sybil resistance, production SD-WAN integrations and native multi-node llama.cpp execution must not be presented as complete unless backed by tests in the repository.
