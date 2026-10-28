@@ -29,6 +29,16 @@ go/no-go decision.
 
 ### Fixed
 
+- PyTorch adapter: bfloat16 activations now round-trip bit-exactly. NumPy has no
+  bfloat16 scalar type, so the raw 16-bit words are transported; `MAGIC` is
+  exported, and `merge([])` raises `ValueError` instead of failing inside
+  `torch.cat`.
+- PyTorch adapter test suite: it had never run in CI and was stale against the
+  implemented wire format (it expected a big-endian magic and 64-bit shape
+  fields); the tests now assert the format the code actually writes.
+- `docs/PYTORCH_INTEGRATION.md` and `examples/pytorch/README.md`: the documented
+  wire format is aligned with the implementation (little-endian magic, uint32
+  shape dimensions, bfloat16 as raw 16-bit words).
 - QUIC data plane: the one-time session token is now consumed only **after** the
   client transport key is verified. The listener previously removed the token
   from the registry before the mTLS client-key check, so an interceptor could

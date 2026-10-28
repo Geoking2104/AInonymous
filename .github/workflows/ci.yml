@@ -151,7 +151,7 @@ jobs:
           python -m pip install --disable-pip-version-check --upgrade pip
           python -m pip install --disable-pip-version-check \
             --index-url https://download.pytorch.org/whl/cpu torch
-          python -m pip install --disable-pip-version-check pytest requests
+          python -m pip install --disable-pip-version-check pytest pytest-asyncio numpy requests
       - name: Run adapter test suite
         working-directory: examples/pytorch
         run: python -m pytest tests/ -v

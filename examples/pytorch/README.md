@@ -56,8 +56,8 @@ Your code
 Safe binary protocol — no pickle, no arbitrary code execution:
 
 ```
-[4 bytes magic 0xA1A0C1C0] [1 byte dtype_id] [1 byte ndim]
-[ndim × 8 bytes shape]     [raw tensor bytes]
+[4 bytes magic 0xA1A0C1C0, LE uint32] [1 byte dtype_id] [1 byte ndim]
+[ndim × 4 bytes shape, uint32]         [raw tensor bytes]
 ```
 
 Supports: `float32`, `float16`, `bfloat16`, `int8`, `int32`, `int64`.
