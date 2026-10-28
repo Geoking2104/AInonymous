@@ -9,7 +9,7 @@ fichier JSON).
 ## Tests automatisés (boucle locale)
 
 ```bash
-cargo test -p relay-quic-spike   # 6 tests
+cargo test -p relay-quic-spike   # 7 tests
 ```
 
 | Test | Vérifie |
@@ -20,12 +20,14 @@ cargo test -p relay-quic-spike   # 6 tests
 | `token_altere_refuse` | un token inconnu est refusé |
 | `faux_worker_refuse_par_le_client` | MITM : le client refuse un serveur dont la clé ≠ `peer_pubkey` |
 | `offre_expiree_refusee` | une offre expirée est refusée côté client |
+| `token_vole_non_brule_par_un_refus_mtls` | un refus mTLS ne consomme pas le token : le client légitime réutilise ensuite la même offre |
 
-Constat à traiter en phase 1 : dans `QuicListener`, le token est retiré du
-registre **avant** la vérification de la clé client. Un tiers qui a intercepté
-le token peut donc le « brûler » (déni de service sur cette session), mais il ne
-peut pas l'utiliser. Une correction possible consiste à vérifier la clé avant
-d'appeler `remove`.
+Constat S4 (corrigé) : dans `QuicListener`, le token était retiré du registre
+**avant** la vérification de la clé client. Un tiers qui avait intercepté le
+token pouvait donc le « brûler » (déni de service sur cette session), sans
+pouvoir l'utiliser. Corrigé côté production (`crates/ainonymous-quic`) : la clé
+client mTLS est vérifiée avant toute consommation du token, avec un test de
+régression (`token_vole_non_brule_par_un_refus_mtls`).
 
 ## Mesures en boucle locale (box de développement, 8 vCPU Xeon, sans GPU)
 

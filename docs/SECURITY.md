@@ -27,6 +27,7 @@ The local operator trusts the machine, Lair process and conductor. Holochain pee
 | Explicit conductor failure cannot downgrade discovery | conductor backend returns an error; static mode must be selected explicitly |
 | QUIC peer verification is strict | configuration rejects `mtls_strict: false` |
 | Holochain caller owns the announced transport key | provenance lookup and constant-format key comparison in session negotiation |
+| A one-time session token is consumed only by a key-verified peer | listener verifies the client transport key before registry removal; regression test in `crates/ainonymous-quic/tests/mtls_handshake.rs` |
 | Discovery indexes cannot be written on behalf of another agent | integrity validation binds agent links, targets and entry authors |
 | SD-WAN TLS verification stays enabled | configuration rejects `tls_verify: false` |
 | Private admission is not compile-time optional | genesis validation always reads DNA properties |

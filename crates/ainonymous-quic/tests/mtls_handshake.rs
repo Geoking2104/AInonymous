@@ -9,7 +9,9 @@
 
 use std::time::Duration;
 
-use ainonymous_quic::{create_endpoint, NodeIdentity, QuicSession, SessionConfig, SessionOffer};
+use ainonymous_quic::{
+    create_endpoint, NodeIdentity, QuicListener, QuicSession, SessionConfig, SessionOffer,
+};
 
 /// Démarre un endpoint serveur mTLS et une tâche d'acceptation qui lit le token
 /// d'auth puis garde la connexion ouverte. Retourne (adresse, handle).
@@ -116,4 +118,100 @@ async fn connexion_rejetee_sans_epinglage() {
 
     assert!(res.is_err(), "connexion sans épinglage aurait dû échouer");
     srv.abort();
+}
+
+/// Régression (constat spike-quic S4) : le listener ne consomme le token
+/// qu'APRÈS vérification de la clé client mTLS. Un attaquant qui présente un
+/// token valide avec sa propre clé doit être refusé **sans brûler le token** ;
+/// le client légitime doit ensuite ouvrir la session avec la même offre.
+#[tokio::test]
+async fn cle_client_erronee_ne_brule_pas_le_token() {
+    use std::sync::{Arc, Mutex};
+
+    let server_id = NodeIdentity::generate();
+    let legit = NodeIdentity::generate();
+    let attacker = NodeIdentity::generate();
+
+    let listener = Arc::new(
+        QuicListener::new("127.0.0.1:0".parse().unwrap(), &server_id)
+            .await
+            .expect("listener"),
+    );
+    let addr = listener.local_addr().unwrap();
+
+    // Offre enregistrée par le plan de contrôle pour le client légitime ; le
+    // même token est remis aux deux clients (l'attaquant l'a « intercepté »).
+    let mut offer = SessionOffer::new(addr, Some((0, 1)));
+    offer.peer_pubkey = Some(server_id.public_key_bytes());
+    offer.client_pubkey = Some(legit.public_key_bytes());
+    listener.register_session(offer.clone());
+
+    // Le handler est la seule preuve qu'une session a été admise.
+    let authenticated: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
+    let run = {
+        let listener = listener.clone();
+        let authenticated = authenticated.clone();
+        tokio::spawn(async move {
+            listener
+                .run(move |_conn, offer| {
+                    let authenticated = authenticated.clone();
+                    async move {
+                        authenticated
+                            .lock()
+                            .unwrap()
+                            .push(offer.session_token.clone());
+                    }
+                })
+                .await
+        })
+    };
+
+    // 1) Token volé + clé de l'attaquant : refus côté serveur. L'issue côté
+    //    client est indifférente (handshake refusé ou connexion fermée après
+    //    le refus) ; ce qui compte est que le token ne soit pas consommé.
+    let attacker_ep = create_endpoint(Some("127.0.0.1:0".parse().unwrap()), &attacker)
+        .await
+        .unwrap();
+    if let Ok(attacker_session) = QuicSession::connect(
+        &attacker_ep,
+        offer.clone(),
+        SessionConfig::default(),
+        &attacker,
+    )
+    .await
+    {
+        let _ = tokio::time::timeout(
+            Duration::from_secs(2),
+            attacker_session.connection.closed(),
+        )
+        .await;
+    }
+    // Laisser le listener instruire le refus avant la tentative légitime
+    // (boucle locale ; même idiome que les tests du spike S4).
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // 2) Le client légitime réutilise le MÊME token : il doit être admis.
+    let legit_ep = create_endpoint(Some("127.0.0.1:0".parse().unwrap()), &legit)
+        .await
+        .unwrap();
+    let legit_session =
+        QuicSession::connect(&legit_ep, offer.clone(), SessionConfig::default(), &legit)
+            .await
+            .expect("le client légitime doit se connecter");
+    let token = legit_session.offer.session_token.clone();
+
+    // 3) Le handler reçoit la session : le token n'a pas été brûlé.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        if authenticated.lock().unwrap().iter().any(|t| t == &token) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "token brûlé par la tentative non autorisée : session légitime jamais admise"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    run.abort();
 }
