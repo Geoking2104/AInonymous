@@ -11,8 +11,8 @@ pub async fn handle(action: ModelAction, api_url: &str) -> Result<()> {
             let models: serde_json::Value = resp.json().await?;
 
             println!("\n📦 Modèles disponibles:");
-            println!("   {:<22} {:<8} {:<10} {:<12} {}",
-                "ID", "VRAM", "Contexte", "Archi", "Multimodal");
+            println!("   {:<22} {:<8} {:<10} {:<12} Multimodal",
+                "ID", "VRAM", "Contexte", "Archi");
             println!("   {}", "─".repeat(65));
 
             if let Some(data) = models["data"].as_array() {

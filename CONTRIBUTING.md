@@ -36,7 +36,7 @@ description:
 ```bash
 cargo check --locked --workspace
 cargo test --locked --workspace
-cargo clippy --locked --workspace -- -A dead_code -A unused
+cargo clippy --locked --workspace --all-targets -- -D warnings
 python scripts/hybridnode/validate_config.py \
   hybridnode/configs/ainonymous.hybridnode.yaml \
   hybridnode/configs/generic-project.hybridnode.yaml

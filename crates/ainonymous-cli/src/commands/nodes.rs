@@ -10,7 +10,7 @@ pub async fn list(api_url: &str, model: Option<&str>) -> Result<()> {
     let data: serde_json::Value = resp.json().await?;
 
     println!("\n🌐 Nœuds du mesh{}:", model.map(|m| format!(" (modèle: {})", m)).unwrap_or_default());
-    println!("   {:<16} {:<12} {:<8} {:<10} {}", "Agent (tronqué)", "GPU", "VRAM", "Load", "Région");
+    println!("   {:<16} {:<12} {:<8} {:<10} Région", "Agent (tronqué)", "GPU", "VRAM", "Load");
     println!("   {}", "─".repeat(60));
 
     if let Some(nodes) = data["nodes"].as_array() {

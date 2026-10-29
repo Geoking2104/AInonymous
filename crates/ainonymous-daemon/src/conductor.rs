@@ -263,16 +263,28 @@ pub async fn run_solo_inference(
 /// 2. Ouvre la session vers le 1er étage (chaînage A→B indiqué).
 /// 3. Boucle prefill → decode (un token par passe, request_id stable).
 /// 4. Ferme la session → purge KV-cache en cascade.
-pub async fn run_pipeline_inference(
-    holochain: &HolochainClient,
-    pipeline: &PipelineClient,
-    plan: &ExecutionPlan,
-    messages: serde_json::Value,
-    max_tokens: u32,
-    identity: &ainonymous_quic::NodeIdentity,
-    eos_token_id: i32,
-    speculative_k: u8,
-) -> Result<CoordinatorResult> {
+pub struct PipelineInference<'a> {
+    pub holochain: &'a HolochainClient,
+    pub pipeline: &'a PipelineClient,
+    pub plan: &'a ExecutionPlan,
+    pub messages: serde_json::Value,
+    pub max_tokens: u32,
+    pub identity: &'a ainonymous_quic::NodeIdentity,
+    pub eos_token_id: i32,
+    pub speculative_k: u8,
+}
+
+pub async fn run_pipeline_inference(params: PipelineInference<'_>) -> Result<CoordinatorResult> {
+    let PipelineInference {
+        holochain,
+        pipeline,
+        plan,
+        messages,
+        max_tokens,
+        identity,
+        eos_token_id,
+        speculative_k,
+    } = params;
     let stages = match plan {
         ExecutionPlan::PipelineSplit { stages } => stages,
         other => anyhow::bail!("run_pipeline_inference: plan non-pipeline ({:?})", other),
@@ -736,7 +748,7 @@ async fn forward_and_receive_many_on(
 /// Les token IDs sont transmis comme u32 LE dans le champ activations
 /// quand layer_start == 0 (premier nœud du pipeline)
 fn parse_token_ids_from_activations(raw: &[u8]) -> Vec<i32> {
-    if raw.len() % 4 != 0 {
+    if !raw.len().is_multiple_of(4) {
         return vec![];
     }
     raw.chunks_exact(4)
