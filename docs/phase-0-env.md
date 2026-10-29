@@ -2,7 +2,8 @@
 
 > Ce document décrit l'environnement **effectivement installé** le 27/10/2026 sur
 > la box de développement Linux (VM partagée, sans GPU ni téléphone), qui a servi
-> aux spikes S1, S4 et S5. Il ne concerne pas le poste Windows de Geoffroy (voir §3).
+> aux spikes S1, S4 et S5. Le poste Windows de Geoffroy est décrit au §3 (besoins)
+> et au §4 (état effectif au 29/10/2026).
 
 ## 1. Machine
 
@@ -49,5 +50,33 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 | Téléphone Android réel (USB debug ou adb Wi-Fi) | S1 (cold start, RAM, service 30 min), S2 (Vulkan, tok/s, thermique) | à fournir |
 | PC Windows + GPU NVIDIA : driver, CUDA 12.x, Vulkan SDK, VS 2022 Build Tools | S3 (G2/G3) | à installer |
 | Second nœud sur le LAN (et Tailscale) | S4 (RTT, débit, TTFT, tok/s sur 2 nœuds) | à fournir |
-| Remplacer Holochain 0.4.1 par 0.7.0 dans le PATH Windows, et la CLI Tauri 1.6.6 par la 2.x | S1/S3 | à faire (plan §2) |
+| ~~Remplacer Holochain 0.4.1 par 0.7.0 dans le PATH Windows~~ — **fait le 29/10/2026, voir §4** ; reste la CLI Tauri 1.6.6 → 2.x | S1/S3 | Holochain : fait ; Tauri : à faire |
 | Certificat de signature de test Windows et keystore Android de release | S3/S5 | keystore **de test** généré à la volée par `spike-android/verify_apk_chain.sh` ; aucun secret n'est versionné |
+
+## 4. Poste Windows (état au 29/10/2026)
+
+Le remplacement prévu au §3 a été effectué. Il a révélé un point que le plan ne
+décrivait pas comme tel : **`hc` 0.4.1 n'a aucune sous-commande `client`**
+(`hc client call --help` se termine par `panicked ... Failed to run external
+subcommand ... "program not found"`). Le flux conducteur du dépôt (`hc client
+call`, assertions de la CI) était donc impossible sur cette version — ce n'était
+pas seulement un écart de numéro de version.
+
+| Élément | État |
+|---|---|
+| Holochain / `hc` **0.7.0** | assets officiels `x86_64-pc-windows-msvc`, SHA-256 vérifiés, installés dans `C:\Users\geoff\holochain-0.7.0\bin` ; `.cargo\bin` pointe désormais sur 0.7.0 (`hc --version` → `holochain_cli 0.7.0`) |
+| Holochain 0.4.1 (isolé) | conservé intact dans `C:\Users\geoff\holochain-0.4.1\` (`activate.ps1` permet de le remettre dans le `PATH` d'une session) |
+| `lair-keystore` | 0.7.1 (déjà à jour) |
+| Script reproductible | [`scripts/setup_holochain_windows.ps1`](../scripts/setup_holochain_windows.ps1) : hash des assets Windows épinglés, mêmes contrôles de version et de surface CLI que la CI |
+| Surface CLI exigée par la CI | `hc client call --help` expose `new-agent`, `list-app-ws`, `install-app`, `add-app-ws` ✔ |
+| Cible Rust `wasm32-unknown-unknown` | déjà installée |
+| `bash` | résout vers le lanceur WSL (`WindowsApps\bash.exe`) : les scripts `.sh` du dépôt s'exécutent dans WSL, pas en natif |
+| Docker | **absent** — la pile Compose et les tests à deux conducteurs restent hors de portée sur ce poste |
+| GPU | Intel Iris Xe (intégré, ~2 Go partagés), **aucun CUDA** — S3 (porte G2) reste bloqué par le matériel |
+
+Non vérifié sur ce poste : démarrage réel d'un conducteur, `hc app pack` sur les
+manifestes du dépôt (exigent les WASM compilés), et toute mesure `tok/s`.
+
+> Note : un binaire `hc07.exe` non conforme aux assets officiels préexistait dans
+> `C:\Users\geoff\.cargo\bin`. Il n'a pas été utilisé ni supprimé ; à archiver
+> ou supprimer sur décision du propriétaire.
