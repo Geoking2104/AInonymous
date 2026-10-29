@@ -63,6 +63,30 @@ async fn client_non_autorise_refuse_meme_avec_token_vole() {
     assert_refused(&mut w, &attacker, offer).await;
 }
 
+/// Régression du constat S4 : un refus mTLS (clé client ≠ `client_pubkey`) ne
+/// doit pas consommer le token. Après le refus de l'attaquant, le client
+/// légitime doit pouvoir ouvrir la session avec la même offre.
+#[tokio::test]
+async fn token_vole_non_brule_par_un_refus_mtls() {
+    let mut w = worker().await;
+    let legit = NodeIdentity::generate();
+    let attacker = NodeIdentity::generate();
+    let offer = w.offer_for(legit.public_key_bytes(), None, w.addr);
+    // 1) Token volé + clé de l'attaquant : refus, sans consommer le token.
+    assert_refused(&mut w, &attacker, offer.clone()).await;
+    // 2) Le client légitime réutilise la même offre : session admise.
+    let (_ep, s) = connect(&legit, offer).await.unwrap();
+    let r = tokio::time::timeout(Duration::from_secs(8), echo_once(&s, 64)).await;
+    assert!(
+        matches!(r, Ok(Ok(_))),
+        "écho légitime échoué (token brûlé ?) : {r:?}"
+    );
+    assert!(matches!(
+        w.events.recv().await,
+        Some(WorkerEvent::Authenticated { .. })
+    ));
+}
+
 #[tokio::test]
 async fn rejeu_du_token_refuse() {
     let mut w = worker().await;

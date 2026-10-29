@@ -130,30 +130,38 @@ impl QuicListener {
             offset += n;
         }
 
-        // Vérifier le token
-        let offer = {
-            let mut sessions = sessions.lock().unwrap();
-            let offer = sessions
-                .remove(&token)
-                .ok_or(QuicError::InvalidSessionToken)?;
-            if offer.is_expired() {
-                return Err(QuicError::SessionExpired);
-            }
-            offer
+        // Vérifier le token SANS le consommer d'abord : la clé client mTLS
+        // doit être vérifiée avant le retrait du registre, sinon un tiers
+        // ayant intercepté le token peut le « brûler » (déni de service sur
+        // la session) par une connexion que mTLS refusera de toute façon
+        // (constat spike-quic S4 — corrigé ici côté production).
+        let (expired, expected_key) = {
+            let sessions = sessions.lock().unwrap();
+            let offer = match sessions.get(&token) {
+                Some(offer) => offer,
+                None => return Err(QuicError::InvalidSessionToken),
+            };
+            (offer.is_expired(), offer.client_pubkey)
         };
-
-        // T3.2b — vérification mTLS côté serveur : si l'offre spécifie une clé
-        // client attendue, on extrait la clé publique du certificat TLS présenté
-        // lors du handshake et on vérifie qu'elle correspond.
-        let expected_key = offer.client_pubkey.ok_or_else(|| {
+        if expired {
+            // Offre expirée : la purger puis refuser.
+            sessions.lock().unwrap().remove(&token);
+            return Err(QuicError::SessionExpired);
+        }
+        let expected_key = expected_key.ok_or_else(|| {
             QuicError::ConnectFailed("offre QUIC non authentifiée: client_pubkey manquante".into())
         })?;
+
+        // T3.2b — vérification mTLS côté serveur : on extrait la clé publique
+        // du certificat TLS client présenté lors du handshake et on vérifie
+        // qu'elle correspond à celle attendue par l'offre. Ce contrôle précède
+        // la consommation du token (voir ci-dessus).
         let actual_key = extract_peer_pubkey(&conn).ok_or_else(|| {
             QuicError::ConnectFailed("cert client absent ou non-ed25519 après handshake".into())
         })?;
         if actual_key != expected_key {
             warn!(
-                "mTLS: clé client reçue {} ≠ attendue {} — connexion refusée",
+                "mTLS: clé client reçue {} ≠ attendue {} — connexion refusée (token non consommé)",
                 hex::encode(actual_key),
                 hex::encode(expected_key)
             );
@@ -162,6 +170,28 @@ impl QuicListener {
             ));
         }
         info!("mTLS client vérifié: {}", hex::encode(actual_key));
+
+        // mTLS OK — consommer MAINTENANT le token à usage unique. Une course
+        // avec une autre connexion légitime se solde par InvalidSessionToken
+        // côté perdant.
+        let offer = {
+            let mut sessions = sessions.lock().unwrap();
+            let offer = sessions
+                .remove(&token)
+                .ok_or(QuicError::InvalidSessionToken)?;
+            if offer.is_expired() {
+                return Err(QuicError::SessionExpired);
+            }
+            // L'offre consommée doit être celle dont la clé vient d'être
+            // vérifiée : un ré-enregistrement concurrent du même token avec
+            // une autre clé client est refusé.
+            if offer.client_pubkey != Some(actual_key) {
+                return Err(QuicError::ConnectFailed(
+                    "offre remplacée entre vérification et consommation".into(),
+                ));
+            }
+            offer
+        };
 
         info!(
             "Session QUIC authentifiée (couches {:?})",
