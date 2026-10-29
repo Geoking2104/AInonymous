@@ -101,7 +101,8 @@ ce qui est démontré aujourd'hui, avec le test correspondant dans le dépôt.
   intrus ne peut pas « griller » l'accès d'un membre légitime.
   → `crates/ainonymous-quic/tests/mtls_handshake.rs`.
 - **Le découpage d'un modèle entre deux machines donne le même résultat** qu'un
-  calcul sur une seule machine (à l'octet près, sur le banc d'essai).
+  calcul sur une seule machine : sur le banc d'essai, l'écart maximal entre les
+  valeurs produites est nul et les 16 jetons générés sont identiques.
   → `spike-pipeline/`.
 - **Les paquets logiciels sont reproductibles** : n'importe qui peut reconstruire
   exactement les mêmes fichiers que l'équipe, et le vérifier.
