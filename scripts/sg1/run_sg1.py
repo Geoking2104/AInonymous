@@ -105,6 +105,11 @@ def write_private_dna(work_dir, wasm_dir, network_id, seed, admin_raw36_hex):
     for src_name, dst_name in mapping.items():
         src = wasm_dir / src_name
         if not src.exists():
+            # prebuilt bundles use the dashed zome names
+            alt = wasm_dir / src_name.replace("_", "-")
+            if alt.exists():
+                src = alt
+        if not src.exists():
             raise SystemExit(f"missing wasm {src}")
         shutil.copyfile(src, zomes / dst_name)
 
@@ -276,6 +281,16 @@ def main():
     parser = argparse.ArgumentParser(description="SG1 two-conductor admission test")
     parser.add_argument("--work-dir", default=None, help="keep artefacts here")
     parser.add_argument("--keep", action="store_true", help="do not delete the work dir")
+    parser.add_argument(
+        "--tool",
+        default=None,
+        help="prebuilt private-network-proof binary (skips the cargo build)",
+    )
+    parser.add_argument(
+        "--wasm-dir",
+        default=None,
+        help="directory with prebuilt hybridnode-*.wasm (skips the zome build)",
+    )
     args = parser.parse_args()
 
     hc_bin = which("hc", "HC_BIN")
@@ -286,7 +301,19 @@ def main():
     results = []
     conductors = {}
     try:
-        wasm_dir, tool = build_everything(work_dir)
+        if args.tool and args.wasm_dir:
+            tool = pathlib.Path(args.tool).resolve()
+            wasm_dir = pathlib.Path(args.wasm_dir).resolve()
+            if not tool.exists():
+                raise SystemExit(f"prebuilt tool not found: {tool}")
+            has_wasm = (wasm_dir / "hybridnode_integrity.wasm").exists() or (
+                wasm_dir / "hybridnode-integrity.wasm"
+            ).exists()
+            if not has_wasm:
+                raise SystemExit(f"prebuilt wasm not found in {wasm_dir}")
+            log(f"==> prebuilt artefacts: {tool}, {wasm_dir}")
+        else:
+            wasm_dir, tool = build_everything(work_dir)
 
         admin_seed = os.urandom(32).hex()
         r = run([str(tool), "admin-pubkey", "--seed-hex", admin_seed])
