@@ -48,8 +48,33 @@ Consequences:
 - `hc app pack` does **not** validate `installed_hash` against the packed DNA —
   the `dna-hashes --check` invocation above is the actual gate.
 
-A reproducible cross-host build (pinned container image, deterministic WASM
-flags) is not implemented; it is required before a third party can rebuild the
-bundles and rejoin the same epoch.
+### Reproducing the epoch
+
+Two independent builds on the same machine are bit-identical, so the compiler is
+deterministic; what changes the bytes is the *environment*. rustc embeds the
+absolute source paths of registry dependencies (for example
+`/home/runner/.cargo/registry/src/index.crates.io-.../serde-1.0.x/src/de.rs`) in
+panic locations, so `CARGO_HOME`, `RUSTUP_HOME`, the workspace path and the host
+all influence the WASM. Measured on 2026-10-29, `inference-mesh` hash:
+
+| Build environment | Hash |
+| --- | --- |
+| Reference runner layout (ubuntu, `HOME=/home/runner`, `CARGO_HOME=/home/runner/.cargo`, workspace `/home/runner/work/AInonymous/AInonymous`, Rust 1.91.1) | `uhC0kYFyQtLQaaKs--WrpAQdNh44E0SXDX8Kk409Tan7Us4QLU5Q_` (pinned) |
+| Same sources, Debian container, reference workspace path, but `CARGO_HOME=/usr/local/cargo` | `uhC0kidndeCTdYPBoLVdylWL5TGo2VIykd140eFTd3J6ixYNvHIIq` |
+| Debian container mirroring the runner layout | `uhC0kYFyQtLQaaKs--WrpAQdNh44E0SXDX8Kk409Tan7Us4QLU5Q_` (pinned) |
+| Windows 11, Rust 1.91.1, `--remap-path-prefix` on the workspace | `uhC0kzs5P3jR0D2MKCjueITX4GDLgUd7v6yCmqUb_PVnEc09nrEKF` |
+| Windows 11, Rust 1.95 | `uhC0kPZgq4_efY2J6_ZwSZU3AOuuvso7jhowLelod0ClwX7OcKpPK` |
+
+The supported way to rebuild the epoch is therefore the pinned image, which
+mirrors the runner layout instead of normalising paths away:
+
+```bash
+docker build -f deploy/containers/repro/Dockerfile -t ainonymous-repro .
+docker run --rm ainonymous-repro   # exits non-zero unless the hashes match the registry
+```
+
+[`repro-bundles.yml`](../.github/workflows/repro-bundles.yml) runs exactly this
+on pull requests that touch `dnas/**` and weekly, so the claim stays verifiable
+rather than aspirational.
 
 Any intentional change to an integrity zome, DNA properties, seed or manifest modifiers requires a new epoch. Rebuild with the pinned CLI, record all new hashes together, update the hApp `installed_hash` values, use a new conductor-volume suffix and reinstall every peer from fresh state.

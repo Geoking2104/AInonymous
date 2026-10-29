@@ -23,8 +23,13 @@ go/no-go decision.
 
 ### Added
 
+- Reproducible bundle build: `deploy/containers/repro/Dockerfile` rebuilds the
+  pinned DNA epoch byte for byte on any host with Docker by mirroring the
+  reference runner layout, and `.github/workflows/repro-bundles.yml` verifies it
+  against `deploy/holochain/dna-hashes.json` on every change under `dnas/**` and
+  weekly.
 - `docs/DNA_HASHES.md`: measured reproducibility boundary for the pinned DNA
-  epoch. The hashes reproduce only in the reference build environment; Windows
+  epoch, and the recipe that removes it. The hashes reproduce only in the reference build environment; Windows
   builds with Rust 1.91 and 1.95 both yield different DNA hashes, so peers must
   install CI/release bundles rather than a local rebuild.
 

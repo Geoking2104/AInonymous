@@ -104,3 +104,25 @@ complet : [DNA hashes](DNA_HASHES.md#reproducibility-boundary-measured-2026-10-2
 > Note : un binaire `hc07.exe` non conforme aux assets officiels préexistait dans
 > `C:\Users\geoff\.cargo\bin`. Il n'a pas été utilisé ni supprimé ; à archiver
 > ou supprimer sur décision du propriétaire.
+
+### 4.2 Reproductibilité : résolue par l'image
+
+Le build est déterministe sur une machine donnée (deux compilations successives
+donnent des octets identiques), mais le WASM embarque les chemins absolus du
+workspace **et du registre cargo** (ex. `/home/runner/.cargo/registry/src/...`
+apparaît dans les messages de panique). Reproduire l'epoch revient donc à
+reproduire l'environnement du runner, pas à normaliser les chemins. Mesuré le
+29/10/2026 sur `inference-mesh` :
+
+| Environnement | Hash |
+|---|---|
+| Runner de référence (`HOME=/home/runner`, `CARGO_HOME=/home/runner/.cargo`, workspace `/home/runner/work/AInonymous/AInonymous`, Rust 1.91.1) | `uhC0kYFy…` (épinglé) |
+| Conteneur Debian, chemin du workspace de référence, mais `CARGO_HOME=/usr/local/cargo` | `uhC0kidn…` |
+| Conteneur Debian calqué sur le runner | `uhC0kYFy…` ✔ |
+| Windows, Rust 1.91.1, remap du workspace | `uhC0kzs5…` |
+
+`deploy/containers/repro/Dockerfile` matérialise cet environnement (toolchain
+1.91, `hc` 0.7.0 vérifié par SHA-256, arborescence du runner) et échoue si les
+bundles ne correspondent pas au registre. Le workflow `Reproducible bundles`
+l'exécute à chaque PR touchant `dnas/**` et une fois par semaine : la
+reproductibilité est donc une propriété vérifiée, plus une intention.
