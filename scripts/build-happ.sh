@@ -76,3 +76,14 @@ echo "==> Packing DNAs and hApps with $HC_VERSION"
 
 echo "Built:"
 ls -lh "$AIN_ROOT/ainonymous-core.happ" "$HYBRID_ROOT/hybridnode.happ"
+
+echo
+echo "NOTE: a local rebuild defines a NEW DNA epoch unless it is produced by the"
+echo "reference build environment (Linux x86_64, Rust 1.91). Check before"
+echo "distributing a bundle:"
+echo "  cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json \\"
+echo "    dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna \\"
+echo "    dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna \\"
+echo "    dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna \\"
+echo "    dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna"
+echo "See docs/DNA_HASHES.md."
