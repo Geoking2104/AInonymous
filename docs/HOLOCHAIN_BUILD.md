@@ -31,6 +31,19 @@ dnas/ainonymous-core/ainonymous-core.happ
 dnas/hybridnode/hybridnode.happ
 ```
 
+> **Local rebuilds change the DNA epoch.** The pinned hashes in
+> [`deploy/holochain/dna-hashes.json`](../deploy/holochain/dna-hashes.json) are
+> reproducible only in the reference build environment (Linux x86_64, Rust 1.91,
+> `hc` 0.7.0). Rebuilding on another host or toolchain produces different WASM
+> bytes and therefore different DNA hashes: installing such a bundle on a pinned
+> network fails with an `installed_hash` mismatch. Use locally built bundles for
+> isolated development only and distribute the CI/release bundles to real peers.
+> See [DNA hashes](DNA_HASHES.md).
+
+On Windows, the zome workspaces must be built with a short `CARGO_TARGET_DIR`
+(for example `C:\wz-ain`): the default target path inside a deep checkout makes
+`link.exe` fail with `LNK1104` while linking build scripts.
+
 To compile without packaging:
 
 ```bash
