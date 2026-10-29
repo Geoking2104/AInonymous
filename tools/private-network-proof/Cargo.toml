@@ -1,0 +1,15 @@
+[package]
+name = "private-network-proof"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+base64.workspace = true
+ed25519-dalek.workspace = true
+serde.workspace = true
+holochain_types = { version = "=0.7.0", default-features = false }
+holochain_serialized_bytes = "=0.0.57"

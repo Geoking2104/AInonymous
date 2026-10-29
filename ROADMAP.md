@@ -14,7 +14,12 @@
 
 ## Next security gates
 
-1. Add end-to-end tests with two real 0.7 conductors, private bootstrap/relay services and membrane-proof installation.
+1. End-to-end tests with two real 0.7 conductors and membrane-proof installation: **done**
+   (`scripts/sg1/run_sg1.py`, CI job `SG1 two-conductor admission` — admission
+   accepted for a valid proof and refused without one, for another agent, another
+   network id or another admin key). Still open for this gate: private
+   bootstrap/relay services, so the two conductors gossip through operator-
+   controlled infrastructure instead of the public defaults.
 2. Add negative tests for cross-network proof replay, wrong transport keys and stale/replaced capability entries.
 3. Define a trusted membership revocation design rather than relying on genesis-time expiry.
 4. Add bounded transfer/backpressure fuzzing and adversarial frame tests.
