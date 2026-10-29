@@ -41,7 +41,11 @@ keyring = { workspace = true, optional = true }
 tempfile = "3"
 
 [features]
-default = ["nat-traversal"]
+# `nat-traversal` (iroh) est un emplacement réservé : aucun code de ce crate ne
+# consomme encore l'API iroh (porte G8 non évaluée, cf. ROADMAP). L'activer par
+# défaut imposait de compiler toute la pile iroh à chaque build du data plane,
+# y compris pour les tests. À activer explicitement avec l'implémentation.
+default = []
 nat-traversal = ["iroh"]
 # Protège la seed ed25519 via le keyring natif de l'OS.
 secure-keyring = ["keyring"]
