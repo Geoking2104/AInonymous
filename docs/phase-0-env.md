@@ -70,12 +70,36 @@ pas seulement un écart de numéro de version.
 | Script reproductible | [`scripts/setup_holochain_windows.ps1`](../scripts/setup_holochain_windows.ps1) : hash des assets Windows épinglés, mêmes contrôles de version et de surface CLI que la CI |
 | Surface CLI exigée par la CI | `hc client call --help` expose `new-agent`, `list-app-ws`, `install-app`, `add-app-ws` ✔ |
 | Cible Rust `wasm32-unknown-unknown` | déjà installée |
+| `hc app pack` + `dna-hashes --check` | exécutés le 29/10/2026 : les deux hApps se packent, mais les hashes DNA **ne correspondent pas** aux valeurs épinglées (voir §4.1) |
 | `bash` | résout vers le lanceur WSL (`WindowsApps\bash.exe`) : les scripts `.sh` du dépôt s'exécutent dans WSL, pas en natif |
 | Docker | **absent** — la pile Compose et les tests à deux conducteurs restent hors de portée sur ce poste |
 | GPU | Intel Iris Xe (intégré, ~2 Go partagés), **aucun CUDA** — S3 (porte G2) reste bloqué par le matériel |
 
 Non vérifié sur ce poste : démarrage réel d'un conducteur, `hc app pack` sur les
 manifestes du dépôt (exigent les WASM compilés), et toute mesure `tok/s`.
+
+### 4.1 Reproductibilité des hashes DNA : mesurée, non acquise
+
+Premier test de bout en bout de la chaîne 0.7.0 sur ce poste — zomes wasm →
+`hc dna pack` → `hc app pack` → `dna-hashes --check` — le tout avec `hc` 0.7.0.
+Tout passe **sauf** la dernière étape :
+
+| Environnement | Hash `inference-mesh` |
+|---|---|
+| Référence (CI ubuntu x86_64, Rust 1.91) — épinglé | `uhC0kYFyQtLQaaKs--WrpAQdNh44E0SXDX8Kk409Tan7Us4QLU5Q_` |
+| Windows, Rust 1.91, `hc` 0.7.0 | `uhC0kzs5P3jR0D2MKCjueITX4GDLgUd7v6yCmqUb_PVnEc09nrEKF` |
+| Windows, Rust 1.95, `hc` 0.7.0 | `uhC0kPZgq4_efY2J6_ZwSZU3AOuuvso7jhowLelod0ClwX7OcKpPK` |
+
+Le hash DNA dépend des octets WASM, donc de la chaîne de build (hôte et version de
+`rustc`) : les valeurs épinglées ne sont reproductibles que dans l'environnement de
+référence. Conséquences pratiques : un opérateur rejoint le réseau avec les bundles
+produits par la CI/les releases, jamais avec un rebuild local ; `hc app pack` ne
+vérifie pas `installed_hash`, seul `dna-hashes --check` fait foi. Détail et tableau
+complet : [DNA hashes](DNA_HASHES.md#reproducibility-boundary-measured-2026-10-29).
+
+> Note build : sous Windows, compiler les workspaces zomes échoue en `LNK1104`
+> (chemin d'objet trop long) si l'on garde le `target/` du dépôt ; utiliser un
+> `CARGO_TARGET_DIR` court (ex. `C:\Users\geoff\wz-ain`).
 
 > Note : un binaire `hc07.exe` non conforme aux assets officiels préexistait dans
 > `C:\Users\geoff\.cargo\bin`. Il n'a pas été utilisé ni supprimé ; à archiver

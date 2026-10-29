@@ -21,6 +21,13 @@ go/no-go decision.
   session token (`crates/ainonymous-quic/tests/mtls_handshake.rs`) and the same
   scenario at spike level (`spike-quic/tests/two_nodes.rs`).
 
+### Added
+
+- `docs/DNA_HASHES.md`: measured reproducibility boundary for the pinned DNA
+  epoch. The hashes reproduce only in the reference build environment; Windows
+  builds with Rust 1.91 and 1.95 both yield different DNA hashes, so peers must
+  install CI/release bundles rather than a local rebuild.
+
 ### Changed
 
 - CI: Clippy now runs with `-D warnings` on all targets (`--all-targets`) for the
