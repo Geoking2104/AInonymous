@@ -41,6 +41,10 @@ go/no-go decision.
 
 ### Changed
 
+- Housekeeping: the 21 leftover remote branches from earlier phases were deleted
+  after checking each tip — either an ancestor of `main`, or squash-landed in
+  `1824be9` (the Holochain 0.7 hardening stack) or `8a0d0e5` (site polish).
+  `gh-pages` is kept deliberately: it is what GitHub Pages serves.
 - CI: Clippy now runs with `-D warnings` on all targets (`--all-targets`) for the
   whole workspace; the lenient `-A dead_code -A unused` allowance is gone. The
   seven warnings it surfaced are fixed (three `print_literal` in the CLI, a
