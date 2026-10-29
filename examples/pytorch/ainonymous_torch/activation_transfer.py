@@ -26,7 +26,7 @@ from typing import Tuple
 
 import torch
 
-_MAGIC = 0xA1A0C1C0
+MAGIC = 0xA1A0C1C0
 
 _DTYPE_TO_ID = {
     torch.float32:  0,
@@ -66,13 +66,15 @@ def pack_activation(tensor: torch.Tensor) -> bytes:
 
     buf = BytesIO()
     # Header
-    buf.write(struct.pack("<I", _MAGIC))
+    buf.write(struct.pack("<I", MAGIC))
     buf.write(struct.pack("<B", dtype_id))
     buf.write(struct.pack("<B", tensor.ndim))
     for dim in tensor.shape:
         buf.write(struct.pack("<I", dim))
-    # Raw data
-    buf.write(tensor.numpy().tobytes())
+    # Raw data. NumPy has no bfloat16 scalar type, so transport the raw 16-bit
+    # words of bfloat16 tensors (bit-exact round-trip, same wire length).
+    raw = tensor.view(torch.uint16) if tensor.dtype == torch.bfloat16 else tensor
+    buf.write(raw.numpy().tobytes())
     return buf.getvalue()
 
 
@@ -96,8 +98,8 @@ def unpack_activation(data: bytes, device: str = "cpu") -> torch.Tensor:
     buf = BytesIO(data)
 
     magic, = struct.unpack("<I", buf.read(4))
-    if magic != _MAGIC:
-        raise ValueError(f"Bad magic: expected {_MAGIC:#010x}, got {magic:#010x}")
+    if magic != MAGIC:
+        raise ValueError(f"Bad magic: expected {MAGIC:#010x}, got {magic:#010x}")
 
     dtype_id, = struct.unpack("<B", buf.read(1))
     dtype = _ID_TO_DTYPE.get(dtype_id)
@@ -110,7 +112,15 @@ def unpack_activation(data: bytes, device: str = "cpu") -> torch.Tensor:
     )
 
     raw = buf.read()
-    tensor = torch.frombuffer(bytearray(raw), dtype=dtype).reshape(shape)
+    if dtype == torch.bfloat16:
+        # Rebuild bfloat16 from its raw 16-bit words (see pack_activation).
+        tensor = (
+            torch.frombuffer(bytearray(raw), dtype=torch.uint16)
+            .view(torch.bfloat16)
+            .reshape(shape)
+        )
+    else:
+        tensor = torch.frombuffer(bytearray(raw), dtype=dtype).reshape(shape)
     return tensor.to(device)
 
 
@@ -142,17 +152,19 @@ class ActivationTransfer:
 
     def split(self, tensor: torch.Tensor) -> list[bytes]:
         """Split a large tensor into ≤ max_chunk_mb chunks along dim=0."""
-        full = pack_activation(tensor)
+        full = self.pack(tensor)
         if len(full) <= self.max_chunk_bytes:
             return [full]
         # Split along batch / sequence dimension
         n = tensor.shape[0]
         chunk_size = max(1, n * self.max_chunk_bytes // len(full))
-        return [pack_activation(tensor[i:i+chunk_size]) for i in range(0, n, chunk_size)]
+        return [self.pack(tensor[i:i+chunk_size]) for i in range(0, n, chunk_size)]
 
     def merge(self, chunks: list[bytes], device: str = "cpu") -> torch.Tensor:
         """Reconstruct a tensor from chunks."""
-        tensors = [unpack_activation(c, device=device) for c in chunks]
+        if not chunks:
+            raise ValueError("merge() requires at least one chunk")
+        tensors = [self.unpack(c, device=device) for c in chunks]
         return torch.cat(tensors, dim=0)
 
     @property

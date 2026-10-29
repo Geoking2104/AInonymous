@@ -40,6 +40,7 @@ crates/
   ainonymous-proxy/       HTTP compatibility proxy
   ainonymous-cli/         operator CLI
   ainonymous-mcp/         MCP integration
+  ainonymous-types/       shared types (inference, node, API, errors, warrants)
   hybridnode-core/        reusable config, identity, topology and scheduler layer
   hybridnode-daemon/      HybridNode identity/topology startup scaffold
 dnas/
@@ -170,10 +171,10 @@ Spikes are standalone and not production code. Status reflects only results actu
 | [`spike-android-gpu/`](spike-android-gpu/README.md) | S2 — llama.cpp GPU inference on Android | Build/bench scripts and protocol only; no measurements yet (needs a phone). |
 | [`spike-windows/`](spike-windows/README.md) | S3 — Windows GPU detection, llama.cpp build, installer | PowerShell scripts only; not run yet (needs a Windows GPU PC). |
 | [`spike-pipeline/`](spike-pipeline/README.md) | S4 — pipeline-parallel equivalence | Split vs single-node: max abs logit diff 0, relative L2 0; two-process chain produced 16 tokens identical to single node. TTFT/tok/s on real nodes pending. |
-| [`spike-quic/`](spike-quic/README.md) | S4 — QUIC activation transport | 6 tests pass. Loopback only (not LAN-representative): setup 1.27–1.61 ms, RTT p50 0.040–0.049 ms, 100 MiB at 3039–3217 Mb/s. LAN/Tailscale pending. |
+| [`spike-quic/`](spike-quic/README.md) | S4 — QUIC activation transport | 7 tests pass. Loopback only (not LAN-representative): setup 1.27–1.61 ms, RTT p50 0.040–0.049 ms, 100 MiB at 3039–3217 Mb/s. LAN/Tailscale pending. |
 | [`spike-release/`](spike-release/README.md) | S5 — signed release manifest and APK verification | 21 tests pass; tampered APK and replayed manifest are rejected. |
 
-Draft PR: [#38](https://github.com/Geoking2104/AInonymous/pull/38). The core-platform roadmap remains in [ROADMAP.md](ROADMAP.md).
+The Phase-0 spike program landed in [#38](https://github.com/Geoking2104/AInonymous/pull/38) (merged 2026-10-27); on-device measurements remain open. The core-platform roadmap remains in [ROADMAP.md](ROADMAP.md).
 
 ## Documentation
 

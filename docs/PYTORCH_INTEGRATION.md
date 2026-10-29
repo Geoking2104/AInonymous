@@ -119,11 +119,11 @@ The QUIC connection uses the peer's separate Ed25519 transport key as the TLS ce
 ```
 Offset  Len  Field
 ──────  ───  ─────────────────────────────────────────
-0       4    Magic: 0xA1A0C1C0 (big-endian uint32)
+0       4    Magic: 0xA1A0C1C0 (little-endian uint32)
 4       1    dtype_id (0=float32 1=float16 2=bfloat16 3=int8 4=int32 5=int64)
-5       1    ndim (number of dimensions, 1–8)
-6       ndim×8  shape (each dim as little-endian int64)
-6+ndim×8  N   raw tensor bytes (contiguous, C-order)
+5       1    ndim (number of dimensions)
+6       ndim×4  shape (each dim as little-endian uint32)
+6+ndim×4  N   raw tensor bytes (contiguous, C-order; bfloat16 as raw 16-bit words)
 ```
 
 - **No pickle** — safe to receive from untrusted peers

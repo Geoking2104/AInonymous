@@ -80,20 +80,20 @@ class TestRoundTrip:
 class TestWireFormat:
     def test_magic_header(self):
         payload = pack_activation(torch.randn(2, 4))
-        magic = struct.unpack_from(">I", payload, 0)[0]
+        magic = struct.unpack_from("<I", payload, 0)[0]
         assert magic == MAGIC, f"Bad magic: {hex(magic)}"
 
     def test_payload_length_float32(self):
         t = torch.randn(3, 4, dtype=torch.float32)
         payload = pack_activation(t)
-        # magic(4) + dtype_id(1) + ndim(1) + shape(ndim*8) + data(numel*itemsize)
-        expected = 4 + 1 + 1 + 2 * 8 + 3 * 4 * 4
+        # magic(4) + dtype_id(1) + ndim(1) + shape(ndim*4) + data(numel*itemsize)
+        expected = 4 + 1 + 1 + 2 * 4 + 3 * 4 * 4
         assert len(payload) == expected
 
     def test_payload_length_float16(self):
         t = torch.randn(3, 4, dtype=torch.float16)
         payload = pack_activation(t)
-        expected = 4 + 1 + 1 + 2 * 8 + 3 * 4 * 2
+        expected = 4 + 1 + 1 + 2 * 4 + 3 * 4 * 2
         assert len(payload) == expected
 
     def test_corrupt_magic_raises(self):
@@ -114,10 +114,10 @@ class TestWireFormat:
 
 class TestActivationTransfer:
     def test_split_merge_identity(self):
-        t = torch.randn(8, 64, 256, dtype=torch.float16)
+        t = torch.randn(8, 128, 512, dtype=torch.float32)  # ~2 MB
         at = ActivationTransfer(max_chunk_mb=1)
         chunks = at.split(t)
-        assert len(chunks) > 1, "Expected chunking for ~8 MB tensor with 1 MB limit"
+        assert len(chunks) > 1, "Expected chunking for a ~2 MB tensor with a 1 MB limit"
         reconstructed = at.merge(chunks)
         assert torch.equal(t, reconstructed)
 
@@ -134,9 +134,9 @@ class TestActivationTransfer:
         chunks = at.split(t)
         at.merge(chunks)
         stats = at.stats
-        assert "chunks" in stats
-        assert "total_bytes" in stats
-        assert stats["total_bytes"] > 0
+        assert set(stats) == {"bytes_sent", "bytes_received", "mb_sent", "mb_received"}
+        assert stats["bytes_sent"] == stats["bytes_received"] > 0
+        assert stats["mb_sent"] > 0
 
     def test_empty_chunks_raises(self):
         at = ActivationTransfer()
