@@ -3,46 +3,47 @@
 # WHY THIS IMAGE EXISTS
 # ---------------------
 # The effective DNA hash is the hash of the packed DNA bundle, which embeds the
-# zome WASM. Cargo mixes the *absolute* path of each package into the crate
-# metadata hash, and that hash reaches symbol names inside the WASM, so the same
-# sources built at a different path (or on another OS) may produce different
-# bytes. Measured on 2026-10-29:
+# zome WASM. Two independent builds are bit-identical on the same machine
+# (measured 2026-10-29), so the compiler itself is deterministic; what leaks into
+# the WASM is the *environment*: rustc embeds the absolute source paths of
+# registry dependencies (for example
+# /home/runner/.cargo/registry/src/index.crates.io-.../serde-1.0.x/src/de.rs) in
+# panic locations. Change CARGO_HOME, the workspace path, the rustup home or the
+# host, and the bytes change. Reproducing the epoch therefore means reproducing
+# the reference environment exactly, not merely pinning the compiler.
 #
-#   * ubuntu at /home/runner/work/AInonymous/AInonymous (with --remap-path-prefix)
-#     -> the pinned hashes, unchanged;
-#   * Windows, same Rust 1.91.1, with --remap-path-prefix -> different hashes;
-#   * Windows, Rust 1.95 -> a third, different set.
+# Measured on 2026-10-29:
+#   * ubuntu-latest, /home/runner/{.cargo,.rustup}, workspace
+#     /home/runner/work/AInonymous/AInonymous -> the pinned hashes;
+#   * the same sources on Windows, with Rust 1.91.1 and path remapping -> other
+#     hashes (drive letters cannot be remapped to POSIX paths);
+#   * a Debian container with the default CARGO_HOME (/usr/local/cargo) and the
+#     reference workspace path -> yet another hash.
 #
-# Path remapping alone is therefore not sufficient, and the working explanation
-# is the path-derived metadata hash. This image pins the toolchain AND the build
-# path: the CI job that runs it is the proof (it exits non-zero unless the
-# rebuilt bundles match the pinned registry).
-#
-# See docs/DNA_HASHES.md for the measurements. The conclusion: pin the toolchain
-# AND the build path. This image does both, so any host with Docker rebuilds the
-# bundles byte for byte and can verify them against the pinned registry.
+# This image mirrors the runner layout (same HOME, CARGO_HOME, RUSTUP_HOME,
+# toolchain name and workspace path), so any host with Docker rebuilds the
+# bundles byte for byte. The CI job that runs it is the proof: it exits non-zero
+# unless the rebuilt bundles match deploy/holochain/dna-hashes.json.
 #
 # USAGE
 # -----
 #   docker build -f deploy/containers/repro/Dockerfile -t ainonymous-repro .
 #   docker run --rm ainonymous-repro
-#
-# The container exits non-zero unless the produced bundles match
-# deploy/holochain/dna-hashes.json.
 FROM debian:bookworm-slim
 
-ARG RUST_VERSION=1.91.1
+# Mirror the GitHub Actions runner layout, because these paths end up in the WASM.
+ENV HOME=/home/runner \
+    RUSTUP_HOME=/home/runner/.rustup \
+    CARGO_HOME=/home/runner/.cargo \
+    DEBIAN_FRONTEND=noninteractive \
+    CARGO_TERM_COLOR=never
 
-# Official holochain-0.7.0 Linux release asset, same value as
+ENV PATH=/home/runner/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Official holochain-0.7.0 Linux release asset, same value pinned in
 # .github/workflows/ci.yml, scripts/setup_holochain_wsl.sh and
-# scripts/setup_holochain_windows.ps1 pin for their own platforms.
+# scripts/setup_holochain_windows.ps1 for their own platforms.
 ARG HC_SHA256=f1eca56b97bc2261324e00e0e86a274f7dc8363f73264e697fd0c0216b2aac23
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    CARGO_TERM_COLOR=never \
-    RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -56,11 +57,13 @@ RUN apt-get update \
       libssl-dev \
       pkg-config \
       python3 \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /home/runner
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-      | sh -s -- -y --no-modify-path --profile minimal \
-          --default-toolchain "${RUST_VERSION}" \
+      | sh -s -- -y --no-modify-path --profile minimal --default-toolchain none \
+ && rustup toolchain install 1.91 --profile minimal --no-self-update \
+ && rustup default 1.91 \
  && rustup target add wasm32-unknown-unknown \
  && rustc --version \
  && cargo --version
@@ -72,9 +75,9 @@ RUN curl --fail --location --silent --show-error \
  && chmod 0755 /usr/local/bin/hc \
  && hc --version
 
-# The build path is part of the input: keep the reference path used by CI.
+# The workspace path is part of the input as well.
 WORKDIR /home/runner/work/AInonymous/AInonymous
 
 COPY . .
 
-CMD ["bash", "-c", "bash scripts/build-happ.sh release && cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna"]
+CMD ["bash", "-c", "bash scripts/build-happ.sh release && find dnas -path '*/zomes/*.wasm' -print0 | sort -z | xargs -0 sha256sum && cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json dnas/ainonymous-core/dnas/inference-mesh/workdir/inference-mesh.dna dnas/ainonymous-core/dnas/agent-registry/workdir/agent-registry.dna dnas/ainonymous-core/dnas/blackboard/workdir/blackboard.dna dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna"]
