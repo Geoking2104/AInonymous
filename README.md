@@ -17,6 +17,26 @@ Holochain and QUIC deliberately use different Ed25519 keys. A node publishes its
 
 See [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), and [Holochain 0.7 migration](docs/HOLOCHAIN_0_7_MIGRATION.md) for the design and its boundaries.
 
+> **Non-technical readers:** [Pourquoi AInonymous ?](docs/PITCH_FR.md) (French) explains the
+> problem, who it is for, and what is—and is not—working today, without jargon.
+
+## What is verified today
+
+Every claim in this repository is expected to be backed by something runnable. The
+current evidence:
+
+| Capability | Evidence |
+| --- | --- |
+| Private admission, two real conductors | [`scripts/sg1/run_sg1.py`](scripts/sg1/README.md) starts two Holochain 0.7 conductors and asserts that a signed `PrivateNetworkProof` is admitted, while a missing proof, a proof for another agent, another network id or another admin key are refused (CI job `SG1 two-conductor admission`) |
+| DNA epoch reproducibility | [`deploy/containers/repro/Dockerfile`](deploy/containers/repro/Dockerfile) rebuilds the pinned bundles byte for byte and checks them against the registry (CI job `Reproducible bundles`) |
+| Data-plane authentication | `crates/ainonymous-quic/tests/mtls_handshake.rs`, including the regression proving a refused client cannot burn a one-time session token |
+| Shared type contracts | `crates/ainonymous-types/tests/types_contract.rs` (activation wire format, warrants, node scoring, OpenAI request shapes) |
+| Build hygiene | CI runs `cargo test --workspace`, `cargo clippy --all-targets -- -D warnings`, the PyTorch adapter suite, the hApp build with pinned hashes and CodeQL on every push and pull request; the SG1 job on every push and pull request; the reproducibility job on changes under `dnas/**` and weekly |
+
+Not verified, and deliberately not claimed: multi-node inference on real
+hardware, phone/GPU measurements, anonymous operation, revocation, quotas, and an
+independent audit. See [Security](docs/SECURITY.md) and [ROADMAP](ROADMAP.md).
+
 ## Version matrix
 
 | Component | Pinned version |
@@ -47,7 +67,11 @@ dnas/
   ainonymous-core/        inference-mesh, agent-registry and blackboard hApp
   hybridnode/             HybridNode membership/audit hApp
 hybridnode/               configuration schema, examples and policies
-scripts/                  build, validation and two-node testnet tooling
+tools/
+  dna-hashes/             prints and checks effective DNA hashes of packed bundles
+  private-network-proof/  generates and verifies HybridNode admission proofs
+scripts/                  build, validation, SG1 harness and testnet tooling
+deploy/containers/        conductor and daemons images, plus the reproducible bundle builder
 docs/                     maintained architecture and operating documentation
 ```
 
@@ -69,6 +93,10 @@ holochain --version
 ```
 
 On x86_64 Linux or WSL2, `bash scripts/setup_holochain_wsl.sh` installs the pinned release assets after verifying their published SHA-256 digests.
+On x86_64 Windows, `powershell -ExecutionPolicy Bypass -File scripts/setup_holochain_windows.ps1`
+does the same from the official `x86_64-pc-windows-msvc` assets, verifies the pinned
+SHA-256 digests, checks the `hc client call` surface CI relies on, and leaves any older
+installation untouched.
 
 Do not package this repository with an older `hc`; manifest validation and bundle formats are version-sensitive.
 
@@ -104,6 +132,13 @@ cargo run --locked -p dna-hashes -- --check deploy/holochain/dna-hashes.json \
   dnas/hybridnode/dnas/hybridnode-core/workdir/hybridnode-core.dna
 ```
 
+Verify private admission end to end with two real conductors (requires `hc` and
+`holochain` 0.7.0 on `PATH`):
+
+```bash
+python3 scripts/sg1/run_sg1.py
+```
+
 For a private deployment, also run validation with `--production`. The reference development configuration intentionally uses a mock SD-WAN adapter and is not a production profile.
 
 ## Reprovision the container stack
@@ -127,7 +162,10 @@ Both commands require `hc 0.7.0` and refuse any other version. Docker is not req
 1. Start a Holochain 0.7.0 conductor using a fresh data root and a loopback-only admin WebSocket.
 2. Pack and install `dnas/ainonymous-core/ainonymous-core.happ` and `dnas/hybridnode/hybridnode.happ`.
 3. Configure app ID `ainonymous` on port 8889 and app ID `hybridnode` on port 8891; admin remains on port 8888.
-4. For a private DNA, generate a `PrivateNetworkProof` for the target agent and network ID, then supply it in the role settings when installing the app.
+4. For a private DNA, generate a `PrivateNetworkProof` for the target agent and network ID
+   with `cargo run -p private-network-proof -- proof --network-id ... --agent-key ... --seed-hex ...`,
+   then supply it in the role settings as a YAML integer sequence when installing the app
+   ([details](scripts/sg1/README.md)).
 5. Start the daemon. Conductor connection failures are fatal; the runtime no longer silently falls back to static discovery.
 
 The exact commands and conductor configuration are in [Holochain build and operations](docs/HOLOCHAIN_BUILD.md).
@@ -188,6 +226,8 @@ Start with the [documentation index](docs/README.md). The most important documen
 - [Network/data plane](docs/NETWORK.md)
 - [Two-node testnet](docs/TESTNET_2NODES.md)
 - [Original architecture review](docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md)
+- [Pourquoi AInonymous ? (French, non-technical)](docs/PITCH_FR.md)
+- [SG1 two-conductor admission test](scripts/sg1/README.md)
 
 ## License
 

@@ -4,6 +4,7 @@ This directory contains the maintained documentation for the Holochain 0.7 gener
 
 ## Start here
 
+- [Pourquoi AInonymous ? (FR, non-technical)](PITCH_FR.md) — the problem, the intended users, and what is and is not working today
 - [Architecture](ARCHITECTURE.md) — components, trust boundaries and request flow
 - [Security](SECURITY.md) — threat model, enforced invariants and known gaps
 - [Holochain 0.7 migration](HOLOCHAIN_0_7_MIGRATION.md) — compatibility matrix and upgrade procedure
