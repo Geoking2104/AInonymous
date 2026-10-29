@@ -4,6 +4,7 @@ This directory contains the maintained documentation for the Holochain 0.7 gener
 
 ## Start here
 
+- [Chantiers v1 (FR)](chantiers-v1.md) — the six product workstreams (installer, Android, real measurements, stealth mode, revocation, audit), with acceptance criteria and sequencing
 - [Pourquoi AInonymous ? (FR, non-technical)](PITCH_FR.md) — the problem, the intended users, and what is and is not working today
 - [Architecture](ARCHITECTURE.md) — components, trust boundaries and request flow
 - [Security](SECURITY.md) — threat model, enforced invariants and known gaps

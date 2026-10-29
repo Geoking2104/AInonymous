@@ -12,6 +12,14 @@
 - Build both zome workspaces in CI.
 - Replace obsolete 0.6 and speculative documentation.
 
+## Workstreams (v1)
+
+The six product workstreams that turn the current demonstrations into something
+usable — Windows installer, Android SDK, real multi-node measurement, GPU/phone
+measurements, stealth transport mode, real-time revocation, and the external
+audit + pilot kit — are defined with measurable acceptance criteria, dependencies
+and sequencing in [`docs/chantiers-v1.md`](docs/chantiers-v1.md) (French).
+
 ## Next security gates
 
 1. End-to-end tests with two real 0.7 conductors and membrane-proof installation: **done**
