@@ -1,0 +1,19 @@
+# Context filter for deploy/containers/repro/Dockerfile.
+#
+# This image needs the zome sources, the packaging script and the hash registry,
+# which the repository-wide .dockerignore (a whitelist for the daemon image)
+# excludes. Build artifacts and VCS data are still irrelevant here.
+.git
+.github
+**/target
+**/node_modules
+**/*.wasm
+**/*.dna
+**/*.happ
+deploy/secrets
+site
+visualizer
+qwen3-codegen
+spike-android
+spike-android-gpu
+spike-windows

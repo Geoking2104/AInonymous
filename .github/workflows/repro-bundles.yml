@@ -1,0 +1,32 @@
+name: Reproducible bundles
+
+# Proves that the pinned DNA epoch can be rebuilt from scratch by anyone with
+# Docker: the image pins Rust 1.91.1, hc 0.7.0 (SHA-256 verified) and the build
+# path, then verifies the produced bundles against deploy/holochain/dna-hashes.json.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '43 4 * * 2'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dnas/**'
+      - 'deploy/holochain/**'
+      - 'deploy/containers/repro/**'
+      - 'scripts/build-happ.sh'
+      - '.github/workflows/repro-bundles.yml'
+
+jobs:
+  reproduce:
+    name: Rebuild bundles in the pinned image and verify hashes
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the reproducible bundle image
+        run: docker build --file deploy/containers/repro/Dockerfile --tag ainonymous-repro .
+
+      - name: Rebuild and verify the pinned epoch
+        run: docker run --rm ainonymous-repro
