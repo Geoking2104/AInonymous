@@ -11,6 +11,7 @@ members = [
     "crates/hybridnode-core",
     "crates/hybridnode-daemon",
     "tools/dna-hashes",
+    "tools/private-network-proof",
     # Phase 0 — spikes Relay GPU (voir docs/plan-phase-0-relay-gpu.md)
     "spike-release",
     "spike-quic",

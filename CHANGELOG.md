@@ -20,9 +20,6 @@ go/no-go decision.
 - Regression test proving that a refused mTLS client cannot consume a one-time
   session token (`crates/ainonymous-quic/tests/mtls_handshake.rs`) and the same
   scenario at spike level (`spike-quic/tests/two_nodes.rs`).
-
-### Added
-
 - Reproducible bundle build: `deploy/containers/repro/Dockerfile` rebuilds the
   pinned DNA epoch byte for byte on any host with Docker by mirroring the
   reference runner layout, and `.github/workflows/repro-bundles.yml` verifies it
@@ -32,6 +29,15 @@ go/no-go decision.
   epoch, and the recipe that removes it. The hashes reproduce only in the reference build environment; Windows
   builds with Rust 1.91 and 1.95 both yield different DNA hashes, so peers must
   install CI/release bundles rather than a local rebuild.
+- SG1 admission gate: `scripts/sg1/run_sg1.py` starts two real Holochain 0.7
+  conductors, builds the private DNA variant and the app bundle, and asserts that
+  a valid `PrivateNetworkProof` is admitted while a missing proof, a proof for
+  another agent, another network id or another admin key are refused. Run in CI
+  by the `SG1 two-conductor admission` job.
+- `tools/private-network-proof`: generates and offline-verifies the
+  `PrivateNetworkProof` bytes the integrity zome checks at genesis, filling the
+  gap left by the documentation ("generate a proof for the target agent and
+  network ID") with no tool.
 
 ### Changed
 

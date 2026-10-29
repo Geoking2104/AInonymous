@@ -5319,6 +5319,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "private-network-proof"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "serde",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

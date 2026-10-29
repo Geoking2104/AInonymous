@@ -156,6 +156,42 @@ jobs:
         working-directory: examples/pytorch
         run: python -m pytest tests/ -v
 
+  sg1-two-conductors:
+    name: SG1 two-conductor admission
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust 1.91 and WASM target
+        uses: dtolnay/rust-toolchain@1.91
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Holochain 0.7.0 tools with checksum verification
+        run: |
+          install -d .bin
+          curl --fail --location --silent --show-error \
+            https://github.com/holochain/holochain/releases/download/holochain-0.7.0/hc-x86_64-unknown-linux-gnu \
+            --output .bin/hc
+          echo "f1eca56b97bc2261324e00e0e86a274f7dc8363f73264e697fd0c0216b2aac23  .bin/hc" \
+            | sha256sum --check --strict
+          chmod 0755 .bin/hc
+          curl --fail --location --silent --show-error \
+            https://github.com/holochain/holochain/releases/download/holochain-0.7.0/holochain-x86_64-unknown-linux-gnu \
+            --output .bin/holochain
+          echo "ffa40a0c6fab5ce062c4af76328dfe2de143256ddf791a504d72bca698a9ba20  .bin/holochain" \
+            | sha256sum --check --strict
+          chmod 0755 .bin/holochain
+          .bin/hc --version
+          .bin/holochain --version
+
+      - name: Run the two-conductor admission test
+        env:
+          HC_BIN: ${{ github.workspace }}/.bin/hc
+          HOLOCHAIN_BIN: ${{ github.workspace }}/.bin/holochain
+        run: python3 scripts/sg1/run_sg1.py
+
   configuration:
     name: Configuration schemas
     runs-on: ubuntu-latest
