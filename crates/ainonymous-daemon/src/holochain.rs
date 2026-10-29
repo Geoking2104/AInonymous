@@ -715,7 +715,8 @@ impl HolochainClient {
 }
 
 // Cache simple pour la découverte DHT (Palier G : optimisation)
-static NODE_DISCOVERY_CACHE: Lazy<RwLock<HashMap<String, (Vec<NodeSummary>, Instant)>>> =
+type NodeDiscoveryCache = RwLock<HashMap<String, (Vec<NodeSummary>, Instant)>>;
+static NODE_DISCOVERY_CACHE: Lazy<NodeDiscoveryCache> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 const DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(30);
 

@@ -23,6 +23,12 @@ go/no-go decision.
 
 ### Changed
 
+- CI: Clippy now runs with `-D warnings` on all targets (`--all-targets`) for the
+  whole workspace; the lenient `-A dead_code -A unused` allowance is gone. The
+  seven warnings it surfaced are fixed (three `print_literal` in the CLI, a
+  redundant `use hex;`, `too_many_arguments` via a `PipelineInference` struct,
+  `manual_is_multiple_of`, and one `type_complexity` via a type alias).
+
 - `README.md`: `crates/ainonymous-types` added to the repository layout; the
   Phase-0 spike program recorded as merged (PR #38) instead of a draft PR; the
   `spike-quic` test count refreshed.

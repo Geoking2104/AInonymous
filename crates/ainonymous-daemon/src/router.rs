@@ -5,7 +5,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use hex;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -159,16 +158,16 @@ async fn mesh_infer(
             .await
         }
         ainonymous_types::ExecutionPlan::PipelineSplit { .. } => {
-            crate::conductor::run_pipeline_inference(
-                &s.holochain,
-                &s.conductor.pipeline,
-                &plan,
-                body.messages,
-                body.max_tokens,
-                &s.identity,
-                s.conductor.eos_token_id,
-                s.conductor.speculative_k,
-            )
+            crate::conductor::run_pipeline_inference(crate::conductor::PipelineInference {
+                holochain: &s.holochain,
+                pipeline: &s.conductor.pipeline,
+                plan: &plan,
+                messages: body.messages,
+                max_tokens: body.max_tokens,
+                identity: &s.identity,
+                eos_token_id: s.conductor.eos_token_id,
+                speculative_k: s.conductor.speculative_k,
+            })
             .await
         }
         other => Err(anyhow::anyhow!("plan non supporté: {:?}", other)),

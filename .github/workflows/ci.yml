@@ -37,8 +37,8 @@ jobs:
       - name: Test workspace
         run: cargo test --locked --workspace
 
-      - name: Run Clippy
-        run: cargo clippy --locked --workspace -- -A dead_code -A unused
+      - name: Run Clippy (warnings are errors)
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
   bundles:
     name: Holochain 0.7 bundles and hashes

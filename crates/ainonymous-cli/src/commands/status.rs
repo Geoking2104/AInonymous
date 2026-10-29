@@ -47,7 +47,7 @@ pub async fn show(api_url: &str) -> Result<()> {
     if let Ok(resp) = client.get(format!("{}/models", api_url)).send().await {
         if let Ok(models) = resp.json::<serde_json::Value>().await {
             println!("\n📦 Modèles disponibles");
-            println!("   {:<20} {:<10} {:<10} {}", "ID", "VRAM", "Contexte", "Nœuds");
+            println!("   {:<20} {:<10} {:<10} Nœuds", "ID", "VRAM", "Contexte");
             println!("   {}", "─".repeat(55));
             if let Some(data) = models["data"].as_array() {
                 for m in data {
