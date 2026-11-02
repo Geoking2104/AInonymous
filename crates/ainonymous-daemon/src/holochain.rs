@@ -47,10 +47,11 @@ pub struct HolochainClient {
     backend: Backend,
     membrane_proof: Option<Vec<u8>>,
     config: DaemonConfig,
+    revocations: Option<ainonymous_quic::revocation::RevocationGate>,
 }
 
 impl HolochainClient {
-    pub async fn connect(config: &DaemonConfig) -> Result<Self> {
+    pub async fn connect(config: &DaemonConfig, local_transport_key: [u8; 32]) -> Result<Self> {
         let membrane_proof = config.holochain.membrane_proof.clone();
 
         let backend = match config.holochain.backend {
@@ -93,8 +94,33 @@ impl HolochainClient {
             backend,
             membrane_proof: proof_bytes,
             config: config.clone(),
+            revocations: match &config.revocation {
+                Some(r) => {
+                    anyhow::ensure!(config.holochain.backend == crate::config::HolochainBackendKind::Conductor,
+                        "CH6 requires conductor backend; static admission has no authenticated agent bindings");
+                    let admin: [u8; 32] = hex::decode(&r.admin_pubkey)?.try_into()
+                        .map_err(|_| anyhow::anyhow!("CH6 admin_pubkey must be 32 bytes"))?;
+                    Some(ainonymous_quic::revocation::RevocationGate::new(r.network_id.clone(), admin,
+                        local_transport_key, r.cache_path.clone())?)
+                }
+                None => None,
+            },
         };
         Ok(client)
+    }
+
+    pub fn revocations(&self) -> Option<ainonymous_quic::revocation::RevocationGate> { self.revocations.clone() }
+
+    pub fn session_config(&self) -> ainonymous_quic::SessionConfig {
+        ainonymous_quic::SessionConfig { revocations: self.revocations.clone(), ..Default::default() }
+    }
+
+    pub async fn refresh_revocations(&self) -> Result<()> {
+        let Some(gate) = &self.revocations else { return Ok(()); };
+        let records = self.zome_call("agent-registry", "coordinator", "list_revocations", Value::Null).await?;
+        let bindings = self.zome_call("agent-registry", "coordinator", "list_transport_bindings", Value::Null).await?;
+        gate.refresh(serde_json::from_value(records)?, serde_json::from_value(bindings)?)?;
+        Ok(())
     }
 
     pub fn membrane_proof(&self) -> Option<&[u8]> {

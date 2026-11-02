@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+ainonymous-revocation = { path = "../ainonymous-revocation" }
 ainonymous-types = { path = "../ainonymous-types" }
 
 tokio = { workspace = true }

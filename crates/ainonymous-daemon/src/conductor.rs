@@ -74,6 +74,7 @@ pub async fn handle_pipeline_session(
         offer: offer.clone(),
         config: ainonymous_quic::SessionConfig::default(),
         established_at: std::time::Instant::now(),
+        active_revocation: None,
     };
 
     // Connexion vers le nœud suivant, négociée UNE fois puis réutilisée pour
@@ -86,6 +87,19 @@ pub async fn handle_pipeline_session(
     // Boucle de passes sur la MÊME connexion (prefill puis chaque decode).
     // Chaque passe = un transfert d'activations entrant + un token renvoyé.
     // La fin de requête est signalée par la fermeture de la connexion amont.
+    let result: Result<()> = tokio::select! {
+        reason = session.connection.closed() => {
+            if matches!(&reason, quinn::ConnectionError::ApplicationClosed(close) if close.error_code == 0u32.into()) {
+                Ok(())
+            } else {
+            let reason = holochain.revocations().and_then(|gate|
+                offer.client_pubkey.and_then(|key| gate.check(&key).err()))
+                .map(|e| e.to_string()).unwrap_or_else(|| reason.to_string());
+            tracing::warn!(status = "failed", reason = %reason, "pipeline job stopped");
+            Err(anyhow::anyhow!("session/job failed: {reason}"))
+            }
+        },
+        result = async {
     loop {
         let (header, raw_activations) = match ActivationTransfer::receive(&session).await {
             Ok(v) => v,
@@ -129,7 +143,7 @@ pub async fn handle_pipeline_session(
                 let ep = ainonymous_quic::create_endpoint(None, identity)
                     .await.context("endpoint QUIC client")?;
                 let s = QuicSession::connect(
-                    &ep, next_offer, ainonymous_quic::SessionConfig::default(), identity,
+                    &ep, next_offer, holochain.session_config(), identity,
                 ).await.context("connexion nœud suivant")?;
                 next_endpoint = Some(ep);
                 next_session = Some(s);
@@ -156,16 +170,31 @@ pub async fn handle_pipeline_session(
         }
     }
 
+    Ok(())
+        } => result,
+    };
+
+    // Close downstream immediately, before HTTP cancellation/cache cleanup.
+    if let Some(next) = next_session {
+        if let Err(error) = &result {
+            next.connection.close(0xC6u32.into(), error.to_string().as_bytes());
+        }
+        next.close();
+    }
+    drop(next_endpoint);
     // Fin de requête : purger le KV-cache local…
     if let Some(rid) = &last_request_id {
-        let _ = pipeline.clear(rid).await;
+        if let Err(error) = &result {
+            match tokio::time::timeout(std::time::Duration::from_secs(1), pipeline.cancel(rid, &error.to_string())).await {
+                Ok(Ok(())) => (),
+                other => tracing::error!("pipeline cancellation not acknowledged: {other:?}"),
+            }
+        }
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(1), pipeline.clear(rid)).await;
         debug!("KV-cache purgé pour {}", rid);
     }
-    // …et fermer la connexion aval (drop) → la purge se propage en cascade.
-    drop(next_session);
-    drop(next_endpoint);
 
-    Ok(())
+    result
 }
 
 // ── Côté COORDINATEUR : initiation de l'inférence pipeline (chaîne) ───────────
@@ -316,7 +345,7 @@ pub async fn run_pipeline_inference(params: PipelineInference<'_>) -> Result<Coo
     let _endpoint = ainonymous_quic::create_endpoint(None, identity)
         .await.context("endpoint QUIC coordinateur")?;
     let session = QuicSession::connect(
-        &_endpoint, offer, ainonymous_quic::SessionConfig::default(), identity,
+        &_endpoint, offer, holochain.session_config(), identity,
     ).await.context("connexion QUIC 1er étage")?;
 
     let budget = if max_tokens == 0 { 512 } else { max_tokens };

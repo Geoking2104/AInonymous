@@ -68,3 +68,5 @@ pub const COMPRESSION_THRESHOLD_BPS: u64 = 1_000_000_000;
 
 /// TTL d'un session token (30 secondes)
 pub const SESSION_TOKEN_TTL_SECS: u64 = 30;
+
+pub mod revocation;

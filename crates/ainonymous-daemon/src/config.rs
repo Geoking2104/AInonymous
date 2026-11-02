@@ -24,6 +24,8 @@ pub struct DaemonConfig {
     pub quic_advertise: Option<String>,
     #[serde(default)]
     pub holochain: HolochainConfig,
+    #[serde(default)]
+    pub revocation: Option<RevocationConfig>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
@@ -196,6 +198,7 @@ impl Default for DaemonConfig {
             pipeline_stages: Vec::new(),
             quic_advertise: None,
             holochain: HolochainConfig::default(),
+            revocation: None,
         }
     }
 }
@@ -255,4 +258,12 @@ mod tests {
         assert_ne!(config.holochain.admin_port, config.holochain.app_port);
         assert_ne!(config.holochain.app_port, config.daemon_port);
     }
+}
+
+/// Must match agent-registry DNA properties. None preserves the legacy epoch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevocationConfig {
+    pub network_id: String,
+    pub admin_pubkey: String,
+    pub cache_path: PathBuf,
 }

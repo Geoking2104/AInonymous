@@ -114,6 +114,7 @@ async fn serve(
     });
     // Activations sur les flux unidirectionnels.
     let session = QuicSession {
+        active_revocation: None,
         connection: conn.clone(),
         offer,
         config: SessionConfig::default(),
