@@ -62,6 +62,7 @@ pub fn build(
         .route("/mesh/blackboard/search", post(blackboard_search))
         // Plan de contrôle : négociation de session QUIC entre pairs
         .route("/mesh/session/negotiate", post(session_negotiate))
+        .route("/mesh/revocations", post(revoke_agent))
         // Coordinateur : inférence distribuée (pipeline-split)
         .route("/mesh/infer", post(mesh_infer))
         // Endpoints internes (zome calls via daemon)
@@ -102,6 +103,11 @@ async fn session_negotiate(
     State(s): State<DaemonState>,
     Json(body): Json<NegotiateBody>,
 ) -> impl IntoResponse {
+    if let Some(gate) = s.holochain.revocations() {
+        if let Err(e) = gate.check(&body.requester_pubkey) {
+            return (StatusCode::FORBIDDEN, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        }
+    }
     let mut offer = SessionOffer::new(s.quic_endpoint, body.layer_range);
     offer.next_agent_id = body.next_agent_id;
     offer.next_layer_range = body.next_layer_range;
@@ -111,7 +117,7 @@ async fn session_negotiate(
     offer.client_pubkey = Some(body.requester_pubkey);
 
     s.registry.register(offer.clone());
-    Json(offer)
+    Json(offer).into_response()
 }
 
 #[derive(Deserialize)]
@@ -399,4 +405,19 @@ async fn rotate_identity(State(s): State<DaemonState>) -> impl IntoResponse {
         "warrants_emitted": true,
     }))
     .into_response()
+}
+
+/// Local admin route: signature is verified before publication and independently on every peer.
+async fn revoke_agent(State(s): State<DaemonState>, Json(r): Json<ainonymous_quic::revocation::Revocation>) -> impl IntoResponse {
+    let Some(gate) = s.holochain.revocations() else {
+        return (StatusCode::SERVICE_UNAVAILABLE, "CH6 is not configured").into_response();
+    };
+    // Applying locally first is conservative if publication subsequently fails.
+    if let Err(e) = gate.apply(r.clone()) {
+        return (StatusCode::BAD_REQUEST, e.to_string()).into_response();
+    }
+    match s.holochain.zome_call("agent-registry", "coordinator", "revoke_agent", serde_json::json!(r)).await {
+        Ok(hash) => (StatusCode::CREATED, Json(serde_json::json!({"action_hash": hash}))).into_response(),
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("locally denied; DHT publication failed: {e}")).into_response(),
+    }
 }

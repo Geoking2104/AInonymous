@@ -5,6 +5,12 @@ use hdk::prelude::*;
 #[hdk_extern]
 pub fn announce_capabilities(caps: NodeCapabilities) -> ExternResult<ActionHash> {
     let hash = create_entry(EntryTypes::NodeCapabilities(caps.clone()))?;
+    create_link(
+        bindings_anchor()?,
+        hash.clone(),
+        LinkTypes::TransportBindings,
+        (),
+    )?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Lier l'agent à ses capacités
@@ -94,7 +100,7 @@ pub fn get_available_nodes(model_id: String) -> ExternResult<Vec<NodeSummary>> {
                 .iter()
                 .max_by_key(|link| link.timestamp)
                 .and_then(|l| {
-                    let age_ms = now_ms as i64 - l.timestamp.as_millis() as i64;
+                    let age_ms = now_ms - l.timestamp.as_millis();
                     if age_ms < 60_000 {
                         // heartbeat < 60 secondes
                         l.target.clone().into_action_hash()
@@ -188,4 +194,74 @@ pub struct NodeSummary {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateQuicInput {
     pub endpoint: String,
+}
+
+/// Admin-signed, monotonic mesh removal. Every DHT validator verifies the signature.
+#[hdk_extern]
+pub fn revoke_agent(revocation: Revocation) -> ExternResult<ActionHash> {
+    let author = agent_info()?.agent_initial_pubkey;
+    if let ValidateCallbackResult::Invalid(reason) = validate_revocation(&revocation, &author)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(reason)));
+    }
+    let hash = create_entry(EntryTypes::Revocation(RevocationEntry { revocation }))?;
+    create_link(
+        revocations_anchor()?,
+        hash.clone(),
+        LinkTypes::Revocations,
+        (),
+    )?;
+    // Polling is authoritative; signals are an optional latency optimisation.
+    emit_signal(hash.clone())?;
+    Ok(hash)
+}
+
+#[hdk_extern]
+pub fn list_revocations(_: ()) -> ExternResult<Vec<Revocation>> {
+    let links = get_links(
+        LinkQuery::try_new(revocations_anchor()?, LinkTypes::Revocations)?,
+        GetStrategy::default(),
+    )?;
+    let mut out = Vec::new();
+    for link in links {
+        if let Some(hash) = link.target.into_action_hash() {
+            let record = get(hash, GetOptions::default())?.ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("CH6 snapshot incomplete".into()))
+            })?;
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<RevocationEntry>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?
+            {
+                out.push(entry.revocation);
+            }
+        }
+    }
+    Ok(out)
+}
+
+#[hdk_extern]
+pub fn list_transport_bindings(_: ()) -> ExternResult<Vec<TransportBinding>> {
+    let links = get_links(
+        LinkQuery::try_new(bindings_anchor()?, LinkTypes::TransportBindings)?,
+        GetStrategy::default(),
+    )?;
+    let mut out = Vec::new();
+    for link in links {
+        if let Some(hash) = link.target.into_action_hash() {
+            let record = get(hash, GetOptions::default())?.ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("CH6 bindings incomplete".into()))
+            })?;
+            if let Some(caps) = record
+                .entry()
+                .to_app_option::<NodeCapabilities>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?
+            {
+                out.push(TransportBinding {
+                    agent_id: record.action().author().to_string(),
+                    node_pubkey: caps.node_pubkey,
+                });
+            }
+        }
+    }
+    Ok(out)
 }

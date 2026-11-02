@@ -66,6 +66,7 @@ impl SessionOffer {
 /// Configuration d'une session QUIC
 #[derive(Debug, Clone)]
 pub struct SessionConfig {
+    pub revocations: Option<crate::revocation::RevocationGate>,
     pub connect_timeout: Duration,
     pub stream_timeout: Duration,
     pub bandwidth_bps: Option<u64>, // estimé pour décider de la compression
@@ -75,6 +76,7 @@ pub struct SessionConfig {
 impl Default for SessionConfig {
     fn default() -> Self {
         Self {
+            revocations: None,
             connect_timeout: Duration::from_secs(5),
             stream_timeout: Duration::from_secs(30),
             bandwidth_bps: None,
@@ -89,6 +91,7 @@ pub struct QuicSession {
     pub offer: SessionOffer,
     pub config: SessionConfig,
     pub established_at: Instant,
+    pub active_revocation: Option<crate::revocation::ActiveSession>,
 }
 
 impl QuicSession {
@@ -113,6 +116,10 @@ impl QuicSession {
         let expected_peer_key = offer.peer_pubkey.ok_or_else(|| {
             QuicError::ConnectFailed("offre QUIC non authentifiée: peer_pubkey manquante".into())
         })?;
+
+        if let Some(gate) = &config.revocations {
+            gate.check(&expected_peer_key)?;
+        }
 
         // mTLS : on présente notre certificat ed25519 et on vérifie que le
         // certificat serveur porte la clé attendue (offer.peer_pubkey).
@@ -141,6 +148,12 @@ impl QuicSession {
         .map_err(|_| QuicError::ConnectTimeout)?
         .map_err(|e| QuicError::ConnectFailed(e.to_string()))?;
 
+        // Recheck after the await and register atomically before sending credentials.
+        let active = match &config.revocations {
+            Some(gate) => Some(gate.track(expected_peer_key, conn.clone())?),
+            None => None,
+        };
+
         // Authentifier avec le session token
         let mut auth_stream = conn
             .open_uni()
@@ -161,6 +174,7 @@ impl QuicSession {
             offer,
             config,
             established_at: Instant::now(),
+            active_revocation: active,
         })
     }
 

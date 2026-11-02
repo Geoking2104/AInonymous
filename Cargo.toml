@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/ainonymous-revocation",
     "crates/ainonymous-types",
     "crates/ainonymous-proxy",
     "crates/ainonymous-quic",

@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
 
     // Connexion au conducteur Holochain
     info!("Connexion au conducteur Holochain...");
-    let holochain = holochain::HolochainClient::connect(&config).await?;
+    let holochain = holochain::HolochainClient::connect(&config, identity.public_key_bytes()).await?;
 
     // Annoncer les capacités de ce nœud dans le DHT, y compris la pubkey ed25519
     // pour le pinning mTLS (palier D). Non-fatal hors Holochain.
@@ -89,7 +89,28 @@ async fn main() -> Result<()> {
 
     // Démarrer le listener QUIC (data plane, mTLS ed25519)
     let quic_addr = format!("0.0.0.0:{}", config.quic_port).parse()?;
-    let quic_listener = ainonymous_quic::QuicListener::new(quic_addr, &identity).await?;
+    let mut quic_listener = ainonymous_quic::QuicListener::new(quic_addr, &identity).await?;
+    if let Some(gate) = holochain.revocations() {
+        // Startup is fail-closed: cached removals alone cannot prove freshness.
+        tokio::time::timeout(std::time::Duration::from_secs(3), holochain.refresh_revocations()).await??;
+        quic_listener.set_revocations(gate.clone());
+        let watchdog = gate.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
+            loop { interval.tick().await; watchdog.enforce(); }
+        });
+        let refresh_client = holochain.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+            loop {
+                interval.tick().await;
+                match tokio::time::timeout(std::time::Duration::from_secs(1), refresh_client.refresh_revocations()).await {
+                    Ok(Ok(())) => (),
+                    other => warn!("CH6 refresh failed: {other:?}"),
+                }
+            }
+        });
+    }
     let quic_addr_public = quic_listener.local_addr()?;
     info!("QUIC listener sur {}", quic_addr_public);
 
