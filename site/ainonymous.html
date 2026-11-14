@@ -305,6 +305,7 @@
     <a href="#comment">Comment ça marche</a>
     <a href="#pourquoi">Pourquoi nous</a>
     <a href="#installer">Installer</a>
+    <a href="#mesh">État du mesh</a>
     <a href="#hybridnode">HybridNode</a>
     <a href="#enterprise">Enterprise</a>
     <a href="https://github.com/Geoking2104/AInonymous">GitHub</a>
@@ -315,7 +316,7 @@
 <div class="hero">
   <div class="hero-badge">
     <div class="dot"></div>
-    <span>Open source · Apache 2.0 · Palier F terminé · Palier G en cours</span>
+    <span>Open source · Apache 2.0 · Alpha · Holochain 0.7 · Phase 0 en cours</span>
   </div>
   <h1>L'IA puissante,<br><span style="color:var(--accent)">sans serveur.</span><br><span style="color:var(--accent2)">Sans compte.</span></h1>
   <p class="hero-sub">
@@ -426,6 +427,91 @@ cargo build --release
   </p>
 </div>
 
+<div class="section" id="mesh">
+  <div class="lang-switch" style="display:inline-flex; margin-bottom:20px;">
+    <a href="#" id="mesh-btn-fr" class="active" onclick="meshLang('fr');return false;">FR</a>
+    <a href="#" id="mesh-btn-en" onclick="meshLang('en');return false;">EN</a>
+  </div>
+
+  <div id="mesh-fr">
+    <div class="eyebrow">Intégration mesh · état au 15 novembre 2026</div>
+    <h2>Où en est le mesh ?</h2>
+    <p class="section-sub">Holochain coordonne (identité, admission, découverte, plan d'exécution) ; QUIC/mTLS transporte les activations entre pairs. Les briques sont en place et testées, mais le calcul réparti n'a <strong>pas encore été mesuré sur plusieurs machines réelles</strong>. Seul ce qui est prouvé dans le dépôt est marqué comme fait.</p>
+
+    <table>
+      <thead>
+        <tr><th>Fait</th><th>Preuve</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Plan de contrôle Holochain 0.7 : hApp <code>ainonymous-core</code> (DNA <code>inference-mesh</code>, <code>agent-registry</code>, <code>blackboard</code>) + hApp HybridNode, epoch DNA v3 épinglé</td><td class="col ok">✓ bundles reconstruits octet pour octet et comparés au registre — <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/DNA_HASHES.md">DNA_HASHES.md</a>, CI « Reproducible bundles »</td></tr>
+        <tr><td>Admission au mesh privé par preuve de membrane, avec deux conducteurs réels</td><td class="col ok">✓ preuve valide admise ; preuve absente, autre agent, autre réseau ou autre clé admin refusés — <a href="https://github.com/Geoking2104/AInonymous/blob/main/scripts/sg1/README.md">scripts/sg1</a>, CI « SG1 two-conductor admission »</td></tr>
+        <tr><td>Liaison clé QUIC ↔ agent Holochain lors de la négociation de session</td><td class="col ok">✓ la zome <code>inference-mesh</code> vérifie que la clé de transport fournie appartient aux capacités publiées par l'appelant</td></tr>
+        <tr><td>Plan de données QUIC / TLS 1.3 avec mTLS strict</td><td class="col ok">✓ vérification stricte non désactivable ; jeton de session consommé seulement après vérification de la clé client — <code>crates/ainonymous-quic/tests/mtls_handshake.rs</code></td></tr>
+        <tr><td>Découverte des nœuds « fail-closed »</td><td class="col ok">✓ une panne du conducteur est fatale : plus de repli silencieux vers une découverte statique</td></tr>
+        <tr><td>Équivalence du découpage en étages (pipeline)</td><td class="col ok">✓ 2 étages : écart nul sur les logits, 16 jetons identiques au nœud unique — <strong>sur une seule machine</strong> (<a href="https://github.com/Geoking2104/AInonymous/blob/main/spike-pipeline/README.md">spike-pipeline</a>)</td></tr>
+        <tr><td>Transport d'activations QUIC entre deux nœuds</td><td class="col ok">✓ 7 tests ; mesures <strong>en boucle locale uniquement</strong>, non représentatives d'un LAN (<a href="https://github.com/Geoking2104/AInonymous/blob/main/spike-quic/README.md">spike-quic</a>)</td></tr>
+      </tbody>
+    </table>
+
+    <table style="margin-top:40px;">
+      <thead>
+        <tr><th>Priorité</th><th>Reste à faire</th><th>Suivi</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>P1</strong></td><td>Mesurer le calcul réparti sur au moins deux machines physiques (LAN, puis Tailscale/VPN) : TTFT, tok/s, perte d'un nœud — portes G4/G7/G8</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/50">CH3 #50</a> · <a href="https://github.com/Geoking2104/AInonymous/issues/30">S4 #30</a> — bloqué par l'accès à une 2ᵉ machine</td></tr>
+        <tr><td><strong>P1</strong></td><td>Bootstrap et relais privés opérés par l'administrateur du mesh (aujourd'hui : valeurs publiques par défaut de Holochain)</td><td>Reste ouvert de la porte SG1 (<a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a>) ; décision d'hébergement du relais</td></tr>
+        <tr><td><strong>P1</strong></td><td>Finir le câblage proxy ↔ daemon : port de l'API du daemon, format de la liste des nœuds, métriques d'inférence pas encore publiées sur le DHT, nombre de nœuds fixe dans <code>/v1/models</code></td><td><code>crates/ainonymous-proxy</code>, <code>crates/ainonymous-daemon/src/router.rs</code></td></tr>
+        <tr><td><strong>P2</strong></td><td>Révocation en temps réel d'un membre (deny list, arrêt du job en cours, objectif &lt; 5 s)</td><td><a href="https://github.com/Geoking2104/AInonymous/pull/57">PR #57</a> en brouillon (nouvel epoch du registre) ; mesure du délai en attente du banc CH3 — <a href="https://github.com/Geoking2104/AInonymous/issues/53">CH6 #53</a></td></tr>
+        <tr><td><strong>P2</strong></td><td>Tests négatifs restants : rejeu de preuve entre réseaux, mauvaise clé de transport, capacités périmées ; fuzzing des trames et de la contre-pression</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/32">#32</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a></td></tr>
+        <tr><td><strong>P2</strong></td><td>Plans MoE (<code>ExpertShard</code>) : calculés par la zome mais pas encore exécutés par le daemon</td><td><code>crates/ainonymous-daemon/src/router.rs</code></td></tr>
+        <tr><td><strong>P3</strong></td><td>Mesures GPU Windows et téléphone, mode furtif, adaptateurs SD-WAN de production (seul le mock existe), quotas et autorisation hors loopback, audit externe</td><td><a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/chantiers-v1.md">chantiers v1</a> (CH4, CH5, CH7)</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Non revendiqué : inférence multi-nœuds sur matériel réel, mesures GPU/téléphone, anonymat, révocation, quotas, audit indépendant. Détails : <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a>, <a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a> et <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/chantiers-v1.md">chantiers v1</a>.
+    </p>
+  </div>
+
+  <div id="mesh-en" style="display:none;">
+    <div class="eyebrow">Mesh integration · status as of November 15, 2026</div>
+    <h2>Where does the mesh stand?</h2>
+    <p class="section-sub">Holochain coordinates (identity, admission, discovery, execution plan); QUIC/mTLS carries activations between peers. The building blocks are in place and tested, but distributed inference has <strong>not yet been measured across several real machines</strong>. Only what is proven in the repository is marked as done.</p>
+
+    <table>
+      <thead>
+        <tr><th>Done</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Holochain 0.7 control plane: <code>ainonymous-core</code> hApp (<code>inference-mesh</code>, <code>agent-registry</code>, <code>blackboard</code> DNAs) + HybridNode hApp, pinned DNA epoch v3</td><td class="col ok">✓ bundles rebuilt byte for byte and checked against the registry — <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/DNA_HASHES.md">DNA_HASHES.md</a>, CI “Reproducible bundles”</td></tr>
+        <tr><td>Private-mesh admission by membrane proof, with two real conductors</td><td class="col ok">✓ valid proof admitted; missing proof, other agent, other network or other admin key refused — <a href="https://github.com/Geoking2104/AInonymous/blob/main/scripts/sg1/README.md">scripts/sg1</a>, CI “SG1 two-conductor admission”</td></tr>
+        <tr><td>QUIC key ↔ Holochain agent binding during session negotiation</td><td class="col ok">✓ the <code>inference-mesh</code> zome checks that the supplied transport key belongs to the caller's published capabilities</td></tr>
+        <tr><td>QUIC / TLS 1.3 data plane with strict mTLS</td><td class="col ok">✓ strict verification cannot be disabled; the session token is consumed only after the client key is verified — <code>crates/ainonymous-quic/tests/mtls_handshake.rs</code></td></tr>
+        <tr><td>Fail-closed node discovery</td><td class="col ok">✓ a conductor failure is fatal: no more silent fallback to static discovery</td></tr>
+        <tr><td>Pipeline-split equivalence</td><td class="col ok">✓ 2 stages: zero logit difference, 16 tokens identical to a single node — <strong>on one machine</strong> (<a href="https://github.com/Geoking2104/AInonymous/blob/main/spike-pipeline/README.md">spike-pipeline</a>)</td></tr>
+        <tr><td>QUIC activation transport between two nodes</td><td class="col ok">✓ 7 tests; measurements <strong>on loopback only</strong>, not LAN-representative (<a href="https://github.com/Geoking2104/AInonymous/blob/main/spike-quic/README.md">spike-quic</a>)</td></tr>
+      </tbody>
+    </table>
+
+    <table style="margin-top:40px;">
+      <thead>
+        <tr><th>Priority</th><th>Still to do</th><th>Tracking</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>P1</strong></td><td>Measure distributed inference on at least two physical machines (LAN, then Tailscale/VPN): TTFT, tok/s, node loss — gates G4/G7/G8</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/50">CH3 #50</a> · <a href="https://github.com/Geoking2104/AInonymous/issues/30">S4 #30</a> — blocked on access to a 2nd machine</td></tr>
+        <tr><td><strong>P1</strong></td><td>Private bootstrap and relay operated by the mesh administrator (today: Holochain's public defaults)</td><td>Still open part of the SG1 gate (<a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a>); relay hosting decision</td></tr>
+        <tr><td><strong>P1</strong></td><td>Finish proxy ↔ daemon wiring: daemon API port, node-list format, inference metrics not yet published to the DHT, fixed node count in <code>/v1/models</code></td><td><code>crates/ainonymous-proxy</code>, <code>crates/ainonymous-daemon/src/router.rs</code></td></tr>
+        <tr><td><strong>P2</strong></td><td>Real-time member revocation (deny list, stop the running job, target &lt; 5 s)</td><td><a href="https://github.com/Geoking2104/AInonymous/pull/57">PR #57</a> in draft (new registry epoch); latency measurement waits for the CH3 bench — <a href="https://github.com/Geoking2104/AInonymous/issues/53">CH6 #53</a></td></tr>
+        <tr><td><strong>P2</strong></td><td>Remaining negative tests: cross-network proof replay, wrong transport key, stale capabilities; frame and backpressure fuzzing</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/32">#32</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a></td></tr>
+        <tr><td><strong>P2</strong></td><td>MoE plans (<code>ExpertShard</code>): computed by the zome but not yet executed by the daemon</td><td><code>crates/ainonymous-daemon/src/router.rs</code></td></tr>
+        <tr><td><strong>P3</strong></td><td>Windows GPU and phone measurements, stealth mode, production SD-WAN adapters (only the mock exists), non-loopback quotas and authorization, external audit</td><td><a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/chantiers-v1.md">v1 workstreams</a> (CH4, CH5, CH7)</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Not claimed: multi-node inference on real hardware, GPU/phone measurements, anonymity, revocation, quotas, independent audit. Details: <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a>, <a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a> and <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/chantiers-v1.md">v1 workstreams</a>.
+    </p>
+  </div>
+</div>
+
 <div class="section" id="hybridnode">
   <div class="lang-switch" style="display:inline-flex; margin-bottom:20px;">
     <a href="#" id="hn-btn-fr" class="active" onclick="hnLang('fr');return false;">FR</a>
@@ -473,22 +559,23 @@ cargo build --release
 
     <div class="eyebrow" style="margin-top:56px;">Réseau fermé</div>
     <h2 style="font-size:clamp(24px,3.2vw,34px);">Mode privé : l'opposé du mesh public</h2>
-    <p class="section-sub" style="margin-bottom:24px;">Par défaut, AInonymous est un mesh public et anonyme — n'importe qui rejoint le DHT sans autorisation. HybridNode permet aussi l'inverse : un réseau <strong>fermé</strong>, où l'admission exige une preuve cryptographique (Membrane Proof) signée par un administrateur — pour un consortium d'entreprise multi-sites, un groupement de recherche, ou tout déploiement où le contrôle d'accès prime sur l'ouverture.</p>
+    <p class="section-sub" style="margin-bottom:24px;">Le mode public reste expérimental (réservé au développement) et ne fournit pas d'anonymat réseau. HybridNode permet aussi l'inverse : un réseau <strong>fermé</strong>, où l'admission exige une preuve cryptographique (Membrane Proof) signée par un administrateur — pour un consortium d'entreprise multi-sites, un groupement de recherche, ou tout déploiement où le contrôle d'accès prime sur l'ouverture.</p>
 
     <table>
       <thead>
         <tr><th>Composant du mode privé</th><th>Statut réel</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>MembraneProofConfig</code> + injection automatique dans les appels de zome</td><td class="col ok">✓ codé et fonctionnel</td></tr>
-        <tr><td>Admission gate dans le zome d'intégrité (feature <code>private-network</code>)</td><td class="col ok">✓ vérifie la signature ed25519 de la preuve contre la clé d'administrateur réseau configurée dans <code>dna.yaml</code></td></tr>
-        <tr><td>Installation d'une hApp avec preuve, côté conducteur</td><td class="no">✗ non fonctionnel actuellement (API holochain_client changée)</td></tr>
-        <tr><td>Expiration / anti-rejeu de la preuve</td><td class="no">✗ champ présent, non vérifié — pas d'accès horloge vérifié dans HDI</td></tr>
+        <tr><td>Admission à la genèse dans le zome d'intégrité</td><td class="col ok">✓ toujours active (lue dans les propriétés de la DNA, plus optionnelle à la compilation) ; signature ed25519 vérifiée contre la clé d'administrateur, preuve liée à l'agent et au <code>network_id</code></td></tr>
+        <tr><td>Installation d'une hApp avec preuve, côté conducteur</td><td class="col ok">✓ via les <em>role settings</em> de Holochain 0.7 ; testé avec deux conducteurs réels (CI « SG1 »)</td></tr>
+        <tr><td>Outil de génération / vérification de preuve</td><td class="col ok">✓ <code>tools/private-network-proof</code></td></tr>
+        <tr><td>Bootstrap / relais privés opérés par l'administrateur</td><td class="no">✗ pas encore : les conducteurs utilisent les valeurs publiques par défaut</td></tr>
+        <tr><td>Expiration / révocation de la preuve</td><td class="no">✗ l'expiration n'est qu'un contrôle à l'émission (horloge non fiable à la genèse) ; révocation en temps réel en cours (PR #57, brouillon)</td></tr>
         <tr><td>Proof-of-work à l'admission, liste blanche d'agents</td><td class="no">✗ pas implémenté — architecture cible uniquement</td></tr>
       </tbody>
     </table>
     <p style="margin-top:16px; margin-bottom:48px; color:var(--muted); font-size:14px;">
-      Direction d'architecture réelle et partiellement codée, pas une fonctionnalité clé-en-main — la vérification cryptographique de la preuve à l'admission reste le chaînon manquant avant un déploiement en consortium fermé.
+      L'admission par preuve fonctionne et est testée en CI ; ce n'est pas encore une fonctionnalité clé-en-main — relais privés, révocation et audit restent à faire avant un déploiement en consortium fermé.
     </p>
 
     <div class="eyebrow">Positionnement</div>
@@ -503,7 +590,7 @@ cargo build --release
         <tr><td>Identité & confiance</td><td class="no">Secret partagé, coordinateur central, ou swarm public ouvert à l'abus</td><td class="col ok">Identité ed25519 auto-certifiante par nœud, aucun tiers</td></tr>
         <tr><td>Comportement invalide</td><td class="no">Non modélisé</td><td class="col ok">Warrant signé publié dans le DHT, expirable, contestable</td></tr>
         <tr><td>Réseau physique (WAN/QoS)</td><td class="no">Non intégré chez les 4</td><td class="col ok">Couche HybridNode : SLA par lien, QoS DSCP 46, scoring géographique</td></tr>
-        <tr><td>Backend inférence</td><td>PyTorch custom (Petals) ou llama.cpp RPC (SharedLLM)</td><td class="col ok">llama.cpp patché nativement — pipeline-split vérifié bit-exact à 2 et 3 nœuds</td></tr>
+        <tr><td>Backend inférence</td><td>PyTorch custom (Petals) ou llama.cpp RPC (SharedLLM)</td><td class="col ok">llama.cpp patché nativement — découpage à 2 étages identique au modèle entier sur un petit modèle de test (une seule machine)</td></tr>
       </tbody>
     </table>
 
@@ -520,7 +607,7 @@ cargo build --release
     </table>
 
     <p style="margin-top:24px; color:var(--muted); font-size:14px;">
-      Ce comparatif ne dit pas tout : AInonymous est expérimental. Le support GPU/MoE du pipeline natif n'est pas fini, le mTLS n'est pas encore strict de bout en bout, et rien ici n'a l'ancienneté d'usage de Petals. Détails vérifiés : <a href="https://github.com/Geoking2104/AInonymous/blob/main/DISCLAIMER.md">DISCLAIMER.md</a> et <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a> sur GitHub.
+      Ce comparatif ne dit pas tout : AInonymous est expérimental. Le support GPU/MoE du pipeline natif n'est pas fini, le calcul réparti n'a pas encore été mesuré sur plusieurs machines réelles, et rien ici n'a l'ancienneté d'usage de Petals. Détails vérifiés : <a href="https://github.com/Geoking2104/AInonymous/blob/main/DISCLAIMER.md">DISCLAIMER.md</a> et <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a> sur GitHub.
     </p>
 
     <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
@@ -535,7 +622,7 @@ bash scripts/hybridnode/init_project.sh mon-projet
 hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
     </div>
     <p style="margin-top:24px; color:var(--muted); font-size:14px;">
-      Documentation complète : <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/HYBRIDNODE.md">docs/HYBRIDNODE.md</a> sur GitHub.
+      Documentation complète : <a href="https://github.com/Geoking2104/AInonymous/blob/main/HYBRIDNODE_APPLY.md">HYBRIDNODE_APPLY.md</a> sur GitHub.
     </p>
   </div>
 
@@ -580,22 +667,23 @@ hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
 
     <div class="eyebrow" style="margin-top:56px;">Closed network</div>
     <h2 style="font-size:clamp(24px,3.2vw,34px);">Private mode: the opposite of the public mesh</h2>
-    <p class="section-sub" style="margin-bottom:24px;">By default, AInonymous is a public, anonymous mesh — anyone can join the DHT without authorization. HybridNode also supports the opposite: a <strong>closed</strong> network where admission requires a cryptographic proof (Membrane Proof) signed by an administrator — for a multi-site enterprise consortium, a research group, or any deployment where access control matters more than public openness.</p>
+    <p class="section-sub" style="margin-bottom:24px;">Public mode remains experimental (development only) and provides no network anonymity. HybridNode also supports the opposite: a <strong>closed</strong> network where admission requires a cryptographic proof (Membrane Proof) signed by an administrator — for a multi-site enterprise consortium, a research group, or any deployment where access control matters more than public openness.</p>
 
     <table>
       <thead>
         <tr><th>Private mode component</th><th>Actual status</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>MembraneProofConfig</code> + automatic injection into zome calls</td><td class="col ok">✓ coded and working</td></tr>
-        <tr><td>Admission gate in the integrity zome (<code>private-network</code> feature)</td><td class="col ok">✓ verifies the proof's ed25519 signature against the network admin key configured in <code>dna.yaml</code></td></tr>
-        <tr><td>Installing a hApp with a proof, conductor-side</td><td class="yes">✓ implemented with Holochain 0.7 role settings</td></tr>
-        <tr><td>Proof expiration / replay protection</td><td class="no">✗ field present, not yet checked — no verified clock access in HDI</td></tr>
+        <tr><td>Genesis admission in the integrity zome</td><td class="col ok">✓ always on (read from DNA properties, no longer a compile-time option); ed25519 signature checked against the admin key, proof bound to the agent and <code>network_id</code></td></tr>
+        <tr><td>Installing a hApp with a proof, conductor-side</td><td class="col ok">✓ via Holochain 0.7 role settings; tested with two real conductors (CI “SG1”)</td></tr>
+        <tr><td>Proof generation / verification tool</td><td class="col ok">✓ <code>tools/private-network-proof</code></td></tr>
+        <tr><td>Private bootstrap / relay operated by the administrator</td><td class="no">✗ not yet: conductors use the public defaults</td></tr>
+        <tr><td>Proof expiration / revocation</td><td class="no">✗ expiry is only an issuance control (clock not trusted at genesis); real-time revocation in progress (PR #57, draft)</td></tr>
         <tr><td>Proof-of-work at admission, trusted-agent allowlist</td><td class="no">✗ not implemented — target architecture only</td></tr>
       </tbody>
     </table>
     <p style="margin-top:16px; margin-bottom:48px; color:var(--muted); font-size:14px;">
-      A real, partially-coded architecture direction, not an off-the-shelf feature yet — cryptographic verification of the admission proof is the missing link before any closed-consortium deployment.
+      Proof-based admission works and is tested in CI; it is not an off-the-shelf feature yet — private relays, revocation and an audit are still needed before any closed-consortium deployment.
     </p>
 
     <div class="eyebrow">Positioning</div>
@@ -610,7 +698,7 @@ hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
         <tr><td>Identity & trust</td><td class="no">Shared secret, central coordinator, or public swarm open to abuse</td><td class="col ok">Self-certifying ed25519 identity per node, no third party</td></tr>
         <tr><td>Invalid behavior</td><td class="no">Not modeled</td><td class="col ok">Signed Warrant published to the DHT, expirable, contestable</td></tr>
         <tr><td>Physical network (WAN/QoS)</td><td class="no">Not integrated by any of the four</td><td class="col ok">HybridNode layer: per-link SLA, DSCP 46 QoS marking, geo-aware scoring</td></tr>
-        <tr><td>Inference backend</td><td>Custom PyTorch (Petals) or llama.cpp RPC (SharedLLM)</td><td class="col ok">Natively patched llama.cpp — pipeline-split verified bit-exact at 2 and 3 nodes</td></tr>
+        <tr><td>Inference backend</td><td>Custom PyTorch (Petals) or llama.cpp RPC (SharedLLM)</td><td class="col ok">Natively patched llama.cpp — 2-stage split identical to the full model on a small test model (one machine)</td></tr>
       </tbody>
     </table>
 
@@ -627,7 +715,7 @@ hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
     </table>
 
     <p style="margin-top:24px; color:var(--muted); font-size:14px;">
-      This comparison doesn't tell the whole story: AInonymous is experimental. GPU/MoE support for the native pipeline isn't finished, mTLS isn't strict end-to-end yet, and nothing here has Petals' track record. Verified details: <a href="https://github.com/Geoking2104/AInonymous/blob/main/DISCLAIMER.md">DISCLAIMER.md</a> and the <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a> on GitHub.
+      This comparison doesn't tell the whole story: AInonymous is experimental. GPU/MoE support for the native pipeline isn't finished, distributed inference hasn't been measured on several real machines yet, and nothing here has Petals' track record. Verified details: <a href="https://github.com/Geoking2104/AInonymous/blob/main/DISCLAIMER.md">DISCLAIMER.md</a> and the <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a> on GitHub.
     </p>
 
     <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
@@ -642,7 +730,7 @@ bash scripts/hybridnode/init_project.sh myproject
 hybridnode --config hybridnode/configs/myproject.hybridnode.yaml</pre>
     </div>
     <p style="margin-top:24px; color:var(--muted); font-size:14px;">
-      Full documentation: <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/HYBRIDNODE.md">docs/HYBRIDNODE.md</a> on GitHub.
+      Full documentation: <a href="https://github.com/Geoking2104/AInonymous/blob/main/HYBRIDNODE_APPLY.md">HYBRIDNODE_APPLY.md</a> on GitHub.
     </p>
   </div>
 </div>
@@ -1673,6 +1761,12 @@ hybridnode --config hybridnode/configs/myproject.hybridnode.yaml</pre>
 </footer>
 
 <script>
+  function meshLang(lang) {
+    document.getElementById('mesh-fr').style.display = lang === 'fr' ? 'block' : 'none';
+    document.getElementById('mesh-en').style.display = lang === 'en' ? 'block' : 'none';
+    document.getElementById('mesh-btn-fr').classList.toggle('active', lang === 'fr');
+    document.getElementById('mesh-btn-en').classList.toggle('active', lang === 'en');
+  }
   function hnLang(lang) {
     document.getElementById('hn-fr').style.display = lang === 'fr' ? 'block' : 'none';
     document.getElementById('hn-en').style.display = lang === 'en' ? 'block' : 'none';
