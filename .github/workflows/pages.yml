@@ -1,0 +1,52 @@
+name: Website (GitHub Pages)
+
+# Publishes the static website in site/ to GitHub Pages.
+# Prerequisite (one-time, repository owner): Settings → Pages → Build and
+# deployment → Source = "GitHub Actions". While the source is still the legacy
+# gh-pages branch, the deploy job fails and the live site keeps serving gh-pages.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Package site/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required pages
+        run: |
+          for f in index.html index.en.html 404.html setup-guide.js setup-guide.css; do
+            test -f "site/$f" || { echo "missing site/$f" >&2; exit 1; }
+          done
+          node --check site/setup-guide.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -496,6 +496,7 @@
       50%       { transform: translate(20px, -25px); }
     }
   </style>
+  <link rel="stylesheet" href="setup-guide.css" />
 </head>
 <body>
 
@@ -513,7 +514,8 @@
       <li><a href="#features">Features</a></li>
       <li><a href="#models">Models</a></li>
       <li><a href="#install">Install</a></li>
-      <li><a href="https://github.com/ainonymous/ainonymous" class="nav-cta">GitHub →</a></li>
+      <li><a href="#join">Setup guide</a></li>
+      <li><a href="https://github.com/Geoking2104/AInonymous" class="nav-cta">GitHub →</a></li>
     </ul>
   </nav>
 
@@ -522,7 +524,7 @@
     <div class="hero-content">
       <div class="badge">
         <span class="badge-dot"></span>
-        Public network · No signup required
+        Alpha · Holochain 0.7 · No online account
       </div>
 
       <h1>
@@ -888,7 +890,7 @@
   <section id="install">
     <div class="section-header">
       <div class="section-tag">Installation</div>
-      <h2>Up and running in 2 minutes</h2>
+      <h2>Get started from source</h2>
       <p>Requirements: Rust 1.91+, Holochain 0.7.0 CLI, llama.cpp</p>
     </div>
 
@@ -903,39 +905,37 @@
 
           <div id="tab-quick" class="install-step active">
             <div class="code-block">
-<span class="comment"># 1. Install binaries</span>
-cargo install ainonymous-cli ainonymous-daemon ainonymous-proxy ainonymous-mcp
+<span class="comment"># 1. Clone the repository</span>
+git clone https://github.com/Geoking2104/AInonymous.git
+cd AInonymous
 
-<span class="comment"># 2. Initial setup (WASM target + Holochain check)</span>
-ainonymous setup
+<span class="comment"># 2. Rust 1.91+ and WASM target, Holochain 0.7.0 (x86_64 Linux/WSL2)</span>
+rustup target add wasm32-unknown-unknown
+bash scripts/setup_holochain_wsl.sh
 
-<span class="comment"># 3. Pull a model</span>
-ainonymous model pull gemma4-e4b   <span class="comment"># 2.5 GB · recommended to start</span>
-
-<span class="comment"># 4. Start the node</span>
-ainonymous start</div>
+<span class="comment"># 3. Build the crates and pack the hApps</span>
+cargo build --workspace
+bash scripts/build-happ.sh release</div>
             <p style="color:var(--muted); font-size:0.85rem; margin-top:0.8rem;">
-              The OpenAI-compatible proxy starts on <span style="color:var(--cyan)">localhost:9337</span>
+              The rest (conductor, daemon, OpenAI-compatible proxy on <span style="color:var(--cyan)">localhost:9337</span>) is covered step by step in the <a href="#join" style="color:var(--cyan)">setup guide</a> below.
             </p>
           </div>
 
           <div id="tab-build" class="install-step">
             <div class="code-block">
-<span class="comment"># Clone and build</span>
-git clone https://github.com/ainonymous/ainonymous
-cd ainonymous
+<span class="comment"># Clone</span>
+git clone https://github.com/Geoking2104/AInonymous.git
+cd AInonymous
 
-<span class="comment"># Install WASM target and Holochain tools</span>
-make setup
-
-<span class="comment"># Compile Rust crates + WASM zomes + package hApp</span>
+<span class="comment"># Build native crates + WASM zomes + pack the hApps</span>
 make build
 
-<span class="comment"># Install binaries</span>
+<span class="comment"># Install ainonymous, ainonymous-daemon, ainonymous-proxy, ainonymous-mcp</span>
 make install
 
-<span class="comment"># Start node</span>
-ainonymous start --model gemma4-26b --verbose</div>
+<span class="comment"># Check: native tests and two-conductor admission (SG1)</span>
+cargo test --workspace
+python3 scripts/sg1/run_sg1.py</div>
           </div>
 
           <div id="tab-goose" class="install-step">
@@ -962,14 +962,19 @@ ainonymous goose profile <span class="string">"mesh-agent"</span>
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="cta-section">
+  <!-- CTA + interactive setup guide -->
+  <section class="cta-section" id="join">
     <h2>Join the network.<br><span class="gradient-text">Share your compute power.</span></h2>
-    <p>The more nodes, the faster the inference. No signup, no account, no permission needed.</p>
+    <p>Every node adds capacity to the mesh. No online account: your identity is a key generated on your machine. To join a private mesh, the network administrator issues you an admission proof.</p>
     <div class="hero-actions">
-      <a href="https://github.com/ainonymous/ainonymous" class="btn-primary">⭐ GitHub</a>
-      <a href="https://docs.ainonymous.network" class="btn-secondary">📖 Documentation</a>
+      <a href="https://github.com/Geoking2104/AInonymous" class="btn-primary">⭐ GitHub</a>
+      <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md" class="btn-secondary">📖 Documentation</a>
     </div>
+
+    <div id="setup-guide" class="setup-guide">
+      <noscript><p style="padding:1.5rem;">The interactive guide needs JavaScript. Text version: <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md">docs/JOIN_NETWORK.md</a>.</p></noscript>
+    </div>
+    <p class="sg-note">Alpha software: the multi-node speed-up has not been measured on real machines yet, and the network provides no anonymity. The guide is a scripted assistant running entirely in your browser; its commands come from the repository (<a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md">docs/JOIN_NETWORK.md</a>).</p>
   </section>
 
   <!-- Footer -->
@@ -1107,5 +1112,6 @@ ainonymous goose profile <span class="string">"mesh-agent"</span>
     const statsBar = document.querySelector('.stats-bar');
     if (statsBar) statsObs.observe(statsBar);
   </script>
+  <script src="setup-guide.js"></script>
 </body>
 </html>

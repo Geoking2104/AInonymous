@@ -4,6 +4,8 @@ AInonymous is an experimental, agent-centric control plane for distributed LLM i
 
 > **Status:** alpha research software. The repository now targets Holochain **0.7.0** exclusively. It is suitable for development and controlled private pilots, not for anonymous public production workloads. The project does not currently provide zero-knowledge inference, traffic-flow anonymity, or a complete public-network Sybil defense.
 
+**Website:** <https://geoking2104.github.io/AInonymous/> — includes an interactive setup guide ([`#rejoindre`](https://geoking2104.github.io/AInonymous/#rejoindre), English page [`index.en.html#join`](https://geoking2104.github.io/AInonymous/index.en.html#join)). Text version: [Rejoindre le réseau](docs/JOIN_NETWORK.md) (French).
+
 ## Architecture
 
 | Plane | Implementation | Purpose |
@@ -36,6 +38,52 @@ current evidence:
 Not verified, and deliberately not claimed: multi-node inference on real
 hardware, phone/GPU measurements, anonymous operation, revocation, quotas, and an
 independent audit. See [Security](docs/SECURITY.md) and [ROADMAP](ROADMAP.md).
+
+## Mesh integration status
+
+Holochain coordinates (identity, admission, discovery, execution plan); QUIC/mTLS
+carries activations directly between peers. The building blocks are in place and
+tested, but distributed inference has **not yet been measured across several real
+machines**.
+
+| Priority | Still to do | Tracking |
+| --- | --- | --- |
+| P1 | Measure distributed inference on two or more physical machines (LAN, then Tailscale/VPN): TTFT, tok/s, node loss — gates G4/G7/G8 | [CH3 #50](https://github.com/Geoking2104/AInonymous/issues/50), [S4 #30](https://github.com/Geoking2104/AInonymous/issues/30) |
+| P1 | Private bootstrap/relay operated by the mesh administrator (reference configs use Holochain's public defaults) | ROADMAP security gate 1 |
+| P1 | Proxy ↔ daemon wiring: the proxy's default daemon port (`AINON_HOLOCHAIN_APP_PORT`, 8889) is the Holochain app WebSocket, not the daemon API (8890); `/mesh/nodes` format mismatch; `/mesh/metrics` not published; fixed node count in `/v1/models` | `crates/ainonymous-proxy`, `crates/ainonymous-daemon/src/router.rs` |
+| P2 | Real-time revocation | [PR #57](https://github.com/Geoking2104/AInonymous/pull/57) (draft), [CH6 #53](https://github.com/Geoking2104/AInonymous/issues/53) |
+| P2 | Remaining negative tests (cross-network replay, wrong transport key, stale capabilities) and frame/backpressure fuzzing; `ExpertShard` (MoE) plans computed but not executed by the daemon | [#32](https://github.com/Geoking2104/AInonymous/issues/32), ROADMAP |
+| P3 | GPU/phone measurements, stealth mode, production SD-WAN adapters, non-loopback authorization and quotas, external audit | [Chantiers v1](docs/chantiers-v1.md) |
+
+## Join the network (quick start)
+
+There is no online account: a node's identity is a key generated locally. A
+**private mesh** additionally requires a membrane proof issued by the network
+administrator. Public mode is development-only.
+
+```bash
+git clone https://github.com/Geoking2104/AInonymous.git
+cd AInonymous
+rustup target add wasm32-unknown-unknown
+bash scripts/setup_holochain_wsl.sh            # x86_64 Linux/WSL2; Windows: scripts/setup_holochain_windows.ps1
+cargo build --workspace
+bash scripts/build-happ.sh release
+
+# Disposable local node (test keystore, admin port 65000)
+holochain -c scripts/testnet/conductor_t51.yaml
+hc client call --port 65000 new-agent
+hc client call --port 65000 install-app --app-id ainonymous \
+  --agent-key <uhCAk...> dnas/ainonymous-core/ainonymous-core.happ
+hc client call --port 65000 enable-app ainonymous
+hc client call --port 65000 add-app-ws 65001 --allowed-origins "*" --installed-app-id ainonymous
+AINON_CONFIG=scripts/testnet/daemon_t51.toml ./target/debug/ainonymous-daemon
+AINON_HOLOCHAIN_APP_PORT=18890 ./target/debug/ainonymous-proxy   # OpenAI-compatible API on 127.0.0.1:9337
+```
+
+Run the conductor, daemon and proxy in separate terminals. The persistent Docker
+stack, joining or operating a private mesh, ports and troubleshooting are covered in
+[Rejoindre le réseau](docs/JOIN_NETWORK.md) and, interactively, by the
+[setup guide on the website](https://geoking2104.github.io/AInonymous/#rejoindre).
 
 ## Version matrix
 
@@ -73,6 +121,7 @@ tools/
 scripts/                  build, validation, SG1 harness and testnet tooling
 deploy/containers/        conductor and daemons images, plus the reproducible bundle builder
 docs/                     maintained architecture and operating documentation
+site/                     static website (GitHub Pages), including the interactive setup guide
 ```
 
 ## Prerequisites
@@ -225,6 +274,7 @@ Start with the [documentation index](docs/README.md). The most important documen
 - [API reference](docs/API_SPEC.md)
 - [Network/data plane](docs/NETWORK.md)
 - [Two-node testnet](docs/TESTNET_2NODES.md)
+- [Rejoindre le réseau — setup guide (French)](docs/JOIN_NETWORK.md)
 - [Original architecture review](docs/ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md)
 - [Pourquoi AInonymous ? (French, non-technical)](docs/PITCH_FR.md)
 - [SG1 two-conductor admission test](scripts/sg1/README.md)
