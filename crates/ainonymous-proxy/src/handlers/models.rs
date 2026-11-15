@@ -6,7 +6,7 @@ use axum::{
 };
 use std::sync::Arc;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 
 use ainonymous_types::api::*;
 use crate::state::ModelArchitecture;
@@ -14,10 +14,19 @@ use crate::AppState;
 
 /// GET /v1/models
 pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let models = state.local_models.read().unwrap();
+    // Copie des métadonnées (le verrou ne doit pas traverser un `.await`)
+    let models: Vec<_> = state.local_models.read().unwrap().values().cloned().collect();
 
-    let data: Vec<ModelInfo> = models.values().map(|m| {
-        let (nodes_available, avg_latency_ms) = (1u32, None::<u32>); // TODO: requête DHT
+    // Nombre réel de nœuds annoncés pour chaque modèle (daemon → agent-registry).
+    // Daemon injoignable : 0 (aucun nœud confirmé), jamais une valeur inventée.
+    let counts = futures::future::join_all(
+        models.iter().map(|m| available_node_count(&state, &m.model_id)),
+    )
+    .await;
+
+    let data: Vec<ModelInfo> = models.iter().zip(counts).map(|(m, nodes_available)| {
+        // Pas de mesure de latence agrégée disponible : non renseignée.
+        let avg_latency_ms = None::<u32>;
 
         ModelInfo {
             id: m.model_id.clone(),
@@ -47,6 +56,17 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }).collect();
 
     Json(ModelsResponse { object: "list", data })
+}
+
+/// Nombre de nœuds disponibles pour `model_id` selon le daemon (0 si injoignable).
+async fn available_node_count(state: &AppState, model_id: &str) -> u32 {
+    match state.mesh.get_available_nodes(model_id).await {
+        Ok(nodes) => nodes.len() as u32,
+        Err(e) => {
+            warn!("Nœuds pour {} indisponibles: {}", model_id, e);
+            0
+        }
+    }
 }
 
 #[derive(Deserialize)]

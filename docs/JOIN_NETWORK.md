@@ -107,15 +107,20 @@ S'appuie sur les configurations de test du dépôt
 5. **Lancer le proxy OpenAI-compatible**
 
    ```bash
-   AINON_HOLOCHAIN_APP_PORT=18890 ./target/debug/ainonymous-proxy
+   AINON_DAEMON_URL=http://127.0.0.1:18890 ./target/debug/ainonymous-proxy
    curl http://127.0.0.1:9337/health
    curl http://127.0.0.1:9337/v1/ainonymous/mesh/status
    ```
 
-   **Contournement connu** : par défaut le proxy appelle le daemon sur le port 8889
-   (WebSocket app Holochain) alors que l'API HTTP du daemon écoute sur 8890 (18890
-   avec la config de test). `AINON_HOLOCHAIN_APP_PORT` doit pointer vers l'API du
-   daemon.
+   `AINON_DAEMON_URL` est l'URL de l'API HTTP du daemon. Par défaut :
+   `http://127.0.0.1:8890` (port `daemon_port` de la config par défaut) ; la
+   config de test t51 utilise 18890. L'ancienne variable `AINON_HOLOCHAIN_APP_PORT`
+   reste acceptée comme port du daemon, avec un avertissement de dépréciation.
+
+   Variante : `./target/debug/ainonymous start` lance le daemon puis le proxy
+   (binaires du même répertoire) et attend que chacun réponde sur `/health`.
+   Il hérite de `AINON_CONFIG` et de `AINON_DAEMON_URL` ; le conducteur Holochain
+   (étape précédente) doit déjà tourner.
 
 ## B. Nœud persistant (pile Docker)
 
@@ -252,7 +257,7 @@ numérique d'un vrai modèle ([TESTNET_2NODES.md](TESTNET_2NODES.md)).
 | Admin Holochain | 8888 | 65000 |
 | WebSocket app `ainonymous` | 8889 | 65001 |
 | WebSocket app `hybridnode` | 8891 | — |
-| API HTTP du daemon | 8890 | 18890 |
+| API HTTP du daemon (`AINON_DAEMON_URL` côté proxy) | 8890 | 18890 |
 | QUIC (UDP) | 9000 | 9010 |
 | Proxy OpenAI-compatible | 9337 | 9337 |
 
@@ -267,7 +272,7 @@ numérique d'un vrai modèle ([TESTNET_2NODES.md](TESTNET_2NODES.md)).
 | `Genesis rejected` | Clé d'agent de la preuve, identifiant réseau, signature, propriétés DNA |
 | Les pairs ne se voient pas | DNA hashes, seeds réseau, bootstrap/relais identiques |
 | Windows `LNK1104` | `CARGO_TARGET_DIR` court |
-| `/v1/ainonymous/mesh/nodes` en 503 | Écart de format connu entre daemon et proxy (P1 du ROADMAP mesh) |
+| `/v1/ainonymous/mesh/nodes` en 503 | Le proxy ne joint pas le daemon : vérifier `AINON_DAEMON_URL` et `curl $AINON_DAEMON_URL/health` ; le daemon renvoie lui-même 503 si le conducteur ne répond pas |
 
 ## Le guide interactif
 

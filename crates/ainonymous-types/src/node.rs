@@ -5,13 +5,35 @@ use std::net::SocketAddr;
 pub type AgentId = String;
 
 /// Informations géographiques optionnelles d'un nœud (si partagé par le nœud)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct GeoLocation {
     pub latitude: f64,
     pub longitude: f64,
     /// Rayon de précision en km (optionnel)
     #[serde(default)]
     pub accuracy_km: Option<f32>,
+}
+
+/// Résumé d'un nœud disponible, tel que renvoyé par la zome
+/// `agent-registry::get_available_nodes` et par l'endpoint daemon `GET /mesh/nodes`.
+///
+/// Type partagé entre le daemon (producteur) et le proxy (consommateur) :
+/// le proxy désérialisait auparavant cette réponse en `NodeCapabilities`,
+/// dont les champs obligatoires (`ram_gb`, `gpu_vendor`, …) sont absents
+/// de la réponse réelle, d'où un 503 systématique sur `/v1/ainonymous/mesh/nodes`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NodeSummary {
+    pub agent_id: AgentId,
+    pub vram_gb: f32,
+    pub current_load: f32,
+    pub available_slots: u8,
+    pub quic_endpoint: Option<String>,
+    pub region_hint: Option<String>,
+    pub score: f32,
+    #[serde(default)]
+    pub node_pubkey: Option<String>,
+    #[serde(default)]
+    pub geo_location: Option<GeoLocation>,
 }
 
 /// Capacités déclarées par un nœud du mesh
@@ -179,4 +201,56 @@ pub struct ExpertStage {
     pub expert_ids: Vec<u32>,
     /// Ce nœud porte aussi le tronc dense du modèle
     pub has_trunk: bool,
+}
+
+#[cfg(test)]
+mod node_summary_tests {
+    use super::*;
+
+    /// Forme exacte produite par le daemon (`GET /mesh/nodes`) : doit se
+    /// désérialiser côté proxy sans champ manquant.
+    #[test]
+    fn node_summary_deserializes_daemon_payload() {
+        let payload = serde_json::json!([{
+            "agent_id": "uhCAk-test",
+            "vram_gb": 8.0,
+            "current_load": 0.25,
+            "available_slots": 2,
+            "quic_endpoint": "127.0.0.1:9010",
+            "region_hint": null,
+            "score": 0.8
+        }]);
+        let nodes: Vec<NodeSummary> = serde_json::from_value(payload).unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].available_slots, 2);
+        assert_eq!(nodes[0].node_pubkey, None);
+        assert_eq!(nodes[0].geo_location, None);
+    }
+
+    #[test]
+    fn node_summary_round_trip() {
+        let n = NodeSummary {
+            agent_id: "a".into(),
+            vram_gb: 4.0,
+            current_load: 0.0,
+            available_slots: 1,
+            quic_endpoint: None,
+            region_hint: Some("eu".into()),
+            score: 1.0,
+            node_pubkey: Some("ab".into()),
+            geo_location: Some(GeoLocation { latitude: 1.0, longitude: 2.0, accuracy_km: None }),
+        };
+        let back: NodeSummary = serde_json::from_value(serde_json::to_value(&n).unwrap()).unwrap();
+        assert_eq!(back, n);
+    }
+
+    /// Régression : la réponse du daemon n'est PAS un `NodeCapabilities`.
+    #[test]
+    fn daemon_payload_is_not_node_capabilities() {
+        let payload = serde_json::json!({
+            "agent_id": "a", "vram_gb": 8.0, "current_load": 0.0,
+            "available_slots": 1, "quic_endpoint": null, "region_hint": null, "score": 0.5
+        });
+        assert!(serde_json::from_value::<NodeCapabilities>(payload).is_err());
+    }
 }

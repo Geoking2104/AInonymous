@@ -12,6 +12,26 @@ go/no-go decision.
 
 ## [Unreleased]
 
+### Fixed
+
+- Proxy ↔ daemon wiring: the proxy now reaches the daemon HTTP API through
+  `AINON_DAEMON_URL` (default `http://127.0.0.1:8890`) instead of port 8889 (the
+  Holochain app WebSocket); `AINON_HOLOCHAIN_APP_PORT` is still honoured as the
+  daemon port, with a deprecation warning.
+- `/v1/ainonymous/mesh/nodes`: the proxy deserializes the daemon response as the
+  shared `ainonymous_types::NodeSummary` (it expected `NodeCapabilities` and
+  always answered 503) and forwards `model_id`.
+- Daemon `POST /mesh/metrics` publishes the received `InferenceMetrics` through
+  the `inference-mesh::publish_metrics` zome (it was a no-op); the proxy sends
+  the measured metrics after each successful completion.
+- `/v1/models`: `nodes_available` is the real number of nodes returned by the
+  daemon for each model (0 when the daemon is unreachable) instead of a fixed 1.
+- `ainonymous start` launches `ainonymous-daemon` and `ainonymous-proxy`, waits
+  for each `/health`, and fails fast if a process exits (it used to start only the
+  daemon and wait for the proxy port).
+- `scripts/testnet/daemon_t51.toml` matches the current `DaemonConfig` schema
+  (it no longer loaded); a unit test parses the testnet configs.
+
 ### Added
 
 - Website: interactive setup guide in the “Rejoins le réseau / Join the network”

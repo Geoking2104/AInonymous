@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         .layer(TraceLayer::new_for_http());
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
-    info!("AInonymous proxy démarré sur http://{}", addr);
+    info!("AInonymous proxy démarré sur http://{} (daemon : {})", addr, config.daemon_url);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
@@ -43,7 +43,10 @@ pub struct ProxyConfig {
     pub port: u16,
     pub llama_server_url: String,
     pub holochain_ws_url: String,
-    pub holochain_app_port: u16,
+    /// URL de base de l'API HTTP du daemon (`ainonymous-daemon`), sans `/` final.
+    /// Source : `AINON_DAEMON_URL`, sinon `AINON_HOLOCHAIN_APP_PORT` (déprécié),
+    /// sinon `http://127.0.0.1:8890` (port `daemon_port` par défaut du daemon).
+    pub daemon_url: String,
 }
 
 impl ProxyConfig {
@@ -56,8 +59,20 @@ impl ProxyConfig {
                 .unwrap_or_else(|_| "http://127.0.0.1:8080".into()),
             holochain_ws_url: std::env::var("AINON_HOLOCHAIN_URL")
                 .unwrap_or_else(|_| "ws://127.0.0.1:8888".into()),
-            holochain_app_port: std::env::var("AINON_HOLOCHAIN_APP_PORT")
-                .ok().and_then(|p| p.parse().ok()).unwrap_or(8889),
+            daemon_url: resolve_daemon_url_logged(),
         }
     }
+}
+
+fn resolve_daemon_url_logged() -> String {
+    use ainonymous_types::endpoints::{daemon_url_from_env, DaemonUrlSource, LEGACY_DAEMON_PORT_ENV};
+    let resolved = daemon_url_from_env();
+    if resolved.source == DaemonUrlSource::LegacyPortEnv {
+        tracing::warn!(
+            "{} est déprécié pour le proxy : utilisez AINON_DAEMON_URL={}",
+            LEGACY_DAEMON_PORT_ENV,
+            resolved.url
+        );
+    }
+    resolved.url
 }

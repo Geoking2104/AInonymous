@@ -37,9 +37,17 @@ pub async fn mesh_status(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }
 }
 
-/// GET /v1/ainonymous/mesh/nodes
-pub async fn mesh_nodes(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.mesh.get_available_nodes("").await {
+#[derive(Deserialize)]
+pub struct NodesQuery {
+    pub model_id: Option<String>,
+}
+
+/// GET /v1/ainonymous/mesh/nodes?model_id=...
+pub async fn mesh_nodes(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<NodesQuery>,
+) -> impl IntoResponse {
+    match state.mesh.get_available_nodes(q.model_id.as_deref().unwrap_or("")).await {
         Ok(nodes) => Json(serde_json::json!({ "nodes": nodes })).into_response(),
         Err(e) => {
             warn!("Récupération des nœuds échouée: {}", e);
@@ -69,10 +77,8 @@ pub async fn blackboard_post(
         "ttl_hours": body.ttl_hours.unwrap_or(48),
     });
 
-    let client = reqwest::Client::new();
-    match client
-        .post(format!("http://127.0.0.1:{}/mesh/blackboard/post",
-            state.config.holochain_app_port))
+    match state.mesh.http()
+        .post(format!("{}/mesh/blackboard/post", state.mesh.daemon_url()))
         .json(&payload)
         .send()
         .await
@@ -102,10 +108,8 @@ pub async fn blackboard_search(
 ) -> impl IntoResponse {
     let terms: Vec<&str> = params.q.split_whitespace().collect();
 
-    let client = reqwest::Client::new();
-    match client
-        .post(format!("http://127.0.0.1:{}/mesh/blackboard/search",
-            state.config.holochain_app_port))
+    match state.mesh.http()
+        .post(format!("{}/mesh/blackboard/search", state.mesh.daemon_url()))
         .json(&serde_json::json!({
             "terms": terms,
             "prefix_filter": params.prefix,

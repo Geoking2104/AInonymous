@@ -1,27 +1,38 @@
 # Config daemon — mode conducteur Holochain réel (T5.1)
 #
 # Usage : AINON_CONFIG=scripts/testnet/daemon_t51.toml ./target/debug/ainonymous-daemon
+# Proxy : AINON_DAEMON_URL=http://127.0.0.1:18890 ./target/debug/ainonymous-proxy
+#
+# Schéma = DaemonConfig (crates/ainonymous-daemon/src/config.rs) ; le test
+# `config::tests::testnet_configs_parse` vérifie que ce fichier reste lisible.
 
-daemon_port            = 18890
-quic_port              = 9010
-llama_server_port      = 8081
-pipeline_server_port   = 8182
-llama_server_bin       = "llama-server"
-models_dir             = "/tmp/models"
+daemon_port             = 18890
+quic_port               = 9010
+llama_server_port       = 8081
+pipeline_server_port    = 8182
+llama_server_bin        = "llama-server"
+models_dir              = "/tmp/models"
 holochain_conductor_url = "ws://127.0.0.1:65001"
-holochain_app_id       = "ainonymous"
+holochain_app_id        = "ainonymous"
 max_concurrent_requests = 4
+
+[network]
+quic_relay_fallback           = true
+activation_compression        = "auto"
+compression_threshold_gbps    = 1.0
+max_activation_size_mb        = 512
+max_concurrent_quic_sessions  = 8
+
+[inference]
+default_model     = "gemma4-e4b"
+context_size      = 2048
+n_gpu_layers      = -1
+flash_attention   = true
+kv_cache_type     = "q8_0"
+parallel_requests = 1
+speculative_k     = 0
 
 [holochain]
 backend    = "conductor"
 admin_port = 65000
 app_port   = 65001
-
-[network]
-listen_addr       = "0.0.0.0"
-discovery_timeout = 30
-
-[inference]
-backend          = "static"
-n_ctx            = 2048
-max_batch_tokens = 512
