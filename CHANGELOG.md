@@ -14,6 +14,15 @@ go/no-go decision.
 
 ### Added
 
+- Website: interactive setup guide in the “Rejoins le réseau / Join the network”
+  section of `site/index.html` and `site/index.en.html` (`site/setup-guide.js`,
+  `site/setup-guide.css`): a client-side scripted assistant with an optional
+  local OpenAI-compatible mode; text version in `docs/JOIN_NETWORK.md`.
+- Website: “État du mesh / Mesh status” section in `site/ainonymous.html`.
+- `.github/workflows/pages.yml`: publishes `site/` to GitHub Pages on pushes to
+  `main` (requires the Pages source to be switched to GitHub Actions).
+- README: mesh integration status, website link and join-the-network quick start.
+
 - `pytorch-adapter` CI job: the adapter test suite in `examples/pytorch` now runs
   in a GitHub workflow instead of only on developer machines.
 - `CONTRIBUTING.md`, including the review policy for large pull requests.
@@ -41,6 +50,9 @@ go/no-go decision.
 
 ### Changed
 
+- Website copy aligned with the repository: no “public network / no signup”
+  claim, no unmeasured speed-up claim, real repository URLs and install commands
+  in `site/index*.html`.
 - Housekeeping: the 21 leftover remote branches from earlier phases were deleted
   after checking each tip — either an ancestor of `main`, or squash-landed in
   `1824be9` (the Holochain 0.7 hardening stack) or `8a0d0e5` (site polish).
