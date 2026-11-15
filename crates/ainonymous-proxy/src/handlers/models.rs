@@ -60,7 +60,8 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoRespons
 
 /// Nombre de nœuds disponibles pour `model_id` selon le daemon (0 si injoignable).
 async fn available_node_count(state: &AppState, model_id: &str) -> u32 {
-    match state.mesh.get_available_nodes(model_id).await {
+    let Some(known) = crate::state::known_model_id(model_id) else { return 0 };
+    match state.mesh.get_available_nodes(known).await {
         Ok(nodes) => nodes.len() as u32,
         Err(e) => {
             warn!("Nœuds pour {} indisponibles: {}", model_id, e);

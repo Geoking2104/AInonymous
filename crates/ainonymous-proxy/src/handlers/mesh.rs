@@ -47,7 +47,18 @@ pub async fn mesh_nodes(
     State(state): State<Arc<AppState>>,
     Query(q): Query<NodesQuery>,
 ) -> impl IntoResponse {
-    match state.mesh.get_available_nodes(q.model_id.as_deref().unwrap_or("")).await {
+    // Seuls les modèles connus du proxy sont relayés au daemon.
+    let model_id = match q.model_id.as_deref().filter(|m| !m.is_empty()) {
+        None => "",
+        Some(m) => match crate::state::known_model_id(m) {
+            Some(known) => known,
+            None => {
+                return (StatusCode::NOT_FOUND,
+                        Json(ApiError::invalid_model(m))).into_response();
+            }
+        },
+    };
+    match state.mesh.get_available_nodes(model_id).await {
         Ok(nodes) => Json(serde_json::json!({ "nodes": nodes })).into_response(),
         Err(e) => {
             warn!("Récupération des nœuds échouée: {}", e);

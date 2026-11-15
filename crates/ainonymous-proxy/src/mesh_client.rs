@@ -68,8 +68,10 @@ impl MeshClient {
     }
 
     /// Récupérer liste des nœuds disponibles pour un modèle
-    /// (forme `NodeSummary`, identique à la réponse du daemon)
-    pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
+    /// (forme `NodeSummary`, identique à la réponse du daemon).
+    /// `model_id` est une constante (`state::known_model_id`, ou `""` pour tous) :
+    /// aucune valeur fournie par le client n'entre dans l'URL sortante.
+    pub async fn get_available_nodes(&self, model_id: &'static str) -> Result<Vec<NodeSummary>> {
         let resp = self.http
             .get(format!("{}/mesh/nodes", self.daemon_url))
             .query(&[("model_id", model_id)])
