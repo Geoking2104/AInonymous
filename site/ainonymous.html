@@ -342,11 +342,11 @@
   <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px; margin-top:48px;">
     <div style="background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:28px;">
       <div style="font-size:13px; color:var(--accent2); font-weight:700; margin-bottom:8px;">1. Vous rejoignez</div>
-      <p style="font-size:15px; color:var(--muted);">Une seule commande. Votre machine reçoit une identité cryptographique unique. Pas de nom, pas de mail, pas de mot de passe.</p>
+      <p style="font-size:15px; color:var(--muted);">Votre machine génère une identité cryptographique locale. Pas de nom, pas de mail, pas de mot de passe. Un mesh privé exige en plus une preuve d'admission signée par son administrateur.</p>
     </div>
     <div style="background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:28px;">
       <div style="font-size:13px; color:var(--accent2); font-weight:700; margin-bottom:8px;">2. Vous contribuez</div>
-      <p style="font-size:15px; color:var(--muted);">Quand vous n'utilisez pas votre ordinateur, il prête sa puissance aux autres. Vous accumulez du crédit de calcul.</p>
+      <p style="font-size:15px; color:var(--muted);">Votre nœud annonce ses capacités au mesh et peut exécuter une partie des inférences des autres membres.</p>
     </div>
     <div style="background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:28px;">
       <div style="font-size:13px; color:var(--accent2); font-weight:700; margin-bottom:8px;">3. Vous utilisez l'IA</div>
@@ -362,8 +362,8 @@
   <div class="feat-grid" style="margin-top:40px;">
     <div class="feat-card">
       <div class="feat-icon fi-p">🔐</div>
-      <h3>Confidentialité absolue</h3>
-      <p>Vos questions ne quittent jamais le réseau chiffré. Aucune entreprise ne peut lire vos conversations.</p>
+      <h3>Échanges chiffrés entre pairs</h3>
+      <p>Les activations circulent en QUIC/TLS 1.3 avec authentification mutuelle stricte. Pas d'anonymat réseau : les métadonnées (adresses, volumes, timing) restent visibles.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon fi-t">⚡</div>
@@ -409,21 +409,23 @@
 
 <div class="section" id="installer">
   <div class="eyebrow">Installation</div>
-  <h2>Prêt en 30 secondes.</h2>
+  <h2>Installer depuis les sources.</h2>
   <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
     <pre style="margin:0; font-size:14px; line-height:1.8;">
 # 1. Cloner le dépôt
 git clone https://github.com/Geoking2104/AInonymous.git
 cd AInonymous
 
-# 2. Builder
-cargo build --release
+# 2. Rust 1.91+ et cible WASM, Holochain 0.7.0 (x86_64 Linux/WSL2)
+rustup target add wasm32-unknown-unknown
+bash scripts/setup_holochain_wsl.sh
 
-# 3. Lancer le daemon
-./target/release/ainonymous-daemon</pre>
+# 3. Compiler les crates et packer les hApps
+cargo build --workspace
+bash scripts/build-happ.sh release</pre>
   </div>
   <p style="margin-top:24px; color:var(--muted); font-size:14px;">
-    Plus d'informations dans le <a href="https://github.com/Geoking2104/AInonymous/blob/main/README.md">README</a>.
+    Conducteur, daemon et proxy : guide pas à pas dans <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md">docs/JOIN_NETWORK.md</a> et sur la <a href="./#rejoindre">page d'accueil</a>.
   </p>
 </div>
 
