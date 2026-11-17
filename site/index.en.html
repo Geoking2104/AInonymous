@@ -420,6 +420,7 @@
       font-family: monospace; font-size: 0.83rem;
       color: var(--text); margin-bottom: 0.8rem;
       position: relative; overflow-x: auto;
+      white-space: pre;
     }
     .code-block .comment { color: var(--muted); }
     .code-block .keyword { color: var(--purple); }
@@ -529,17 +530,17 @@
 
       <h1>
         Decentralized LLM inference<br>
-        <span class="gradient-text">private by design</span>
+        <span class="gradient-text">between authenticated peers</span>
       </h1>
 
       <p class="hero-sub">
-        AInonymous distributes Gemma 4 inference across a Holochain P2P network.
-        No central server. No cloud. No data leakage.
+        AInonymous coordinates LLM inference over a Holochain P2P network, with a direct QUIC/mTLS
+        channel between peers. No central server. Alpha software: no network anonymity.
       </p>
 
       <div class="hero-actions">
-        <a href="#install" class="btn-primary">
-          ⚡ Get started in 2 minutes
+        <a href="#join" class="btn-primary">
+          ⚡ Get started step by step
         </a>
         <a href="#architecture" class="btn-secondary">
           📐 Architecture →
@@ -556,14 +557,24 @@
         <div class="terminal-body">
           <div class="line">
             <span class="t-prompt">~</span>
-            <span class="t-cmd"> ainonymous start --model gemma4-26b</span>
+            <span class="t-cmd"> holochain -c scripts/testnet/conductor_t51.yaml</span>
           </div>
-          <div class="line t-out">◦ Starting Holochain conductor...</div>
-          <div class="line t-ok">✓ Connected to P2P network (47 active nodes)</div>
-          <div class="line t-out">◦ QUIC endpoint: 0.0.0.0:9338 (NAT traversal active)</div>
-          <div class="line t-ok">✓ Model loaded: gemma4-26b-moe [12.3 GB VRAM]</div>
-          <div class="line t-ok">✓ Execution plan: <span class="t-cyan">PipelineSplit (3 nodes)</span></div>
-          <div class="line t-out">◦ OpenAI-compatible proxy on <span class="t-cyan">http://localhost:9337</span></div>
+          <div class="line t-out">◦ Holochain 0.7 test conductor (admin :65000)</div>
+          <div class="line">
+            <span class="t-prompt">~</span>
+            <span class="t-cmd"> AINON_CONFIG=scripts/testnet/daemon_t51.toml ./target/debug/ainonymous-daemon</span>
+          </div>
+          <div class="line t-out">◦ daemon API on 127.0.0.1:18890, QUIC on :9010</div>
+          <div class="line">
+            <span class="t-prompt">~</span>
+            <span class="t-cmd"> curl http://127.0.0.1:18890/health</span>
+          </div>
+          <div class="line t-ok">ok</div>
+          <div class="line">
+            <span class="t-prompt">~</span>
+            <span class="t-cmd"> python3 scripts/sg1/run_sg1.py</span>
+          </div>
+          <div class="line t-out">◦ private admission checked with two real conductors (CI “SG1”)</div>
           <div class="line">
             <span class="t-prompt">~</span>
             <span class="t-cursor"></span>
@@ -576,20 +587,20 @@
   <!-- Stats bar -->
   <div class="stats-bar">
     <div class="stat-item">
-      <div class="stat-num">+38%</div>
-      <div class="stat-label">throughput · speculative decoding</div>
+      <div class="stat-num">4</div>
+      <div class="stat-label">pinned DNAs, rebuilt byte for byte (CI)</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">~60%</div>
-      <div class="stat-label">activation compression (zstd-1)</div>
+      <div class="stat-num">2</div>
+      <div class="stat-label">real Holochain 0.7 conductors · SG1 admission test</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">128K</div>
-      <div class="stat-label">token context window · Gemma 4</div>
+      <div class="stat-num">16/16</div>
+      <div class="stat-label">tokens identical to a single node · 2-stage split, 1 machine</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num">3 ms</div>
-      <div class="stat-label">compression latency · 5 MB tensor</div>
+      <div class="stat-num">7</div>
+      <div class="stat-label">QUIC/mTLS transport tests · loopback</div>
     </div>
   </div>
 
@@ -950,7 +961,7 @@ extensions:
     enabled: <span class="keyword">true</span>
 
 <span class="comment"># Start Goose with the mesh profile</span>
-ainonymous goose profile <span class="string">"mesh-agent"</span>
+ainonymous goose --profile standard   <span class="comment"># fast | standard | powerful</span>
 
 <span class="comment"># Example usage in Goose</span>
 <span class="comment"># > "Run inference with gemma4-26b on the mesh network"</span>
@@ -1096,10 +1107,10 @@ ainonymous goose profile <span class="string">"mesh-agent"</span>
         if (e.isIntersecting) {
           const nums = e.target.querySelectorAll('.stat-num');
           const data = [
-            [0, 38, '%', 1200],
-            [0, 60, '%', 1400],
-            [0, 128, 'K', 1000],
-            [0, 3, ' ms', 800],
+            [0, 4, '', 800],
+            [0, 2, '', 800],
+            [0, 16, '/16', 1000],
+            [0, 7, '', 800],
           ];
           nums.forEach((n, i) => {
             if (data[i]) animateValue(n, data[i][0], data[i][1], data[i][2], data[i][3]);
