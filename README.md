@@ -50,7 +50,7 @@ machines**.
 | --- | --- | --- |
 | P1 | Measure distributed inference on two or more physical machines (LAN, then Tailscale/VPN): TTFT, tok/s, node loss — gates G4/G7/G8 | [CH3 #50](https://github.com/Geoking2104/AInonymous/issues/50), [S4 #30](https://github.com/Geoking2104/AInonymous/issues/30) |
 | P1 | Private bootstrap/relay operated by the mesh administrator (reference configs use Holochain's public defaults) | ROADMAP security gate 1 |
-| P1 | Proxy ↔ daemon wiring: the proxy's default daemon port (`AINON_HOLOCHAIN_APP_PORT`, 8889) is the Holochain app WebSocket, not the daemon API (8890); `/mesh/nodes` format mismatch; `/mesh/metrics` not published; fixed node count in `/v1/models` | `crates/ainonymous-proxy`, `crates/ainonymous-daemon/src/router.rs` |
+| P2 | Metrics follow-up: per-model average latency in `/v1/models` is not aggregated yet (`null`); `/mesh/infer` does not report prompt tokens | `crates/ainonymous-proxy`, `crates/ainonymous-daemon/src/router.rs` |
 | P2 | Real-time revocation | [PR #57](https://github.com/Geoking2104/AInonymous/pull/57) (draft), [CH6 #53](https://github.com/Geoking2104/AInonymous/issues/53) |
 | P2 | Remaining negative tests (cross-network replay, wrong transport key, stale capabilities) and frame/backpressure fuzzing; `ExpertShard` (MoE) plans computed but not executed by the daemon | [#32](https://github.com/Geoking2104/AInonymous/issues/32), ROADMAP |
 | P3 | GPU/phone measurements, stealth mode, production SD-WAN adapters, non-loopback authorization and quotas, external audit | [Chantiers v1](docs/chantiers-v1.md) |
@@ -77,10 +77,13 @@ hc client call --port 65000 install-app --app-id ainonymous \
 hc client call --port 65000 enable-app ainonymous
 hc client call --port 65000 add-app-ws 65001 --allowed-origins "*" --installed-app-id ainonymous
 AINON_CONFIG=scripts/testnet/daemon_t51.toml ./target/debug/ainonymous-daemon
-AINON_HOLOCHAIN_APP_PORT=18890 ./target/debug/ainonymous-proxy   # OpenAI-compatible API on 127.0.0.1:9337
+AINON_DAEMON_URL=http://127.0.0.1:18890 ./target/debug/ainonymous-proxy   # OpenAI-compatible API on 127.0.0.1:9337
 ```
 
-Run the conductor, daemon and proxy in separate terminals. The persistent Docker
+Run the conductor, daemon and proxy in separate terminals, or start the daemon and
+proxy together with `./target/debug/ainonymous start` once the conductor is up
+(`AINON_DAEMON_URL` defaults to `http://127.0.0.1:8890`; set it to
+`http://127.0.0.1:18890` with the t51 config). The persistent Docker
 stack, joining or operating a private mesh, ports and troubleshooting are covered in
 [Rejoindre le réseau](docs/JOIN_NETWORK.md) and, interactively, by the
 [setup guide on the website](https://geoking2104.github.io/AInonymous/#rejoindre).

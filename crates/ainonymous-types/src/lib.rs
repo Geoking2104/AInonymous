@@ -3,6 +3,7 @@ pub mod node;
 pub mod api;
 pub mod errors;
 pub mod warrants;
+pub mod endpoints;
 
 pub use inference::*;
 pub use node::*;

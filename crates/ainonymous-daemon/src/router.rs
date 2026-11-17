@@ -251,12 +251,28 @@ async fn mesh_plan(
     }
 }
 
+/// Publie les métriques réelles d'une inférence (envoyées par le proxy)
+/// via la zome `inference-mesh::publish_metrics`. Aucune valeur n'est
+/// fabriquée ici : le corps doit être un `InferenceMetrics` complet.
 async fn mesh_metrics(
-    State(_s): State<DaemonState>,
-    Json(_body): Json<serde_json::Value>,
+    State(s): State<DaemonState>,
+    Json(body): Json<ainonymous_types::InferenceMetrics>,
 ) -> impl IntoResponse {
-    // TODO: publier les métriques via zome call Holochain
-    StatusCode::OK
+    match s.holochain.publish_metrics(&body).await {
+        Ok(action_hash) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({ "action_hash": action_hash })),
+        )
+            .into_response(),
+        Err(e) => {
+            warn!("publish_metrics échoué: {}", e);
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response()
+        }
+    }
 }
 
 async fn blackboard_post(

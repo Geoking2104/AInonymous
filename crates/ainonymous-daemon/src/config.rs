@@ -245,6 +245,24 @@ impl DaemonConfig {
 mod tests {
     use super::*;
 
+    /// Les configs de test référencées par la doc doivent rester conformes
+    /// au schéma `DaemonConfig` (régression : daemon_t51.toml ne se chargeait plus).
+    #[test]
+    fn testnet_configs_parse() {
+        for (name, src) in [
+            ("daemon_t41.toml", include_str!("../../../scripts/testnet/daemon_t41.toml")),
+            ("daemon_t51.toml", include_str!("../../../scripts/testnet/daemon_t51.toml")),
+        ] {
+            let cfg: DaemonConfig =
+                toml::from_str(src).unwrap_or_else(|e| panic!("{name} invalide : {e}"));
+            assert_ne!(cfg.daemon_port, cfg.holochain.app_port, "{name}");
+        }
+        let t51: DaemonConfig =
+            toml::from_str(include_str!("../../../scripts/testnet/daemon_t51.toml")).unwrap();
+        assert_eq!(t51.daemon_port, 18890);
+        assert_eq!(t51.holochain.backend, HolochainBackendKind::Conductor);
+    }
+
     #[test]
     fn default_ports_do_not_overlap() {
         let config = DaemonConfig::default();

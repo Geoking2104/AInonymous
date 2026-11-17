@@ -13,7 +13,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use ainonymous_types::api::*;
-use ainonymous_types::ExecutionPlan;
+use ainonymous_types::{ExecutionPlan, InferenceMetrics};
 use crate::AppState;
 
 /// POST /v1/chat/completions
@@ -69,6 +69,19 @@ async fn handle_blocking(
                     let tps = if latency > 0 {
                         completion_tokens as f32 / (latency as f32 / 1000.0)
                     } else { 0.0 };
+
+                    spawn_publish_metrics(state.clone(), InferenceMetrics {
+                        request_id: Uuid::new_v4(),
+                        model_id: req.model.clone(),
+                        total_latency_ms: latency,
+                        tokens_per_second: tps,
+                        prompt_tokens,
+                        completion_tokens,
+                        nodes_used: 1,
+                        execution_mode: "solo".into(),
+                        success: true,
+                        error_reason: None,
+                    });
 
                     info!("✓ {} — {}ms — {:.1} tok/s", req.model, latency, tps);
 
@@ -142,6 +155,21 @@ async fn mesh_pipeline_response(
             } else { 0.0 };
 
             info!("✓ {} (pipeline_split, {} nœuds) — {}ms", req.model, nodes_used, latency);
+
+            // prompt_tokens : le daemon (/mesh/infer) ne le renvoie pas ; 0 comme
+            // dans `usage` ci-dessous, en attendant qu'il soit exposé.
+            spawn_publish_metrics(state.clone(), InferenceMetrics {
+                request_id: Uuid::new_v4(),
+                model_id: req.model.clone(),
+                total_latency_ms: latency,
+                tokens_per_second: tps,
+                prompt_tokens: 0,
+                completion_tokens,
+                nodes_used,
+                execution_mode: "pipeline_split".into(),
+                success: true,
+                error_reason: None,
+            });
 
             let response = ChatCompletionResponse {
                 id: request_id,
@@ -300,4 +328,12 @@ fn build_llama_request(req: &ChatCompletionRequest, stream: bool) -> Value {
         "stream": stream,
         "stop": req.stop,
     })
+}
+
+/// Publie en arrière-plan les métriques mesurées d'une requête vers le daemon
+/// (`POST /mesh/metrics` → zome `publish_metrics`), sans retarder la réponse.
+fn spawn_publish_metrics(state: Arc<AppState>, metrics: InferenceMetrics) {
+    tokio::spawn(async move {
+        state.mesh.publish_metrics(&metrics).await;
+    });
 }

@@ -37,9 +37,28 @@ pub async fn mesh_status(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }
 }
 
-/// GET /v1/ainonymous/mesh/nodes
-pub async fn mesh_nodes(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.mesh.get_available_nodes("").await {
+#[derive(Deserialize)]
+pub struct NodesQuery {
+    pub model_id: Option<String>,
+}
+
+/// GET /v1/ainonymous/mesh/nodes?model_id=...
+pub async fn mesh_nodes(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<NodesQuery>,
+) -> impl IntoResponse {
+    // Seuls les modèles connus du proxy sont relayés au daemon.
+    let model_id = match q.model_id.as_deref().filter(|m| !m.is_empty()) {
+        None => "",
+        Some(m) => match crate::state::known_model_id(m) {
+            Some(known) => known,
+            None => {
+                return (StatusCode::NOT_FOUND,
+                        Json(ApiError::invalid_model(m))).into_response();
+            }
+        },
+    };
+    match state.mesh.get_available_nodes(model_id).await {
         Ok(nodes) => Json(serde_json::json!({ "nodes": nodes })).into_response(),
         Err(e) => {
             warn!("Récupération des nœuds échouée: {}", e);
@@ -69,10 +88,8 @@ pub async fn blackboard_post(
         "ttl_hours": body.ttl_hours.unwrap_or(48),
     });
 
-    let client = reqwest::Client::new();
-    match client
-        .post(format!("http://127.0.0.1:{}/mesh/blackboard/post",
-            state.config.holochain_app_port))
+    match state.mesh.http()
+        .post(crate::mesh_client::daemon_endpoint("mesh/blackboard/post"))
         .json(&payload)
         .send()
         .await
@@ -102,10 +119,8 @@ pub async fn blackboard_search(
 ) -> impl IntoResponse {
     let terms: Vec<&str> = params.q.split_whitespace().collect();
 
-    let client = reqwest::Client::new();
-    match client
-        .post(format!("http://127.0.0.1:{}/mesh/blackboard/search",
-            state.config.holochain_app_port))
+    match state.mesh.http()
+        .post(crate::mesh_client::daemon_endpoint("mesh/blackboard/search"))
         .json(&serde_json::json!({
             "terms": terms,
             "prefix_filter": params.prefix,

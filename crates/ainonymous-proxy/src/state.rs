@@ -87,6 +87,18 @@ impl AppState {
     }
 }
 
+/// Identifiants de modèles connus du proxy (registre ci-dessous).
+pub const KNOWN_MODEL_IDS: [&str; 6] = [
+    "gemma4-e2b", "gemma4-e4b", "gemma4-26b-moe", "gemma4-31b", "qwen3-8b", "qwen3-32b",
+];
+
+/// Identifiant canonique (constante) d'un modèle connu. Seules ces valeurs
+/// sont transmises au daemon dans l'URL de `/mesh/nodes` : une entrée client
+/// n'est jamais recopiée telle quelle dans une requête sortante.
+pub fn known_model_id(id: &str) -> Option<&'static str> {
+    KNOWN_MODEL_IDS.iter().copied().find(|k| *k == id)
+}
+
 fn default_model_registry() -> Vec<(String, ModelStatus)> {
     vec![
         ("gemma4-e2b".into(), ModelStatus {
@@ -138,4 +150,25 @@ fn default_model_registry() -> Vec<(String, ModelStatus)> {
             architecture: ModelArchitecture::Dense,
         }),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registry_and_known_ids_match() {
+        let mut reg: Vec<String> = default_model_registry().into_iter().map(|(k, _)| k).collect();
+        reg.sort();
+        let mut known: Vec<String> = KNOWN_MODEL_IDS.iter().map(|s| s.to_string()).collect();
+        known.sort();
+        assert_eq!(reg, known);
+    }
+
+    #[test]
+    fn unknown_model_id_is_rejected() {
+        assert_eq!(known_model_id("gemma4-e4b"), Some("gemma4-e4b"));
+        assert_eq!(known_model_id("http://evil/"), None);
+        assert_eq!(known_model_id(""), None);
+    }
 }

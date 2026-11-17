@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use ed25519_dalek::VerifyingKey;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -14,23 +13,11 @@ use tracing::{debug, info, warn};
 use crate::conductor_client::ConductorClient;
 use crate::config::DaemonConfig;
 use ainonymous_types::{
-    ExecutionPlan, GeoLocation, ModelClaim, NodeHeartbeat, Warrant, WarrantType,
+    ExecutionPlan, GeoLocation, InferenceMetrics, ModelClaim, NodeHeartbeat, Warrant, WarrantType,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeSummary {
-    pub agent_id: String,
-    pub vram_gb: f32,
-    pub current_load: f32,
-    pub available_slots: u8,
-    pub quic_endpoint: Option<String>,
-    pub region_hint: Option<String>,
-    pub score: f32,
-    #[serde(default)]
-    pub node_pubkey: Option<String>,
-    #[serde(default)]
-    pub geo_location: Option<GeoLocation>,
-}
+/// Type partagé avec le proxy (voir `ainonymous_types::NodeSummary`).
+pub use ainonymous_types::NodeSummary;
 
 #[derive(Clone)]
 enum Backend {
@@ -253,6 +240,18 @@ impl HolochainClient {
             .await?;
 
         Ok(serde_json::from_value(resp)?)
+    }
+
+    /// Publie les métriques d'une inférence sur le DHT
+    /// (zome `inference-mesh::coordinator::publish_metrics`, renvoie l'ActionHash).
+    pub async fn publish_metrics(&self, metrics: &InferenceMetrics) -> Result<Value> {
+        self.zome_call(
+            "inference-mesh",
+            "coordinator",
+            "publish_metrics",
+            serde_json::to_value(metrics)?,
+        )
+        .await
     }
 
     pub async fn get_available_nodes(&self, model_id: &str) -> Result<Vec<NodeSummary>> {
@@ -979,5 +978,60 @@ fn detect_compute_backends(
         GpuVendor::Amd { .. } => vec![ComputeBackend::Hip, ComputeBackend::Cpu],
         GpuVendor::Intel { .. } => vec![ComputeBackend::Vulkan, ComputeBackend::Cpu],
         GpuVendor::CpuOnly => vec![ComputeBackend::Cpu],
+    }
+}
+
+#[cfg(test)]
+mod publish_metrics_tests {
+    use super::*;
+    use axum::{extract::Path, routing::post, Json, Router};
+    use std::sync::Mutex;
+
+    /// `publish_metrics` envoie le payload réel à la zome
+    /// `inference-mesh::coordinator::publish_metrics` et renvoie l'ActionHash.
+    #[tokio::test]
+    async fn publish_metrics_calls_inference_mesh_zome() {
+        let seen: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let seen2 = seen.clone();
+        let app = Router::new().route(
+            "/zome/:dna/:zome/:function",
+            post(move |Path((dna, zome, function)): Path<(String, String, String)>,
+                       Json(body): Json<Value>| {
+                let seen = seen2.clone();
+                async move {
+                    seen.lock().unwrap().push((format!("{dna}::{zome}::{function}"), body));
+                    Json(json!("uhCkkHASH"))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let mut config = DaemonConfig::default();
+        config.holochain.backend = crate::config::HolochainBackendKind::Static;
+        config.daemon_port = port;
+        let client = HolochainClient::connect(&config).await.unwrap();
+
+        let metrics = InferenceMetrics {
+            request_id: uuid::Uuid::new_v4(),
+            model_id: "gemma4-e4b".into(),
+            total_latency_ms: 250,
+            tokens_per_second: 8.0,
+            prompt_tokens: 3,
+            completion_tokens: 2,
+            nodes_used: 2,
+            execution_mode: "pipeline_split".into(),
+            success: true,
+            error_reason: None,
+        };
+        let hash = client.publish_metrics(&metrics).await.unwrap();
+        assert_eq!(hash, json!("uhCkkHASH"));
+
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].0, "inference-mesh::coordinator::publish_metrics");
+        assert_eq!(seen[0].1["nodes_used"], 2);
+        assert_eq!(seen[0].1["request_id"], metrics.request_id.to_string());
     }
 }
