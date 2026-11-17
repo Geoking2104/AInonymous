@@ -89,7 +89,7 @@ pub async fn blackboard_post(
     });
 
     match state.mesh.http()
-        .post(format!("{}/mesh/blackboard/post", state.mesh.daemon_url()))
+        .post(crate::mesh_client::daemon_endpoint("mesh/blackboard/post"))
         .json(&payload)
         .send()
         .await
@@ -120,7 +120,7 @@ pub async fn blackboard_search(
     let terms: Vec<&str> = params.q.split_whitespace().collect();
 
     match state.mesh.http()
-        .post(format!("{}/mesh/blackboard/search", state.mesh.daemon_url()))
+        .post(crate::mesh_client::daemon_endpoint("mesh/blackboard/search"))
         .json(&serde_json::json!({
             "terms": terms,
             "prefix_filter": params.prefix,
