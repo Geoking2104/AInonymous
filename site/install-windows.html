@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AInonymous — Installation nœud A (PC Windows)</title>
+  <style>
+    :root {
+      --bg: #080c12; --bg2: #0d1320; --bg3: #111928; --border: #1e2d45;
+      --cyan: #00d4ff; --purple: #8b5cf6; --green: #10b981; --red: #f87171;
+      --amber: #fbbf24; --text: #e2e8f0; --muted: #64748b;
+      --card: rgba(13,19,32,0.8);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+    }
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.9rem 2rem;
+      background: rgba(8,12,18,0.9); backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-weight: 700; letter-spacing: -0.5px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
+    .nav-links a:hover { color: var(--cyan); }
+    .nav-links .other { border: 1px solid var(--border); padding: 0.3rem 0.8rem; border-radius: 8px; }
+
+    main { max-width: 880px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.25);
+      color: var(--cyan); padding: 0.3rem 0.9rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 500; margin-bottom: 1.2rem;
+    }
+    h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-weight: 800; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.8rem; }
+    .gradient { background: linear-gradient(135deg, var(--cyan), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sub { color: var(--muted); max-width: 640px; margin-bottom: 2.5rem; }
+
+    .step {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.6rem 1.8rem; margin-bottom: 1.5rem; backdrop-filter: blur(10px);
+    }
+    .step-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.3rem; }
+    .step-num {
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.85rem; color: #000;
+    }
+    .step h2 { font-size: 1.05rem; font-weight: 700; }
+    .step p { color: var(--muted); font-size: 0.9rem; margin: 0.4rem 0 0.9rem; }
+    .step p a { color: var(--cyan); text-decoration: none; }
+    .step p a:hover { text-decoration: underline; }
+
+    .code {
+      position: relative; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.9rem 1.1rem; margin-bottom: 0.7rem;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.82rem; color: var(--text);
+      white-space: pre; overflow-x: auto;
+    }
+    .code .c { color: var(--muted); }
+    .copy {
+      position: absolute; top: 0.55rem; right: 0.55rem;
+      background: var(--bg3); color: var(--muted);
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.72rem; padding: 0.25rem 0.7rem; cursor: pointer;
+      font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    }
+    .copy:hover { color: var(--cyan); border-color: var(--cyan); }
+    .copy.done { color: var(--green); border-color: var(--green); }
+
+    .note {
+      font-size: 0.82rem; color: var(--muted);
+      border-left: 2px solid var(--border); padding-left: 0.9rem; margin-top: 0.9rem;
+    }
+
+    /* ── vérificateur ── */
+    .verify-box { border-color: rgba(0,212,255,0.35); }
+    textarea {
+      width: 100%; min-height: 150px; resize: vertical;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      padding: 0.9rem 1rem; outline: none;
+    }
+    textarea:focus { border-color: var(--cyan); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      color: #000; font-weight: 700; font-size: 0.88rem;
+      padding: 0.6rem 1.4rem; border-radius: 8px; border: none;
+      cursor: pointer; margin-top: 0.8rem;
+    }
+    .results { margin-top: 1.2rem; }
+    .rrow {
+      display: flex; align-items: baseline; gap: 0.7rem;
+      padding: 0.55rem 0.2rem; border-bottom: 1px solid rgba(30,45,69,0.5);
+      font-size: 0.86rem;
+    }
+    .rrow:last-child { border-bottom: none; }
+    .rstate { flex-shrink: 0; width: 92px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; }
+    .ok   .rstate { color: var(--green); }
+    .miss .rstate { color: var(--red); }
+    .warn .rstate { color: var(--amber); }
+    .unk  .rstate { color: var(--muted); }
+    .rkey { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text); flex-shrink: 0; }
+    .rval { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; overflow-wrap: anywhere; }
+    .summary {
+      margin-top: 1rem; padding: 0.8rem 1.1rem; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 600; display: none;
+    }
+    .summary.all { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.4); color: var(--green); }
+    .summary.part { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.4); color: var(--amber); }
+
+    footer {
+      border-top: 1px solid var(--border); padding: 1.5rem 2rem;
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+      color: var(--muted); font-size: 0.8rem;
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--cyan); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="index.html">← AInonymous</a>
+  <div class="nav-links">
+    <a href="install-android.html" class="other">📱 Page Android (nœud B)</a>
+    <a href="https://github.com/Geoking2104/AInonymous" target="_blank" rel="noopener">GitHub →</a>
+  </div>
+</nav>
+
+<main>
+  <div class="badge">⚙️ Nœud A · coordinateur · campagne CH3/S4</div>
+  <h1>Installer le kit de mesure<br><span class="gradient">sur ton PC Windows</span></h1>
+  <p class="sub">
+    Cette page installe le minimum pour jouer le rôle de nœud A (coordinateur) dans la campagne de
+    mesure QUIC/mTLS entre deux machines réelles (<a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md" style="color:var(--cyan)">protocole</a>).
+    Chaque bloc se copie en un clic ; l'étape finale vérifie chaque paquet automatiquement.
+  </p>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">1</div><h2>Prérequis — les paquets</h2></div>
+    <p>Git, Rust 1.91+, Python 3 et les platform-tools Android (adb). Installe ce qui manque, puis passe au bloc suivant.</p>
+    <div class="code" data-copy><button class="copy">Copier</button><span class="c"># Git for Windows (si absent) — https://git-scm.com/download/win
+# Rust (si absent) :</span>
+winget install Rustlang.Rustup
+rustup default stable
+rustup target add wasm32-unknown-unknown
+
+<span class="c"># Python 3 (si absent) :</span>
+winget install Python.Python.3.13
+
+<span class="c"># platform-tools (adb) :</span>
+winget install Google.PlatformTools</div>
+    <div class="note">Le NDK Android n'est nécessaire qu'à l'étape 3 (compilation croisée du binaire du téléphone). Si tu as Android Studio, il est probablement déjà dans <code>%LOCALAPPDATA%\Android\Sdk\ndk</code>.</div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">2</div><h2>Cloner le dépôt et compiler le binaire du PC</h2></div>
+    <p>Dans PowerShell (ou Git Bash) :</p>
+    <div class="code" data-copy><button class="copy">Copier</button>git clone https://github.com/Geoking2104/AInonymous.git
+cd AInonymous
+cargo build --release -p relay-quic-spike</div>
+    <div class="note">Résultat attendu : <code>target\release\quic-spike.exe</code>. Premier build : quelques minutes.</div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">3</div><h2>Compiler le binaire du téléphone (Android)</h2></div>
+    <p>Dans Git Bash, depuis la racine du dépôt. Le script trouve seul le NDK (<code>ANDROID_NDK_HOME</code> ou le dossier SDK) :</p>
+    <div class="code" data-copy><button class="copy">Copier</button>bash scripts/campaign/cross-compile-android.sh</div>
+    <div class="note">Résultat : <code>dist\android\quic-spike</code> (binaire aarch64 du téléphone) + <code>dist\android\SHA256SUMS</code>.</div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">4</div><h2>Préparer le téléphone connecté</h2></div>
+    <p>Active le <strong>débogage USB</strong> sur le téléphone, branche-le, puis dans Git Bash :</p>
+    <div class="code" data-copy><button class="copy">Copier</button>bash scripts/campaign/android/prepare-device.sh</div>
+    <p>Le script installe Termux si besoin, pousse le binaire + les scripts vers le téléphone et établit la redirection <code>tcp:7700</code>. Ensuite, sur le téléphone, suis la <a href="install-android.html" style="color:var(--cyan)">page Android (nœud B)</a>.</p>
+  </div>
+
+  <div class="step verify-box">
+    <div class="step-head"><div class="step-num">✓</div><h2>Vérifier l'installation</h2></div>
+    <p>Lance le vérificateur, copie sa sortie complète, et colle-la ci-dessous :</p>
+    <div class="code" data-copy><button class="copy">Copier</button>powershell -ExecutionPolicy Bypass -File scripts\campaign\check-windows.ps1</div>
+    <textarea id="paste" placeholder="Colle ici la sortie de check-windows.ps1 —&#10;CHECK git=git version 2.x&#10;MISSING adb&#10;…&#10;SUMMARY 7/9" spellcheck="false"></textarea>
+    <button class="btn" id="run">Analyser la sortie</button>
+    <div class="summary" id="summary"></div>
+    <div class="results" id="results"></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><div class="step-num">▶</div><h2>Tout est vert ? Lance la campagne</h2></div>
+    <div class="code" data-copy><button class="copy">Copier</button><span class="c"># worker démarré sur le téléphone (voir page Android) :</span>
+python scripts/campaign/run-campaign.py --links usb,wifi --runs 3 --hardware "PC &lt;modèle&gt; + téléphone &lt;modèle&gt;"
+
+<span class="c"># puis consolider les résultats :</span>
+python scripts/campaign/aggregate-results.py</div>
+  </div>
+</main>
+
+<footer>
+  <span>AInonymous — kit de campagne CH3/S4</span>
+  <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">Protocole</a>
+  <a href="install-android.html">Page Android</a>
+</footer>
+
+<script>
+  // ── copie en un clic ──────────────────────────────────────────────────────
+  document.querySelectorAll('[data-copy]').forEach(block => {
+    const btn = block.querySelector('.copy');
+    btn.addEventListener('click', async () => {
+      const clone = block.cloneNode(true);
+      clone.querySelector('.copy').remove();
+      const text = clone.textContent.replace(/^\n/, '').replace(/\n$/, '');
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy'); ta.remove();
+      }
+      const old = btn.textContent;
+      btn.textContent = 'Copié ✓'; btn.classList.add('done');
+      setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+    });
+  });
+
+  // ── vérificateur : analyse la sortie de check-windows.ps1 ────────────────
+  const EXPECTED = {
+    'git':               'Git',
+    'rustc':             'Rust (compilateur)',
+    'cargo':             'Cargo',
+    'python':            'Python 3',
+    'adb':               'adb (platform-tools)',
+    'quic-spike-pc':     'Binaire du PC (target\\release\\quic-spike.exe)',
+    'quic-spike-run':    'Binaire du PC exécutable',
+    'quic-spike-android':'Binaire Android (dist\\android\\quic-spike)',
+    'sha256sums':        'Somme SHA-256 (dist\\android\\SHA256SUMS)',
+  };
+  const OPTIONAL = {
+    'ndk': 'NDK Android (requis pour l\u2019étape 3 seulement)',
+    'wifi-ip': null,
+  };
+
+  document.getElementById('run').addEventListener('click', () => {
+    const raw = document.getElementById('paste').value;
+    const found = {};
+    let summary = null;
+    raw.split(/\r?\n/).forEach(line => {
+      let m = line.match(/^CHECK\s+([A-Za-z0-9_-]+)=(.*)$/);
+      if (m) { found[m[1]] = { state: 'ok', val: m[2].trim() }; return; }
+      m = line.match(/^MISSING\s+([A-Za-z0-9_-]+)$/);
+      if (m) { found[m[1]] = { state: 'miss', val: '' }; return; }
+      m = line.match(/^WARN\s+([A-Za-z0-9_-]+)=(.*)$/);
+      if (m && OPTIONAL[m[1]] !== null && OPTIONAL[m[1]] !== undefined) {
+        found[m[1]] = { state: 'warn', val: m[2].trim() }; return;
+      }
+      m = line.match(/^SUMMARY\s+(\d+)\/(\d+)$/);
+      if (m) { summary = [parseInt(m[1], 10), parseInt(m[2], 10)]; }
+    });
+
+    const results = document.getElementById('results');
+    const sumEl = document.getElementById('summary');
+    results.innerHTML = '';
+    sumEl.style.display = 'none';
+
+    if (Object.keys(found).length === 0 && summary === null) {
+      results.innerHTML = '<div class="rrow unk"><span class="rstate">—</span><span class="rval">Aucune ligne reconnue. Colle la sortie complète de check-windows.ps1 (elle commence par « === AINONYMOUS CAMPAIGN CHECK »).</span></div>';
+      return;
+    }
+
+    const LABEL = { ok: '✓ OK', miss: '✗ MANQUE', warn: '◇ INFO', unk: '? non vu' };
+    const order = Object.keys(EXPECTED).concat(Object.keys(OPTIONAL).filter(k => OPTIONAL[k]));
+    order.forEach(key => {
+      const isReq = key in EXPECTED;
+      const e = found[key] || { state: 'unk', val: '' };
+      if (!isReq && e.state === 'unk') return; // options non signalées : on n'affiche pas
+      const row = document.createElement('div');
+      row.className = 'rrow ' + e.state;
+      const name = isReq ? EXPECTED[key] : OPTIONAL[key];
+      row.innerHTML = '<span class="rstate">' + LABEL[e.state] + '</span>' +
+        '<span class="rkey">' + name + '</span>' +
+        '<span class="rval">' + e.val.replace(/</g, '&lt;') + '</span>';
+      results.appendChild(row);
+    });
+
+    if (summary) {
+      const [ok, total] = summary;
+      sumEl.style.display = 'block';
+      if (ok === total) {
+        sumEl.className = 'summary all';
+        sumEl.textContent = '✓ ' + ok + '/' + total + ' — installation complète, tu peux lancer la campagne.';
+      } else {
+        sumEl.className = 'summary part';
+        sumEl.textContent = ok + '/' + total + ' — corrige les lignes ✗ ci-dessus puis relance le vérificateur.';
+      }
+    }
+  });
+</script>
+</body>
+</html>

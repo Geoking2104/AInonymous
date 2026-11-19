@@ -91,6 +91,9 @@ echo "▶ Poussée des fichiers vers Termux…"
 # compatible : /sdcard/Download puis cp via run-as).
 "$ADB" push "$BIN" /sdcard/Download/quic-spike
 "$ADB" push "$DIST/SHA256SUMS" /sdcard/Download/quic-spike.SHA256SUMS
+"$ADB" shell mkdir -p /sdcard/Download/campaign
+"$ADB" push "$ROOT/scripts/campaign/android/worker-start.sh" /sdcard/Download/campaign/worker-start.sh
+"$ADB" push "$ROOT/scripts/campaign/android/check-termux.sh" /sdcard/Download/campaign/check-termux.sh
 
 # Copie interne + chmod. run-as fonctionne si l'APK est debuggable (build
 # Termux github-debug) ; sinon repli sur une copie depuis /sdcard au premier

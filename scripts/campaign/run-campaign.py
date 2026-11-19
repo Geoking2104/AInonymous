@@ -50,6 +50,10 @@ import sys
 import time
 from typing import NoReturn
 
+# Binaire natif par défaut : .exe sous Windows.
+DEFAULT_BIN = os.path.join("target", "release",
+                           "quic-spike.exe" if os.name == "nt" else "quic-spike")
+
 # ── Constantes du protocole (spike-quic) ────────────────────────────────────
 OFFER_TTL_S = 30          # jeton de session à usage unique : TTL 30 s
 OFFER_REGEN_S = 20        # le worker régénère l'offre toutes les 20 s
@@ -222,7 +226,7 @@ def main() -> int:
     ap.add_argument("--bytes", type=int, default=100 * 1024 * 1024,
                     help="octets du transfert de débit (défaut : 100 MiB)")
     ap.add_argument("--bin", default=os.environ.get(
-        "QUIC_SPIKE_BIN", "target/release/quic-spike"),
+        "QUIC_SPIKE_BIN", DEFAULT_BIN),
                     help="chemin du binaire quic-spike du PC")
     ap.add_argument("--hardware", default=os.environ.get("HARDWARE", "non renseigné"),
                     help="description libre du matériel (PC + téléphone)")
