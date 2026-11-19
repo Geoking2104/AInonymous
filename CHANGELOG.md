@@ -33,6 +33,8 @@ go/no-go decision.
   (it no longer loaded); a unit test parses the testnet configs.
 
 ### Added
+- CH3/S4 measurement campaign kit: `scripts/campaign/` cross-compiles `quic-spike` for Android (aarch64, API 24+), prepares a Termux worker over adb, orchestrates repeated two-real-machines measurements per link (usb/wifi) with fresh 30-s session offers, aggregates results into `results/ch3/` in the established format, and is covered by seven stdlib unit tests run in a dedicated CI job (`Campaign scripts`). Protocol: `docs/campaign/PROTOCOL.md`.
+
 
 - Website: interactive setup guide in the “Rejoins le réseau / Join the network”
   section of `site/index.html` and `site/index.en.html` (`site/setup-guide.js`,
