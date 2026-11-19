@@ -33,6 +33,8 @@ go/no-go decision.
   (it no longer loaded); a unit test parses the testnet configs.
 
 ### Added
+- Site: the `installer` section of `ainonymous.html` is now bilingual (FR/EN switch, same pattern as the mesh/HybridNode/enterprise sections) and links two guided campaign-install pages — `site/install-windows.html` (node A) and `site/install-android.html` (node B) — each bilingual (FR/EN, `?lang=en` deep link), with one-click copy blocks and a paste-back checker that parses `check-windows.ps1` / `check-termux.sh` output per package; relative links are rewritten for htmlpreview.github.io.
+
 - CH3/S4 measurement campaign kit: `scripts/campaign/` cross-compiles `quic-spike` for Android (aarch64, API 24+), prepares a Termux worker over adb, orchestrates repeated two-real-machines measurements per link (usb/wifi) with fresh 30-s session offers, aggregates results into `results/ch3/` in the established format, and is covered by seven stdlib unit tests run in a dedicated CI job (`Campaign scripts`). Protocol: `docs/campaign/PROTOCOL.md`.
 
 

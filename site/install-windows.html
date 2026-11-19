@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AInonymous — Installation nœud A (PC Windows)</title>
+  <title>AInonymous — Installation nœud A (PC Windows) / Node A setup (Windows PC)</title>
   <style>
     :root {
       --bg: #080c12; --bg2: #0d1320; --bg3: #111928; --border: #1e2d45;
@@ -20,7 +20,7 @@
     nav {
       position: sticky; top: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0.9rem 2rem;
+      padding: 0.9rem 1.5rem;
       background: rgba(8,12,18,0.9); backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
@@ -30,26 +30,35 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       text-decoration: none;
     }
-    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
-    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
-    .nav-links a:hover { color: var(--cyan); }
-    .nav-links .other { border: 1px solid var(--border); padding: 0.3rem 0.8rem; border-radius: 8px; }
+    .nav-right { display: flex; gap: 0.9rem; align-items: center; }
+    .nav-right a { color: var(--muted); text-decoration: none; font-size: 0.82rem; }
+    .nav-right a:hover { color: var(--cyan); }
+    .nav-right .other { border: 1px solid var(--border); padding: 0.28rem 0.7rem; border-radius: 8px; }
+    .lang-switch {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 12px; font-weight: 700;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+    }
+    .lang-switch a { padding: 5px 12px; color: var(--muted); text-decoration: none; transition: all .15s; }
+    .lang-switch a.active { background: var(--cyan); color: #000; }
 
-    main { max-width: 880px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+    main { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
     .badge {
       display: inline-flex; align-items: center; gap: 0.5rem;
       background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.25);
       color: var(--cyan); padding: 0.3rem 0.9rem; border-radius: 999px;
-      font-size: 0.78rem; font-weight: 500; margin-bottom: 1.2rem;
+      font-size: 0.76rem; font-weight: 500; margin-bottom: 1.2rem;
     }
-    h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-weight: 800; letter-spacing: -1px; line-height: 1.1; margin-bottom: 0.8rem; }
+    h1 { font-size: clamp(1.8rem, 4.5vw, 2.7rem); font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin-bottom: 0.8rem; }
     .gradient { background: linear-gradient(135deg, var(--cyan), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .sub { color: var(--muted); max-width: 640px; margin-bottom: 2.5rem; }
+    .sub { color: var(--muted); font-size: 0.95rem; max-width: 640px; margin-bottom: 2.2rem; }
+    .sub a { color: var(--cyan); text-decoration: none; }
 
     .step {
       background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-      padding: 1.6rem 1.8rem; margin-bottom: 1.5rem; backdrop-filter: blur(10px);
+      padding: 1.5rem 1.7rem; margin-bottom: 1.4rem; backdrop-filter: blur(10px);
     }
     .step-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.3rem; }
     .step-num {
@@ -58,17 +67,17 @@
       display: flex; align-items: center; justify-content: center;
       font-weight: 800; font-size: 0.85rem; color: #000;
     }
-    .step h2 { font-size: 1.05rem; font-weight: 700; }
-    .step p { color: var(--muted); font-size: 0.9rem; margin: 0.4rem 0 0.9rem; }
+    .step h2 { font-size: 1.02rem; font-weight: 700; }
+    .step p { color: var(--muted); font-size: 0.89rem; margin: 0.4rem 0 0.9rem; }
     .step p a { color: var(--cyan); text-decoration: none; }
-    .step p a:hover { text-decoration: underline; }
+    .step p strong { color: var(--text); }
 
     .code {
       position: relative; background: var(--bg);
       border: 1px solid var(--border); border-radius: 8px;
       padding: 0.9rem 1.1rem; margin-bottom: 0.7rem;
       font-family: 'JetBrains Mono', 'Fira Code', monospace;
-      font-size: 0.82rem; color: var(--text);
+      font-size: 0.81rem; color: var(--text);
       white-space: pre; overflow-x: auto;
     }
     .code .c { color: var(--muted); }
@@ -81,26 +90,24 @@
     }
     .copy:hover { color: var(--cyan); border-color: var(--cyan); }
     .copy.done { color: var(--green); border-color: var(--green); }
-
     .note {
-      font-size: 0.82rem; color: var(--muted);
+      font-size: 0.81rem; color: var(--muted);
       border-left: 2px solid var(--border); padding-left: 0.9rem; margin-top: 0.9rem;
     }
 
-    /* ── vérificateur ── */
     .verify-box { border-color: rgba(0,212,255,0.35); }
     textarea {
       width: 100%; min-height: 150px; resize: vertical;
       background: var(--bg); color: var(--text);
       border: 1px solid var(--border); border-radius: 8px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.79rem;
       padding: 0.9rem 1rem; outline: none;
     }
     textarea:focus { border-color: var(--cyan); }
     .btn {
       display: inline-flex; align-items: center; gap: 0.5rem;
       background: linear-gradient(135deg, var(--cyan), var(--purple));
-      color: #000; font-weight: 700; font-size: 0.88rem;
+      color: #000; font-weight: 700; font-size: 0.87rem;
       padding: 0.6rem 1.4rem; border-radius: 8px; border: none;
       cursor: pointer; margin-top: 0.8rem;
     }
@@ -111,24 +118,24 @@
       font-size: 0.86rem;
     }
     .rrow:last-child { border-bottom: none; }
-    .rstate { flex-shrink: 0; width: 92px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; }
+    .rstate { flex-shrink: 0; width: 96px; font-size: 0.71rem; font-weight: 700; letter-spacing: 0.5px; }
     .ok   .rstate { color: var(--green); }
     .miss .rstate { color: var(--red); }
     .warn .rstate { color: var(--amber); }
     .unk  .rstate { color: var(--muted); }
-    .rkey { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text); flex-shrink: 0; }
-    .rval { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; overflow-wrap: anywhere; }
+    .rkey { font-family: 'JetBrains Mono', monospace; font-size: 0.79rem; color: var(--text); flex-shrink: 0; }
+    .rval { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; overflow-wrap: anywhere; }
     .summary {
       margin-top: 1rem; padding: 0.8rem 1.1rem; border-radius: 8px;
-      font-size: 0.9rem; font-weight: 600; display: none;
+      font-size: 0.89rem; font-weight: 600; display: none;
     }
     .summary.all { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.4); color: var(--green); }
     .summary.part { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.4); color: var(--amber); }
 
     footer {
-      border-top: 1px solid var(--border); padding: 1.5rem 2rem;
-      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
-      color: var(--muted); font-size: 0.8rem;
+      border-top: 1px solid var(--border); padding: 1.4rem 1.5rem;
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem;
+      color: var(--muted); font-size: 0.78rem;
     }
     footer a { color: var(--muted); text-decoration: none; }
     footer a:hover { color: var(--cyan); }
@@ -138,25 +145,30 @@
 
 <nav>
   <a class="nav-logo" href="index.html">← AInonymous</a>
-  <div class="nav-links">
-    <a href="install-android.html" class="other">📱 Page Android (nœud B)</a>
+  <div class="nav-right">
+    <div class="lang-switch">
+      <a href="#" id="btn-fr" class="active" onclick="pageLang('fr');return false;">FR</a>
+      <a href="#" id="btn-en" onclick="pageLang('en');return false;">EN</a>
+    </div>
+    <a href="install-android.html" class="other">📱 <span class="i18n" data-fr="Page Android (nœud B)" data-en="Android page (node B)">Page Android (nœud B)</span></a>
     <a href="https://github.com/Geoking2104/AInonymous" target="_blank" rel="noopener">GitHub →</a>
   </div>
 </nav>
 
 <main>
-  <div class="badge">⚙️ Nœud A · coordinateur · campagne CH3/S4</div>
-  <h1>Installer le kit de mesure<br><span class="gradient">sur ton PC Windows</span></h1>
-  <p class="sub">
-    Cette page installe le minimum pour jouer le rôle de nœud A (coordinateur) dans la campagne de
-    mesure QUIC/mTLS entre deux machines réelles (<a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md" style="color:var(--cyan)">protocole</a>).
-    Chaque bloc se copie en un clic ; l'étape finale vérifie chaque paquet automatiquement.
-  </p>
+  <div id="page-fr">
+    <div class="badge">⚙️ Nœud A · coordinateur · campagne CH3/S4</div>
+    <h1>Installer le kit de mesure<br><span class="gradient">sur ton PC Windows</span></h1>
+    <p class="sub">
+      Cette page installe le minimum pour jouer le rôle de nœud A (coordinateur) dans la campagne de
+      mesure QUIC/mTLS entre deux machines réelles (<a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">protocole</a>).
+      Chaque bloc se copie en un clic ; l'étape finale vérifie chaque paquet automatiquement.
+    </p>
 
-  <div class="step">
-    <div class="step-head"><div class="step-num">1</div><h2>Prérequis — les paquets</h2></div>
-    <p>Git, Rust 1.91+, Python 3 et les platform-tools Android (adb). Installe ce qui manque, puis passe au bloc suivant.</p>
-    <div class="code" data-copy><button class="copy">Copier</button><span class="c"># Git for Windows (si absent) — https://git-scm.com/download/win
+    <div class="step">
+      <div class="step-head"><div class="step-num">1</div><h2>Prérequis — les paquets</h2></div>
+      <p>Git, Rust 1.91+, Python 3 et les platform-tools Android (adb). Installe ce qui manque, puis passe au bloc suivant.</p>
+      <div class="code" data-copy><button class="copy">Copier</button><span class="c"># Git for Windows (si absent) — https://git-scm.com/download/win
 # Rust (si absent) :</span>
 winget install Rustlang.Rustup
 rustup default stable
@@ -167,150 +179,270 @@ winget install Python.Python.3.13
 
 <span class="c"># platform-tools (adb) :</span>
 winget install Google.PlatformTools</div>
-    <div class="note">Le NDK Android n'est nécessaire qu'à l'étape 3 (compilation croisée du binaire du téléphone). Si tu as Android Studio, il est probablement déjà dans <code>%LOCALAPPDATA%\Android\Sdk\ndk</code>.</div>
-  </div>
+      <div class="note">Le NDK Android n'est nécessaire qu'à l'étape 3 (compilation croisée du binaire du téléphone). Si tu as Android Studio, il est probablement déjà dans <code>%LOCALAPPDATA%\Android\Sdk\ndk</code>.</div>
+    </div>
 
-  <div class="step">
-    <div class="step-head"><div class="step-num">2</div><h2>Cloner le dépôt et compiler le binaire du PC</h2></div>
-    <p>Dans PowerShell (ou Git Bash) :</p>
-    <div class="code" data-copy><button class="copy">Copier</button>git clone https://github.com/Geoking2104/AInonymous.git
+    <div class="step">
+      <div class="step-head"><div class="step-num">2</div><h2>Cloner le dépôt et compiler le binaire du PC</h2></div>
+      <p>Dans PowerShell (ou Git Bash) :</p>
+      <div class="code" data-copy><button class="copy">Copier</button>git clone https://github.com/Geoking2104/AInonymous.git
 cd AInonymous
 cargo build --release -p relay-quic-spike</div>
-    <div class="note">Résultat attendu : <code>target\release\quic-spike.exe</code>. Premier build : quelques minutes.</div>
-  </div>
+      <div class="note">Résultat attendu : <code>target\release\quic-spike.exe</code>. Premier build : quelques minutes.</div>
+    </div>
 
-  <div class="step">
-    <div class="step-head"><div class="step-num">3</div><h2>Compiler le binaire du téléphone (Android)</h2></div>
-    <p>Dans Git Bash, depuis la racine du dépôt. Le script trouve seul le NDK (<code>ANDROID_NDK_HOME</code> ou le dossier SDK) :</p>
-    <div class="code" data-copy><button class="copy">Copier</button>bash scripts/campaign/cross-compile-android.sh</div>
-    <div class="note">Résultat : <code>dist\android\quic-spike</code> (binaire aarch64 du téléphone) + <code>dist\android\SHA256SUMS</code>.</div>
-  </div>
+    <div class="step">
+      <div class="step-head"><div class="step-num">3</div><h2>Compiler le binaire du téléphone (Android)</h2></div>
+      <p>Dans Git Bash, depuis la racine du dépôt. Le script trouve seul le NDK (<code>ANDROID_NDK_HOME</code> ou le dossier SDK) :</p>
+      <div class="code" data-copy><button class="copy">Copier</button>bash scripts/campaign/cross-compile-android.sh</div>
+      <div class="note">Résultat : <code>dist\android\quic-spike</code> (binaire aarch64 du téléphone) + <code>dist\android\SHA256SUMS</code>.</div>
+    </div>
 
-  <div class="step">
-    <div class="step-head"><div class="step-num">4</div><h2>Préparer le téléphone connecté</h2></div>
-    <p>Active le <strong>débogage USB</strong> sur le téléphone, branche-le, puis dans Git Bash :</p>
-    <div class="code" data-copy><button class="copy">Copier</button>bash scripts/campaign/android/prepare-device.sh</div>
-    <p>Le script installe Termux si besoin, pousse le binaire + les scripts vers le téléphone et établit la redirection <code>tcp:7700</code>. Ensuite, sur le téléphone, suis la <a href="install-android.html" style="color:var(--cyan)">page Android (nœud B)</a>.</p>
-  </div>
+    <div class="step">
+      <div class="step-head"><div class="step-num">4</div><h2>Préparer le téléphone connecté</h2></div>
+      <p>Active le <strong>débogage USB</strong> sur le téléphone, branche-le, puis dans Git Bash :</p>
+      <div class="code" data-copy><button class="copy">Copier</button>bash scripts/campaign/android/prepare-device.sh</div>
+      <p>Le script installe Termux si besoin, pousse le binaire + les scripts vers le téléphone et établit la redirection <code>tcp:7700</code>. Ensuite, sur le téléphone, suis la <a href="install-android.html">page Android (nœud B)</a>.</p>
+    </div>
 
-  <div class="step verify-box">
-    <div class="step-head"><div class="step-num">✓</div><h2>Vérifier l'installation</h2></div>
-    <p>Lance le vérificateur, copie sa sortie complète, et colle-la ci-dessous :</p>
-    <div class="code" data-copy><button class="copy">Copier</button>powershell -ExecutionPolicy Bypass -File scripts\campaign\check-windows.ps1</div>
-    <textarea id="paste" placeholder="Colle ici la sortie de check-windows.ps1 —&#10;CHECK git=git version 2.x&#10;MISSING adb&#10;…&#10;SUMMARY 7/9" spellcheck="false"></textarea>
-    <button class="btn" id="run">Analyser la sortie</button>
-    <div class="summary" id="summary"></div>
-    <div class="results" id="results"></div>
-  </div>
+    <div class="step verify-box">
+      <div class="step-head"><div class="step-num">✓</div><h2>Vérifier l'installation</h2></div>
+      <p>Lance le vérificateur, copie sa sortie complète, et colle-la ci-dessous :</p>
+      <div class="code" data-copy><button class="copy">Copier</button>powershell -ExecutionPolicy Bypass -File scripts\campaign\check-windows.ps1</div>
+      <textarea id="paste" placeholder="Colle ici la sortie de check-windows.ps1 —&#10;CHECK git=git version 2.x&#10;MISSING adb&#10;…&#10;SUMMARY 7/9" spellcheck="false"></textarea>
+      <button class="btn" id="run">Analyser la sortie</button>
+      <div class="summary" id="summary"></div>
+      <div class="results" id="results"></div>
+    </div>
 
-  <div class="step">
-    <div class="step-head"><div class="step-num">▶</div><h2>Tout est vert ? Lance la campagne</h2></div>
-    <div class="code" data-copy><button class="copy">Copier</button><span class="c"># worker démarré sur le téléphone (voir page Android) :</span>
+    <div class="step">
+      <div class="step-head"><div class="step-num">▶</div><h2>Tout est vert ? Lance la campagne</h2></div>
+      <div class="code" data-copy><button class="copy">Copier</button><span class="c"># worker démarré sur le téléphone (voir page Android) :</span>
 python scripts/campaign/run-campaign.py --links usb,wifi --runs 3 --hardware "PC &lt;modèle&gt; + téléphone &lt;modèle&gt;"
 
 <span class="c"># puis consolider les résultats :</span>
 python scripts/campaign/aggregate-results.py</div>
+    </div>
+  </div>
+
+  <div id="page-en" style="display:none;">
+    <div class="badge">⚙️ Node A · coordinator · CH3/S4 campaign</div>
+    <h1>Set up the measurement kit<br><span class="gradient">on your Windows PC</span></h1>
+    <p class="sub">
+      This page installs the minimum needed to act as node A (coordinator) in the real two-machine
+      QUIC/mTLS measurement campaign (<a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">protocol</a>).
+      Every block is one-click copyable; the final step verifies each package automatically.
+    </p>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">1</div><h2>Prerequisites — the packages</h2></div>
+      <p>Git, Rust 1.91+, Python 3 and the Android platform-tools (adb). Install what is missing, then move on.</p>
+      <div class="code" data-copy><button class="copy">Copy</button><span class="c"># Git for Windows (if missing) — https://git-scm.com/download/win
+# Rust (if missing):</span>
+winget install Rustlang.Rustup
+rustup default stable
+rustup target add wasm32-unknown-unknown
+
+<span class="c"># Python 3 (if missing):</span>
+winget install Python.Python.3.13
+
+<span class="c"># platform-tools (adb):</span>
+winget install Google.PlatformTools</div>
+      <div class="note">The Android NDK is only needed at step 3 (cross-compiling the phone binary). If you have Android Studio, it is probably already in <code>%LOCALAPPDATA%\Android\Sdk\ndk</code>.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">2</div><h2>Clone the repository and build the PC binary</h2></div>
+      <p>In PowerShell (or Git Bash):</p>
+      <div class="code" data-copy><button class="copy">Copy</button>git clone https://github.com/Geoking2104/AInonymous.git
+cd AInonymous
+cargo build --release -p relay-quic-spike</div>
+      <div class="note">Expected result: <code>target\release\quic-spike.exe</code>. First build: a few minutes.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">3</div><h2>Build the phone binary (Android)</h2></div>
+      <p>In Git Bash, from the repository root. The script locates the NDK by itself (<code>ANDROID_NDK_HOME</code> or the SDK folder):</p>
+      <div class="code" data-copy><button class="copy">Copy</button>bash scripts/campaign/cross-compile-android.sh</div>
+      <div class="note">Result: <code>dist\android\quic-spike</code> (the phone's aarch64 binary) + <code>dist\android\SHA256SUMS</code>.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">4</div><h2>Prepare the connected phone</h2></div>
+      <p>Enable <strong>USB debugging</strong> on the phone, plug it in, then in Git Bash:</p>
+      <div class="code" data-copy><button class="copy">Copy</button>bash scripts/campaign/android/prepare-device.sh</div>
+      <p>The script installs Termux if needed, pushes the binary + scripts to the phone and sets up the <code>tcp:7700</code> forwarding. Then, on the phone, follow the <a href="install-android.html">Android page (node B)</a>.</p>
+    </div>
+
+    <div class="step verify-box">
+      <div class="step-head"><div class="step-num">✓</div><h2>Verify the installation</h2></div>
+      <p>Run the checker, copy its full output, and paste it below:</p>
+      <div class="code" data-copy><button class="copy">Copy</button>powershell -ExecutionPolicy Bypass -File scripts\campaign\check-windows.ps1</div>
+      <textarea id="paste-en" placeholder="Paste the output of check-windows.ps1 here —&#10;CHECK git=git version 2.x&#10;MISSING adb&#10;…&#10;SUMMARY 7/9" spellcheck="false"></textarea>
+      <button class="btn" id="run-en">Analyze output</button>
+      <div class="summary" id="summary-en"></div>
+      <div class="results" id="results-en"></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">▶</div><h2>All green? Run the campaign</h2></div>
+      <div class="code" data-copy><button class="copy">Copy</button><span class="c"># worker started on the phone (see Android page):</span>
+python scripts/campaign/run-campaign.py --links usb,wifi --runs 3 --hardware "PC &lt;model&gt; + phone &lt;model&gt;"
+
+<span class="c"># then consolidate the results:</span>
+python scripts/campaign/aggregate-results.py</div>
+    </div>
   </div>
 </main>
 
 <footer>
-  <span>AInonymous — kit de campagne CH3/S4</span>
-  <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">Protocole</a>
-  <a href="install-android.html">Page Android</a>
+  <span>AInonymous — CH3/S4 campaign kit</span>
+  <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">Protocole / Protocol</a>
+  <a href="install-android.html">Page Android / Android page</a>
 </footer>
 
 <script>
+  // ── i18n de la page ───────────────────────────────────────────────────────
+  function pageLang(lang) {
+    document.getElementById('page-fr').style.display = lang === 'fr' ? 'block' : 'none';
+    document.getElementById('page-en').style.display = lang === 'en' ? 'block' : 'none';
+    document.getElementById('btn-fr').classList.toggle('active', lang === 'fr');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    var el = document.querySelector('.i18n');
+    if (el) el.textContent = el.getAttribute('data-' + lang);
+  }
+  if (location.hash === '#en' || new URLSearchParams(location.search).get('lang') === 'en') {
+    pageLang('en');
+  }
+
   // ── copie en un clic ──────────────────────────────────────────────────────
-  document.querySelectorAll('[data-copy]').forEach(block => {
-    const btn = block.querySelector('.copy');
-    btn.addEventListener('click', async () => {
-      const clone = block.cloneNode(true);
+  var COPY_LABELS = { fr: ['Copier', 'Copié ✓'], en: ['Copy', 'Copied ✓'] };
+  function currentLang() {
+    return document.getElementById('page-en').style.display !== 'none' ? 'en' : 'fr';
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (block) {
+    var btn = block.querySelector('.copy');
+    btn.addEventListener('click', function () {
+      var clone = block.cloneNode(true);
       clone.querySelector('.copy').remove();
-      const text = clone.textContent.replace(/^\n/, '').replace(/\n$/, '');
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch (e) {
-        const ta = document.createElement('textarea');
-        ta.value = text; document.body.appendChild(ta);
-        ta.select(); document.execCommand('copy'); ta.remove();
-      }
-      const old = btn.textContent;
-      btn.textContent = 'Copié ✓'; btn.classList.add('done');
-      setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+      var text = clone.textContent.replace(/^\n/, '').replace(/\n$/, '');
+      var done = function () {
+        var labels = COPY_LABELS[currentLang()];
+        btn.textContent = labels[1]; btn.classList.add('done');
+        setTimeout(function () { btn.textContent = labels[0]; btn.classList.remove('done'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      } else { fallbackCopy(text); done(); }
     });
   });
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+  }
 
   // ── vérificateur : analyse la sortie de check-windows.ps1 ────────────────
-  const EXPECTED = {
-    'git':               'Git',
-    'rustc':             'Rust (compilateur)',
-    'cargo':             'Cargo',
-    'python':            'Python 3',
-    'adb':               'adb (platform-tools)',
-    'quic-spike-pc':     'Binaire du PC (target\\release\\quic-spike.exe)',
-    'quic-spike-run':    'Binaire du PC exécutable',
-    'quic-spike-android':'Binaire Android (dist\\android\\quic-spike)',
-    'sha256sums':        'Somme SHA-256 (dist\\android\\SHA256SUMS)',
-  };
-  const OPTIONAL = {
-    'ndk': 'NDK Android (requis pour l\u2019étape 3 seulement)',
-    'wifi-ip': null,
+  var I18N = {
+    fr: {
+      expected: {
+        'git': 'Git', 'rustc': 'Rust (compilateur)', 'cargo': 'Cargo',
+        'python': 'Python 3', 'adb': 'adb (platform-tools)',
+        'quic-spike-pc': 'Binaire PC (target\\release\\quic-spike.exe)',
+        'quic-spike-run': 'Binaire PC exécutable',
+        'quic-spike-android': 'Binaire Android (dist\\android\\quic-spike)',
+        'sha256sums': 'Somme SHA-256 (dist\\android\\SHA256SUMS)'
+      },
+      optional: { 'ndk': 'NDK Android (requis pour l\u2019étape 3 seulement)' },
+      label: { ok: '✓ OK', miss: '✗ MANQUE', warn: '◇ INFO', unk: '? non vu' },
+      empty: 'Aucune ligne reconnue. Colle la sortie complète de check-windows.ps1 (elle commence par « === AINONYMOUS CAMPAIGN CHECK »).',
+      all: function (ok, total) { return '✓ ' + ok + '/' + total + ' — installation complète, tu peux lancer la campagne.'; },
+      part: function (ok, total) { return ok + '/' + total + ' — corrige les lignes ✗ ci-dessus puis relance le vérificateur.'; }
+    },
+    en: {
+      expected: {
+        'git': 'Git', 'rustc': 'Rust (compiler)', 'cargo': 'Cargo',
+        'python': 'Python 3', 'adb': 'adb (platform-tools)',
+        'quic-spike-pc': 'PC binary (target\\release\\quic-spike.exe)',
+        'quic-spike-run': 'PC binary runs',
+        'quic-spike-android': 'Android binary (dist\\android\\quic-spike)',
+        'sha256sums': 'SHA-256 checksum (dist\\android\\SHA256SUMS)'
+      },
+      optional: { 'ndk': 'Android NDK (only needed for step 3)' },
+      label: { ok: '✓ OK', miss: '✗ MISSING', warn: '◇ INFO', unk: '? not seen' },
+      empty: 'No recognizable lines. Paste the full output of check-windows.ps1 (it starts with "=== AINONYMOUS CAMPAIGN CHECK").',
+      all: function (ok, total) { return '✓ ' + ok + '/' + total + ' — installation complete, you can run the campaign.'; },
+      part: function (ok, total) { return ok + '/' + total + ' — fix the ✗ lines above, then run the checker again.'; }
+    }
   };
 
-  document.getElementById('run').addEventListener('click', () => {
-    const raw = document.getElementById('paste').value;
-    const found = {};
-    let summary = null;
-    raw.split(/\r?\n/).forEach(line => {
-      let m = line.match(/^CHECK\s+([A-Za-z0-9_-]+)=(.*)$/);
+  function analyze(raw, t) {
+    var found = {}; var summary = null;
+    raw.split(/\r?\n/).forEach(function (line) {
+      var m = line.match(/^CHECK\s+([A-Za-z0-9_-]+)=(.*)$/);
       if (m) { found[m[1]] = { state: 'ok', val: m[2].trim() }; return; }
       m = line.match(/^MISSING\s+([A-Za-z0-9_-]+)$/);
       if (m) { found[m[1]] = { state: 'miss', val: '' }; return; }
       m = line.match(/^WARN\s+([A-Za-z0-9_-]+)=(.*)$/);
-      if (m && OPTIONAL[m[1]] !== null && OPTIONAL[m[1]] !== undefined) {
-        found[m[1]] = { state: 'warn', val: m[2].trim() }; return;
-      }
+      if (m && t.optional[m[1]]) { found[m[1]] = { state: 'warn', val: m[2].trim() }; return; }
       m = line.match(/^SUMMARY\s+(\d+)\/(\d+)$/);
       if (m) { summary = [parseInt(m[1], 10), parseInt(m[2], 10)]; }
     });
+    return { found: found, summary: summary };
+  }
 
-    const results = document.getElementById('results');
-    const sumEl = document.getElementById('summary');
+  function render(suffix) {
+    var t = I18N[currentLang()];
+    var raw = document.getElementById('paste' + suffix).value;
+    var r = analyze(raw, t);
+    var results = document.getElementById('results' + suffix);
+    var sumEl = document.getElementById('summary' + suffix);
     results.innerHTML = '';
     sumEl.style.display = 'none';
 
-    if (Object.keys(found).length === 0 && summary === null) {
-      results.innerHTML = '<div class="rrow unk"><span class="rstate">—</span><span class="rval">Aucune ligne reconnue. Colle la sortie complète de check-windows.ps1 (elle commence par « === AINONYMOUS CAMPAIGN CHECK »).</span></div>';
+    if (Object.keys(r.found).length === 0 && r.summary === null) {
+      results.innerHTML = '<div class="rrow unk"><span class="rstate">—</span>' +
+        '<span class="rval">' + t.empty + '</span></div>';
       return;
     }
-
-    const LABEL = { ok: '✓ OK', miss: '✗ MANQUE', warn: '◇ INFO', unk: '? non vu' };
-    const order = Object.keys(EXPECTED).concat(Object.keys(OPTIONAL).filter(k => OPTIONAL[k]));
-    order.forEach(key => {
-      const isReq = key in EXPECTED;
-      const e = found[key] || { state: 'unk', val: '' };
-      if (!isReq && e.state === 'unk') return; // options non signalées : on n'affiche pas
-      const row = document.createElement('div');
+    var order = Object.keys(t.expected).concat(Object.keys(t.optional));
+    order.forEach(function (key) {
+      var isReq = key in t.expected;
+      var e = r.found[key] || { state: 'unk', val: '' };
+      if (!isReq && e.state === 'unk') return;
+      var row = document.createElement('div');
       row.className = 'rrow ' + e.state;
-      const name = isReq ? EXPECTED[key] : OPTIONAL[key];
-      row.innerHTML = '<span class="rstate">' + LABEL[e.state] + '</span>' +
+      var name = isReq ? t.expected[key] : t.optional[key];
+      row.innerHTML = '<span class="rstate">' + t.label[e.state] + '</span>' +
         '<span class="rkey">' + name + '</span>' +
         '<span class="rval">' + e.val.replace(/</g, '&lt;') + '</span>';
       results.appendChild(row);
     });
-
-    if (summary) {
-      const [ok, total] = summary;
+    if (r.summary) {
+      var ok = r.summary[0], total = r.summary[1];
       sumEl.style.display = 'block';
-      if (ok === total) {
-        sumEl.className = 'summary all';
-        sumEl.textContent = '✓ ' + ok + '/' + total + ' — installation complète, tu peux lancer la campagne.';
-      } else {
-        sumEl.className = 'summary part';
-        sumEl.textContent = ok + '/' + total + ' — corrige les lignes ✗ ci-dessus puis relance le vérificateur.';
-      }
+      if (ok === total) { sumEl.className = 'summary all'; sumEl.textContent = t.all(ok, total); }
+      else { sumEl.className = 'summary part'; sumEl.textContent = t.part(ok, total); }
     }
-  });
+  }
+
+  document.getElementById('run').addEventListener('click', function () { render(''); });
+  document.getElementById('run-en').addEventListener('click', function () { render('-en'); });
+</script>
+
+<script>
+  // Sous htmlpreview.github.io, les liens relatifs doivent pointer vers la
+  // forme ?https://github.com/.../blob/main/site/<page> pour fonctionner.
+  (function () {
+    if (location.hostname !== 'htmlpreview.github.io') return;
+    var BASE = 'https://htmlpreview.github.io/?https://github.com/Geoking2104/AInonymous/blob/main/site/';
+    document.querySelectorAll('a[href]').forEach(function (a) {
+      var href = a.getAttribute('href');
+      if (!href || /^(https?:|mailto:)/.test(href)) return;
+      if (href.charAt(0) === '#' || href.indexOf('./#') === 0) return;
+      a.setAttribute('href', BASE + href.replace(/^\.\//, ''));
+    });
+  })();
 </script>
 </body>
 </html>
