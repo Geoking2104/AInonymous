@@ -408,9 +408,15 @@
 </div>
 
 <div class="section" id="installer">
-  <div class="eyebrow">Installation</div>
-  <h2>Installer depuis les sources.</h2>
-  <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
+  <div class="lang-switch" style="display:inline-flex; margin-bottom:20px;">
+    <a href="#" id="installer-btn-fr" class="active" onclick="installerLang('fr');return false;">FR</a>
+    <a href="#" id="installer-btn-en" onclick="installerLang('en');return false;">EN</a>
+  </div>
+
+  <div id="installer-fr">
+    <div class="eyebrow">Installation</div>
+    <h2>Installer depuis les sources.</h2>
+    <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
     <pre style="margin:0; font-size:14px; line-height:1.8;">
 # 1. Cloner le dépôt
 git clone https://github.com/Geoking2104/AInonymous.git
@@ -423,10 +429,65 @@ bash scripts/setup_holochain_wsl.sh
 # 3. Compiler les crates et packer les hApps
 cargo build --workspace
 bash scripts/build-happ.sh release</pre>
+    </div>
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Conducteur, daemon et proxy : guide pas à pas dans <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md">docs/JOIN_NETWORK.md</a> et sur la <a href="./#rejoindre">page d'accueil</a>.
+    </p>
+    <div class="eyebrow" style="margin-top:56px;">Campagne de mesure CH3/S4 · deux machines réelles</div>
+    <h2 style="font-size:clamp(22px,3vw,30px); margin-top:8px;">Mesurer le mesh sur PC et téléphone.</h2>
+    <p style="color:var(--muted); max-width:660px; margin:12px 0 28px; font-size:15px; line-height:1.7;">Le kit <code>scripts/campaign/</code> installe un nœud A (PC Windows) et un nœud B (téléphone Android), puis mesure QUIC/mTLS entre eux (portes G4/G7). Deux pages guidées avec vérification de l'installation :</p>
+    <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+      <a href="install-windows.html" style="flex:1 1 260px; display:block; background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:24px; text-decoration:none;">
+      <div style="font-size:12px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase;">Nœud A · coordinateur</div>
+      <div style="font-size:17px; color:var(--text); font-weight:700; margin:8px 0 6px;">💻 PC Windows</div>
+      <div style="font-size:13.5px; color:var(--muted); line-height:1.6;">Prérequis, compilation du PC, cross-compilation Android, préparation du téléphone — chaque étape copiable en un clic et vérifiée automatiquement.</div>
+    </a>
+      <a href="install-android.html" style="flex:1 1 260px; display:block; background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:24px; text-decoration:none;">
+      <div style="font-size:12px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase;">Nœud B · worker QUIC</div>
+      <div style="font-size:17px; color:var(--text); font-weight:700; margin:8px 0 6px;">📱 Android / Termux</div>
+      <div style="font-size:13.5px; color:var(--muted); line-height:1.6;">Installation Termux (F-Droid), récupération du kit, vérification, démarrage du worker Wi-Fi ou USB.</div>
+    </a>
+    </div>
+    <p style="color:var(--muted); font-size:13px; line-height:1.6;">Protocole complet : <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">docs/campaign/PROTOCOL.md</a>. État honnête : seule la boucle locale est mesurée à ce jour — la campagne entre machines réelles est précisément ce que ce kit prépare.</p>
   </div>
-  <p style="margin-top:24px; color:var(--muted); font-size:14px;">
-    Conducteur, daemon et proxy : guide pas à pas dans <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md">docs/JOIN_NETWORK.md</a> et sur la <a href="./#rejoindre">page d'accueil</a>.
-  </p>
+
+  <div id="installer-en" style="display:none;">
+    <div class="eyebrow">Installation</div>
+    <h2>Install from source.</h2>
+    <div style="background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:32px; margin-top:32px;">
+    <pre style="margin:0; font-size:14px; line-height:1.8;">
+# 1. Clone the repository
+git clone https://github.com/Geoking2104/AInonymous.git
+cd AInonymous
+
+# 2. Rust 1.91+ and WASM target, Holochain 0.7.0 (x86_64 Linux/WSL2)
+rustup target add wasm32-unknown-unknown
+bash scripts/setup_holochain_wsl.sh
+
+# 3. Build the crates and pack the hApps
+cargo build --workspace
+bash scripts/build-happ.sh release</pre>
+    </div>
+    <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+      Conductor, daemon and proxy: step-by-step guide in <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/JOIN_NETWORK.md">docs/JOIN_NETWORK.md</a> and on the <a href="./#rejoindre">home page</a>.
+    </p>
+    <div class="eyebrow" style="margin-top:56px;">CH3/S4 measurement campaign · two real machines</div>
+    <h2 style="font-size:clamp(22px,3vw,30px); margin-top:8px;">Measure the mesh across PC and phone.</h2>
+    <p style="color:var(--muted); max-width:660px; margin:12px 0 28px; font-size:15px; line-height:1.7;">The <code>scripts/campaign/</code> kit sets up node A (Windows PC) and node B (Android phone), then measures QUIC/mTLS between them (gates G4/G7). Two guided pages with installation checks:</p>
+    <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+      <a href="install-windows.html" style="flex:1 1 260px; display:block; background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:24px; text-decoration:none;">
+      <div style="font-size:12px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase;">Node A · coordinator</div>
+      <div style="font-size:17px; color:var(--text); font-weight:700; margin:8px 0 6px;">💻 Windows PC</div>
+      <div style="font-size:13.5px; color:var(--muted); line-height:1.6;">Prerequisites, PC build, Android cross-compilation, phone preparation — every step one-click copyable and automatically verified.</div>
+    </a>
+      <a href="install-android.html" style="flex:1 1 260px; display:block; background:var(--bg3); border:1px solid var(--border2); border-radius:16px; padding:24px; text-decoration:none;">
+      <div style="font-size:12px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase;">Node B · QUIC worker</div>
+      <div style="font-size:17px; color:var(--text); font-weight:700; margin:8px 0 6px;">📱 Android / Termux</div>
+      <div style="font-size:13.5px; color:var(--muted); line-height:1.6;">Termux install (F-Droid), kit retrieval, verification, worker start over Wi-Fi or USB.</div>
+    </a>
+    </div>
+    <p style="color:var(--muted); font-size:13px; line-height:1.6;">Full protocol: <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">docs/campaign/PROTOCOL.md</a>. Honest status: only loopback has been measured so far — the real two-machines campaign is exactly what this kit prepares.</p>
+  </div>
 </div>
 
 <div class="section" id="mesh">
@@ -1775,12 +1836,33 @@ hybridnode --config hybridnode/configs/myproject.hybridnode.yaml</pre>
     document.getElementById('hn-btn-fr').classList.toggle('active', lang === 'fr');
     document.getElementById('hn-btn-en').classList.toggle('active', lang === 'en');
   }
+  function installerLang(lang) {
+    document.getElementById('installer-fr').style.display = lang === 'fr' ? 'block' : 'none';
+    document.getElementById('installer-en').style.display = lang === 'en' ? 'block' : 'none';
+    document.getElementById('installer-btn-fr').classList.toggle('active', lang === 'fr');
+    document.getElementById('installer-btn-en').classList.toggle('active', lang === 'en');
+  }
   function entLang(lang) {
     document.getElementById('ent-fr').style.display = lang === 'fr' ? 'block' : 'none';
     document.getElementById('ent-en').style.display = lang === 'en' ? 'block' : 'none';
     document.getElementById('ent-btn-fr').classList.toggle('active', lang === 'fr');
     document.getElementById('ent-btn-en').classList.toggle('active', lang === 'en');
   }
+</script>
+
+<script>
+  // Sous htmlpreview.github.io, les liens relatifs doivents pointer vers la
+  // forme ?https://github.com/.../blob/main/site/<page> pour fonctionner.
+  (function () {
+    if (location.hostname !== 'htmlpreview.github.io') return;
+    var BASE = 'https://htmlpreview.github.io/?https://github.com/Geoking2104/AInonymous/blob/main/site/';
+    document.querySelectorAll('a[href]').forEach(function (a) {
+      var href = a.getAttribute('href');
+      if (!href || /^(https?:|mailto:)/.test(href)) return;
+      if (href.charAt(0) === '#' || href.indexOf('./#') === 0) return;
+      a.setAttribute('href', BASE + href.replace(/^\.\//, ''));
+    });
+  })();
 </script>
 
 </body>

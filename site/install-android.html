@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AInonymous — Installation nœud B (Android / Termux) / Node B setup (Android / Termux)</title>
+  <style>
+    :root {
+      --bg: #080c12; --bg2: #0d1320; --bg3: #111928; --border: #1e2d45;
+      --cyan: #00d4ff; --purple: #8b5cf6; --green: #10b981; --red: #f87171;
+      --amber: #fbbf24; --text: #e2e8f0; --muted: #64748b;
+      --card: rgba(13,19,32,0.8);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+    }
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.8rem 1.2rem;
+      background: rgba(8,12,18,0.9); backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-weight: 700; letter-spacing: -0.5px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+    .nav-right { display: flex; gap: 0.9rem; align-items: center; }
+    .nav-right a { color: var(--muted); text-decoration: none; font-size: 0.82rem; }
+    .nav-right a:hover { color: var(--cyan); }
+    .nav-right .other { border: 1px solid var(--border); padding: 0.28rem 0.7rem; border-radius: 8px; }
+    .lang-switch {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 12px; font-weight: 700;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+    }
+    .lang-switch a { padding: 5px 12px; color: var(--muted); text-decoration: none; transition: all .15s; }
+    .lang-switch a.active { background: var(--cyan); color: #000; }
+
+    main { max-width: 720px; margin: 0 auto; padding: 2.2rem 1.2rem 4rem; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.25);
+      color: var(--cyan); padding: 0.3rem 0.9rem; border-radius: 999px;
+      font-size: 0.76rem; font-weight: 500; margin-bottom: 1.2rem;
+    }
+    h1 { font-size: clamp(1.7rem, 4.5vw, 2.4rem); font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin-bottom: 0.8rem; }
+    .gradient { background: linear-gradient(135deg, var(--cyan), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 2.2rem; }
+    .sub a { color: var(--cyan); text-decoration: none; }
+
+    .step {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.4rem 1.5rem; margin-bottom: 1.3rem; backdrop-filter: blur(10px);
+    }
+    .step-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.3rem; }
+    .step-num {
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.85rem; color: #000;
+    }
+    .step h2 { font-size: 1rem; font-weight: 700; }
+    .step p { color: var(--muted); font-size: 0.88rem; margin: 0.4rem 0 0.9rem; }
+    .step p a { color: var(--cyan); text-decoration: none; }
+    .step p strong { color: var(--text); }
+
+    .code {
+      position: relative; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.85rem 1rem; margin-bottom: 0.7rem;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.78rem; color: var(--text);
+      white-space: pre; overflow-x: auto;
+    }
+    .code .c { color: var(--muted); }
+    .copy {
+      position: absolute; top: 0.5rem; right: 0.5rem;
+      background: var(--bg3); color: var(--muted);
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.7rem; padding: 0.22rem 0.65rem; cursor: pointer;
+      font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    }
+    .copy:hover { color: var(--cyan); border-color: var(--cyan); }
+    .copy.done { color: var(--green); border-color: var(--green); }
+    .note {
+      font-size: 0.8rem; color: var(--muted);
+      border-left: 2px solid var(--border); padding-left: 0.9rem; margin-top: 0.9rem;
+    }
+
+    .verify-box { border-color: rgba(0,212,255,0.35); }
+    textarea {
+      width: 100%; min-height: 140px; resize: vertical;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+      padding: 0.85rem 0.95rem; outline: none;
+    }
+    textarea:focus { border-color: var(--cyan); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      color: #000; font-weight: 700; font-size: 0.85rem;
+      padding: 0.55rem 1.3rem; border-radius: 8px; border: none;
+      cursor: pointer; margin-top: 0.8rem;
+    }
+    .results { margin-top: 1.2rem; }
+    .rrow {
+      display: flex; align-items: baseline; gap: 0.6rem;
+      padding: 0.5rem 0.2rem; border-bottom: 1px solid rgba(30,45,69,0.5);
+      font-size: 0.84rem;
+    }
+    .rrow:last-child { border-bottom: none; }
+    .rstate { flex-shrink: 0; width: 96px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; }
+    .ok   .rstate { color: var(--green); }
+    .miss .rstate { color: var(--red); }
+    .warn .rstate { color: var(--amber); }
+    .unk  .rstate { color: var(--muted); }
+    .rkey { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); flex-shrink: 0; }
+    .rval { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; overflow-wrap: anywhere; }
+    .summary {
+      margin-top: 1rem; padding: 0.8rem 1.1rem; border-radius: 8px;
+      font-size: 0.88rem; font-weight: 600; display: none;
+    }
+    .summary.all { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.4); color: var(--green); }
+    .summary.part { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.4); color: var(--amber); }
+
+    footer {
+      border-top: 1px solid var(--border); padding: 1.4rem 1.2rem;
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem;
+      color: var(--muted); font-size: 0.78rem;
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--cyan); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="index.html">← AInonymous</a>
+  <div class="nav-right">
+    <div class="lang-switch">
+      <a href="#" id="btn-fr" class="active" onclick="pageLang('fr');return false;">FR</a>
+      <a href="#" id="btn-en" onclick="pageLang('en');return false;">EN</a>
+    </div>
+    <a href="install-windows.html" class="other">💻 <span class="i18n" data-fr="Page Windows (nœud A)" data-en="Windows page (node A)">Page Windows (nœud A)</span></a>
+    <a href="https://github.com/Geoking2104/AInonymous" target="_blank" rel="noopener">GitHub →</a>
+  </div>
+</nav>
+
+<main>
+  <div id="page-fr">
+    <div class="badge">📱 Nœud B · worker QUIC · campagne CH3/S4</div>
+    <h1>Installer le worker de mesure<br><span class="gradient">sur ton téléphone Android</span></h1>
+    <p class="sub">
+      Le PC (nœud A) prépare tout : installe d'abord le kit depuis la
+      <a href="install-windows.html">page Windows</a> — son étape « préparer le téléphone » pousse le binaire
+      et les scripts vers Termux. Cette page démarre le worker et vérifie l'installation.
+    </p>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">1</div><h2>Installer Termux (F-Droid)</h2></div>
+      <p><code>prepare-device.sh</code> (côté PC) installe Termux automatiquement s'il est absent. Pour l'installer toi-même,
+      prends l'APK <strong>F-Droid</strong> (la version Play Store n'est pas compatible) :</p>
+      <div class="code" data-copy><button class="copy">Copier</button><span class="c"># Sur le téléphone : télécharger puis installer l'APK F-Droid</span>
+https://f-droid.org/fr/packages/com.termux/</div>
+      <p>Une fois installé : <strong>ouvre Termux une fois</strong> (crée son espace de données), puis exécute dedans :</p>
+      <div class="code" data-copy><button class="copy">Copier</button>termux-setup-storage</div>
+      <div class="note">Autorise l'accès stockage : c'est le canal par lequel le binaire, la clé publique du PC et l'offre de session transitent.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">2</div><h2>Récupérer le kit dans Termux</h2></div>
+      <p>Si <code>prepare-device.sh</code> a été lancé côté PC, tout est déjà sur /sdcard. Dans Termux :</p>
+      <div class="code" data-copy><button class="copy">Copier</button><span class="c"># crée ~/campaign et copie le kit depuis /sdcard/Download</span>
+mkdir -p ~/campaign &amp;&amp; cd ~/campaign
+cp /sdcard/Download/quic-spike ./quic-spike
+cp /sdcard/Download/quic-spike.SHA256SUMS ./quic-spike.SHA256SUMS 2&gt;/dev/null
+
+<span class="c"># les scripts du worker (poussés par prepare-device.sh) :</span>
+cp /sdcard/Download/campaign/worker-start.sh ./worker-start.sh
+cp /sdcard/Download/campaign/check-termux.sh ./check-termux.sh
+chmod 700 ./quic-spike</div>
+      <div class="note">Binaire introuvable sur /sdcard ? Lance <code>bash scripts/campaign/android/prepare-device.sh</code> sur le PC, puis reviens.</div>
+    </div>
+
+    <div class="step verify-box">
+      <div class="step-head"><div class="step-num">3</div><h2>Vérifier l'installation</h2></div>
+      <p>Lance le vérificateur dans Termux, copie sa sortie (appui long → Copier), et colle-la ci-dessous :</p>
+      <div class="code" data-copy><button class="copy">Copier</button>bash check-termux.sh</div>
+      <textarea id="paste" placeholder="Colle ici la sortie de check-termux.sh —&#10;CHECK android-version=13&#10;CHECK abi=arm64-v8a&#10;…&#10;SUMMARY 7/8" spellcheck="false"></textarea>
+      <button class="btn" id="run">Analyser la sortie</button>
+      <div class="summary" id="summary"></div>
+      <div class="results" id="results"></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">4</div><h2>Démarrer le worker</h2></div>
+      <p>Choisis la liaison : <strong>Wi-Fi</strong> (PC et téléphone sur le même réseau) ou <strong>USB</strong> (redirection adb, aucun réglage pare-feu) :</p>
+      <div class="code" data-copy><button class="copy">Copier</button><span class="c"># Wi-Fi — le script détecte et annonce l'IP du téléphone :</span>
+bash worker-start.sh
+
+<span class="c"># USB — via la redirection adb tcp:7700 établie par le PC :</span>
+ADVERTISE=127.0.0.1:7700 bash worker-start.sh</div>
+      <p>Le worker affiche sa clé publique et attend les connexions du PC. L'offre de session est publiée automatiquement
+      vers <code>/sdcard/Download/campaign/offer.json</code> toutes les 3 s (jeton TTL 30 s).</p>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">5</div><h2>Revenir au PC pour la campagne</h2></div>
+      <p>Le worker tourne ? Retourne à la <a href="install-windows.html">page Windows</a>, dernière étape — le PC orchestre les mesures.</p>
+    </div>
+  </div>
+
+  <div id="page-en" style="display:none;">
+    <div class="badge">📱 Node B · QUIC worker · CH3/S4 campaign</div>
+    <h1>Set up the measurement worker<br><span class="gradient">on your Android phone</span></h1>
+    <p class="sub">
+      The PC (node A) prepares everything: first install the kit from the
+      <a href="install-windows.html">Windows page</a> — its "prepare the phone" step pushes the binary
+      and scripts to Termux. This page starts the worker and verifies the installation.
+    </p>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">1</div><h2>Install Termux (F-Droid)</h2></div>
+      <p><code>prepare-device.sh</code> (on the PC) installs Termux automatically if missing. To install it yourself,
+      use the <strong>F-Droid</strong> APK (the Play Store build is not compatible):</p>
+      <div class="code" data-copy><button class="copy">Copy</button><span class="c"># On the phone: download then install the F-Droid APK</span>
+https://f-droid.org/fr/packages/com.termux/</div>
+      <p>Once installed: <strong>open Termux once</strong> (this creates its data space), then run inside:</p>
+      <div class="code" data-copy><button class="copy">Copy</button>termux-setup-storage</div>
+      <div class="note">Grant the storage permission: it is the channel through which the binary, the PC's public key and the session offer travel.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">2</div><h2>Retrieve the kit in Termux</h2></div>
+      <p>If <code>prepare-device.sh</code> was run on the PC, everything is already on /sdcard. In Termux:</p>
+      <div class="code" data-copy><button class="copy">Copy</button><span class="c"># create ~/campaign and copy the kit from /sdcard/Download</span>
+mkdir -p ~/campaign &amp;&amp; cd ~/campaign
+cp /sdcard/Download/quic-spike ./quic-spike
+cp /sdcard/Download/quic-spike.SHA256SUMS ./quic-spike.SHA256SUMS 2&gt;/dev/null
+
+<span class="c"># the worker scripts (pushed by prepare-device.sh):</span>
+cp /sdcard/Download/campaign/worker-start.sh ./worker-start.sh
+cp /sdcard/Download/campaign/check-termux.sh ./check-termux.sh
+chmod 700 ./quic-spike</div>
+      <div class="note">Binary missing from /sdcard? Run <code>bash scripts/campaign/android/prepare-device.sh</code> on the PC, then come back.</div>
+    </div>
+
+    <div class="step verify-box">
+      <div class="step-head"><div class="step-num">3</div><h2>Verify the installation</h2></div>
+      <p>Run the checker in Termux, copy its output (long-press → Copy), and paste it below:</p>
+      <div class="code" data-copy><button class="copy">Copy</button>bash check-termux.sh</div>
+      <textarea id="paste-en" placeholder="Paste the output of check-termux.sh here —&#10;CHECK android-version=13&#10;CHECK abi=arm64-v8a&#10;…&#10;SUMMARY 7/8" spellcheck="false"></textarea>
+      <button class="btn" id="run-en">Analyze output</button>
+      <div class="summary" id="summary-en"></div>
+      <div class="results" id="results-en"></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">4</div><h2>Start the worker</h2></div>
+      <p>Choose the link: <strong>Wi-Fi</strong> (PC and phone on the same network) or <strong>USB</strong> (adb forwarding, no firewall setup):</p>
+      <div class="code" data-copy><button class="copy">Copy</button><span class="c"># Wi-Fi — the script detects and advertises the phone's IP:</span>
+bash worker-start.sh
+
+<span class="c"># USB — through the adb tcp:7700 forwarding set up by the PC:</span>
+ADVERTISE=127.0.0.1:7700 bash worker-start.sh</div>
+      <p>The worker prints its public key and waits for the PC's connections. The session offer is published automatically
+      to <code>/sdcard/Download/campaign/offer.json</code> every 3 s (30-s one-time token).</p>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="step-num">5</div><h2>Back to the PC for the campaign</h2></div>
+      <p>Worker running? Return to the <a href="install-windows.html">Windows page</a>, final step — the PC orchestrates the measurements.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>AInonymous — CH3/S4 campaign kit</span>
+  <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/campaign/PROTOCOL.md">Protocole / Protocol</a>
+  <a href="install-windows.html">Page Windows / Windows page</a>
+</footer>
+
+<script>
+  // ── i18n de la page ───────────────────────────────────────────────────────
+  function pageLang(lang) {
+    document.getElementById('page-fr').style.display = lang === 'fr' ? 'block' : 'none';
+    document.getElementById('page-en').style.display = lang === 'en' ? 'block' : 'none';
+    document.getElementById('btn-fr').classList.toggle('active', lang === 'fr');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    var el = document.querySelector('.i18n');
+    if (el) el.textContent = el.getAttribute('data-' + lang);
+  }
+  if (location.hash === '#en' || new URLSearchParams(location.search).get('lang') === 'en') {
+    pageLang('en');
+  }
+
+  // ── copie en un clic ──────────────────────────────────────────────────────
+  var COPY_LABELS = { fr: ['Copier', 'Copié ✓'], en: ['Copy', 'Copied ✓'] };
+  function currentLang() {
+    return document.getElementById('page-en').style.display !== 'none' ? 'en' : 'fr';
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (block) {
+    var btn = block.querySelector('.copy');
+    btn.addEventListener('click', function () {
+      var clone = block.cloneNode(true);
+      clone.querySelector('.copy').remove();
+      var text = clone.textContent.replace(/^\n/, '').replace(/\n$/, '');
+      var done = function () {
+        var labels = COPY_LABELS[currentLang()];
+        btn.textContent = labels[1]; btn.classList.add('done');
+        setTimeout(function () { btn.textContent = labels[0]; btn.classList.remove('done'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      } else { fallbackCopy(text); done(); }
+    });
+  });
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+  }
+
+  // ── vérificateur : analyse la sortie de check-termux.sh ──────────────────
+  var I18N = {
+    fr: {
+      expected: {
+        'android-version': 'Android (≥ 7.0)',
+        'abi': 'ABI arm64-v8a',
+        'quic-spike': 'Binaire de mesure ~/campaign/quic-spike',
+        'quic-spike-run': 'Binaire exécutable (clé générée)',
+        'sha256': 'Somme SHA-256 vérifiée',
+        'worker-script': 'Script worker-start.sh',
+        'pushed-binary': 'Binaire poussé sur /sdcard (prepare-device)',
+        'storage-mirror': 'Canal /sdcard accessible en écriture'
+      },
+      optional: { 'wifi-ip': 'IP Wi-Fi détectée (sinon liaison USB)' },
+      label: { ok: '✓ OK', miss: '✗ MANQUE', warn: '◇ INFO', unk: '? non vu' },
+      empty: 'Aucune ligne reconnue. Colle la sortie complète de check-termux.sh (elle commence par « === AINONYMOUS CAMPAIGN CHECK »).',
+      all: function (ok, total) { return '✓ ' + ok + '/' + total + ' — nœud B prêt, démarre le worker (étape 4).'; },
+      part: function (ok, total) { return ok + '/' + total + ' — corrige les lignes ✗ ci-dessus puis relance check-termux.sh.'; }
+    },
+    en: {
+      expected: {
+        'android-version': 'Android (≥ 7.0)',
+        'abi': 'ABI arm64-v8a',
+        'quic-spike': 'Measurement binary ~/campaign/quic-spike',
+        'quic-spike-run': 'Binary runs (key generated)',
+        'sha256': 'SHA-256 checksum verified',
+        'worker-script': 'worker-start.sh script',
+        'pushed-binary': 'Binary pushed to /sdcard (prepare-device)',
+        'storage-mirror': '/sdcard channel writable'
+      },
+      optional: { 'wifi-ip': 'Wi-Fi IP detected (otherwise USB link)' },
+      label: { ok: '✓ OK', miss: '✗ MISSING', warn: '◇ INFO', unk: '? not seen' },
+      empty: 'No recognizable lines. Paste the full output of check-termux.sh (it starts with "=== AINONYMOUS CAMPAIGN CHECK").',
+      all: function (ok, total) { return '✓ ' + ok + '/' + total + ' — node B ready, start the worker (step 4).'; },
+      part: function (ok, total) { return ok + '/' + total + ' — fix the ✗ lines above, then run check-termux.sh again.'; }
+    }
+  };
+
+  function analyze(raw, t) {
+    var found = {}; var summary = null;
+    raw.split(/\r?\n/).forEach(function (line) {
+      var m = line.match(/^CHECK\s+([A-Za-z0-9_-]+)=(.*)$/);
+      if (m) { found[m[1]] = { state: 'ok', val: m[2].trim() }; return; }
+      m = line.match(/^MISSING\s+([A-Za-z0-9_-]+)$/);
+      if (m) { found[m[1]] = { state: 'miss', val: '' }; return; }
+      m = line.match(/^WARN\s+([A-Za-z0-9_-]+)=(.*)$/);
+      if (m && t.optional[m[1]]) { found[m[1]] = { state: 'warn', val: m[2].trim() }; return; }
+      m = line.match(/^SUMMARY\s+(\d+)\/(\d+)$/);
+      if (m) { summary = [parseInt(m[1], 10), parseInt(m[2], 10)]; }
+    });
+    return { found: found, summary: summary };
+  }
+
+  function render(suffix) {
+    var t = I18N[currentLang()];
+    var raw = document.getElementById('paste' + suffix).value;
+    var r = analyze(raw, t);
+    var results = document.getElementById('results' + suffix);
+    var sumEl = document.getElementById('summary' + suffix);
+    results.innerHTML = '';
+    sumEl.style.display = 'none';
+
+    if (Object.keys(r.found).length === 0 && r.summary === null) {
+      results.innerHTML = '<div class="rrow unk"><span class="rstate">—</span>' +
+        '<span class="rval">' + t.empty + '</span></div>';
+      return;
+    }
+    var order = Object.keys(t.expected).concat(Object.keys(t.optional));
+    order.forEach(function (key) {
+      var isReq = key in t.expected;
+      var e = r.found[key] || { state: 'unk', val: '' };
+      if (!isReq && e.state === 'unk') return;
+      var row = document.createElement('div');
+      row.className = 'rrow ' + e.state;
+      var name = isReq ? t.expected[key] : t.optional[key];
+      row.innerHTML = '<span class="rstate">' + t.label[e.state] + '</span>' +
+        '<span class="rkey">' + name + '</span>' +
+        '<span class="rval">' + e.val.replace(/</g, '&lt;') + '</span>';
+      results.appendChild(row);
+    });
+    if (r.summary) {
+      var ok = r.summary[0], total = r.summary[1];
+      sumEl.style.display = 'block';
+      if (ok === total) { sumEl.className = 'summary all'; sumEl.textContent = t.all(ok, total); }
+      else { sumEl.className = 'summary part'; sumEl.textContent = t.part(ok, total); }
+    }
+  }
+
+  document.getElementById('run').addEventListener('click', function () { render(''); });
+  document.getElementById('run-en').addEventListener('click', function () { render('-en'); });
+</script>
+
+<script>
+  // Sous htmlpreview.github.io, les liens relatifs doivent pointer vers la
+  // forme ?https://github.com/.../blob/main/site/<page> pour fonctionner.
+  (function () {
+    if (location.hostname !== 'htmlpreview.github.io') return;
+    var BASE = 'https://htmlpreview.github.io/?https://github.com/Geoking2104/AInonymous/blob/main/site/';
+    document.querySelectorAll('a[href]').forEach(function (a) {
+      var href = a.getAttribute('href');
+      if (!href || /^(https?:|mailto:)/.test(href)) return;
+      if (href.charAt(0) === '#' || href.indexOf('./#') === 0) return;
+      a.setAttribute('href', BASE + href.replace(/^\.\//, ''));
+    });
+  })();
+</script>
+</body>
+</html>

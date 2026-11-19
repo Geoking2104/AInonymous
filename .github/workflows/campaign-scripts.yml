@@ -1,0 +1,33 @@
+name: Campaign scripts
+
+on:
+  push:
+    branches: [main, 'feat/**', 'codex/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  campaign-scripts:
+    name: CH3/S4 campaign kit unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Compile campaign scripts (syntax gate)
+        run: |
+          python -m py_compile \
+            scripts/campaign/run-campaign.py \
+            scripts/campaign/aggregate-results.py
+
+      - name: Bash syntax gate
+        run: |
+          bash -n scripts/campaign/cross-compile-android.sh
+          bash -n scripts/campaign/android/prepare-device.sh
+          bash -n scripts/campaign/android/worker-start.sh
+
+      - name: Run unit tests
+        run: python -m unittest discover -s scripts/campaign/tests -v
