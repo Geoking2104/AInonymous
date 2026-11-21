@@ -14,7 +14,7 @@
 
 ## Workstreams (v1)
 
-The six product workstreams that turn the current demonstrations into something
+The seven product workstreams that turn the current demonstrations into something
 usable — Windows installer, Android SDK, real multi-node measurement, GPU/phone
 measurements, stealth transport mode, real-time revocation, and the external
 audit + pilot kit — are defined with measurable acceptance criteria, dependencies

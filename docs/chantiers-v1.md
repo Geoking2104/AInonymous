@@ -2,7 +2,7 @@
 
 *Document de définition. Version 1, 29 octobre 2026.*
 
-Ce document transforme six demandes produit en chantiers définis : ce que chacun
+Ce document transforme sept demandes produit en chantiers définis : ce que chacun
 apporte, ce qui existe déjà, ce qu'il faut construire, **comment on saura que c'est
 fait**, ce dont il dépend, et ce qu'il ne promettra pas.
 

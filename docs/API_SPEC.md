@@ -6,18 +6,20 @@ The APIs are experimental and may change before a tagged release. Local HTTP end
 
 ## Local HTTP surface
 
-The proxy and daemons expose a subset of these routes depending on the selected binary and features:
+The following routes support the local inference path. The [proxy router](../crates/ainonymous-proxy/src/router.rs) accepts client requests. The [daemon router](../crates/ainonymous-daemon/src/router.rs) serves the proxy. The quick-start proxy listens on loopback port 9337. Its daemon URL defaults to `http://127.0.0.1:8890` and can be set with `AINON_DAEMON_URL`. The t51 configuration uses daemon port 18890.
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | process health |
-| `GET` | `/metrics` | Prometheus metrics when enabled |
-| `GET` | `/v1/models` | locally visible model metadata |
-| `POST` | `/v1/chat/completions` | OpenAI-compatible local inference request |
-| `GET` | `/mesh/nodes` | discovered node summary |
-| `POST` | `/mesh/plan` | request or calculate an inference plan |
+| Binary | Method | Route | Purpose |
+| --- | --- | --- | --- |
+| Both | GET | `/health` | Process liveness |
+| Proxy | GET | `/v1/models` | Model metadata and observed node counts |
+| Proxy | POST | `/v1/chat/completions` | Submit an OpenAI-compatible chat request |
+| Proxy | GET | `/v1/ainonymous/mesh/nodes` | Read node summaries, optionally filtered by `model_id` |
+| Daemon | GET | `/mesh/nodes` | Return the discovered nodes to the proxy |
+| Daemon | POST | `/mesh/plan` | Resolve the plan for a model |
+| Daemon | POST | `/mesh/infer` | Execute a supported plan and return the result |
+| Daemon | POST | `/mesh/metrics` | Accept an `InferenceMetrics` record for publication through the inference-mesh zome |
 
-Callers must inspect the actual router in the selected binary; the repository does not claim one consolidated, remotely hardened public API. Do not expose these endpoints directly to the Internet.
+Keep these interfaces local. The daemon also exposes management operations that require an isolated management boundary.
 
 ## Holochain roles
 
