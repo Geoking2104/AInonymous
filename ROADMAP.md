@@ -1,5 +1,9 @@
 # Roadmap
 
+## Enterprise pilot
+
+The [enterprise specification](docs/ENTERPRISE_PILOT_SPEC.md) maps the proposed private inference and learning service to CH3, CH6 and CH7. Follow its delivery sequence for the first customer pilot.
+
 ## Completed in the Holochain 0.7 migration
 
 - Pin one Holochain 0.7 compatibility family across native clients and zomes.

@@ -2,6 +2,10 @@
 
 This directory contains the maintained documentation for the Holochain 0.7 generation of AInonymous. Older speculative milestone documents were removed during the migration because they described APIs, manifests and security properties that were no longer true. Their history remains available in Git.
 
+## Enterprise pilot
+
+[Functional and technical specification](ENTERPRISE_PILOT_SPEC.md) — proposed requirements, acceptance journeys, engineering dependencies and release decisions.
+
 ## Start here
 
 - [Chantiers v1 (FR)](chantiers-v1.md) — the seven product workstreams (installer, Android, multi-node inference, GPU and phone measurements, stealth mode, revocation, audit), with acceptance criteria and sequencing

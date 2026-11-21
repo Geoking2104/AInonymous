@@ -34,6 +34,8 @@ go/no-go decision.
 
 ### Added
 
+- Add the proposed [enterprise pilot specification](docs/ENTERPRISE_PILOT_SPEC.md) with functional requirements, technical contracts and qualification criteria.
+
 - Website: interactive setup guide in the “Rejoins le réseau / Join the network”
   section of `site/index.html` and `site/index.en.html` (`site/setup-guide.js`,
   `site/setup-guide.css`): a client-side scripted assistant with an optional

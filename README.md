@@ -6,6 +6,8 @@ AInonymous is an experimental, agent-centric control plane for distributed LLM i
 
 **Website:** <https://geoking2104.github.io/AInonymous/> — includes an interactive setup guide ([`#rejoindre`](https://geoking2104.github.io/AInonymous/#rejoindre), English page [`index.en.html#join`](https://geoking2104.github.io/AInonymous/index.en.html#join)). Text version: [Rejoindre le réseau](docs/JOIN_NETWORK.md) (French).
 
+**Enterprise pilot planning:** The [functional and technical specification](docs/ENTERPRISE_PILOT_SPEC.md) defines the proposed internal procedures assistant, its trust boundaries and the evidence required for production.
+
 ## Architecture
 
 | Plane | Implementation | Purpose |
