@@ -30,7 +30,7 @@ struct ChatCompletionRequest<'a> {
 #[derive(Deserialize)]
 struct ChatCompletionResponse {
     choices: Vec<Choice>,
-    usage: Option<Usage>,
+    usage: Option<MeasuredUsage>,
 }
 
 #[derive(Deserialize)]
@@ -44,15 +44,18 @@ struct ChoiceMessage {
     content: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct Usage {
-    completion_tokens: u32,
+/// Counts reported by the engine. Missing usage stays unknown for measurement.
+#[derive(Default, Deserialize, Serialize)]
+pub struct MeasuredUsage {
+    pub prompt_tokens: Option<u32>,
+    pub completion_tokens: Option<u32>,
 }
 
 /// Résultat d'une inférence solo via llama-server.
 pub struct SoloResult {
     pub text: String,
     pub token_count: u32,
+    pub usage: MeasuredUsage,
     pub finish_reason: Option<String>,
 }
 
@@ -120,11 +123,11 @@ impl LlamaClient {
             .ok_or_else(|| anyhow::anyhow!("llama-server: réponse vide (0 choices)"))?;
 
         let text = choice.message.content.unwrap_or_default();
-        let token_count = completion.usage
-            .map(|u| u.completion_tokens)
+        let usage = completion.usage.unwrap_or_default();
+        let token_count = usage.completion_tokens
             .unwrap_or(text.split_whitespace().count() as u32); // fallback heuristique
 
-        Ok(SoloResult { text, token_count, finish_reason: choice.finish_reason })
+        Ok(SoloResult { text, token_count, usage, finish_reason: choice.finish_reason })
     }
 }
 

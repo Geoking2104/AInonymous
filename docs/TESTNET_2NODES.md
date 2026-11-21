@@ -34,6 +34,8 @@ BIN="$PWD/target/debug" \
 
 Review the script parameters before running; model download, GPU memory and backend behavior vary by environment.
 
+For repeat runs against a running coordinator, follow the [inference benchmark](../scripts/bench/README.md). Its measurements include pipeline time to first token, measured input/output usage and client latency.
+
 ## Holochain requirements
 
 Use a fresh 0.7 data root and the 0.7 conductor configuration shape. Do not reuse 0.6 databases or bundles. Both peers must install the same newly packed hApps and use the same network seeds and relay/bootstrap settings.

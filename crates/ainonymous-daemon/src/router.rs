@@ -183,6 +183,8 @@ async fn mesh_infer(
             Json(serde_json::json!({
                 "content": r.text,
                 "token_count": r.token_count,
+                "usage": r.usage,
+                "coordinator_ttft_ms": r.coordinator_ttft_ms,
                 "node_ids": r.node_ids,
                 "execution_mode": mode,
                 "speculative_acceptance_rate": r.speculative_acceptance_rate,

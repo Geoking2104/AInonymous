@@ -206,3 +206,5 @@ jobs:
           python scripts/hybridnode/validate_config.py \
             hybridnode/configs/ainonymous.hybridnode.yaml \
             hybridnode/configs/generic-project.hybridnode.yaml
+      - name: Exercise inference measurement through a local HTTP fixture
+        run: python -m unittest discover -s scripts/bench -v
