@@ -311,6 +311,12 @@ zero-knowledge ». Cette position reste vraie : le mode furtif réduit la
 
 ## CH6 — Révocation en temps réel
 
+**Première tranche implémentée** : extension d'`agent-registry`, révocation signée,
+barrière d'admission locale persistante et fermeture QUIC/annulation des jobs.
+Voir [contrat, configuration et limites d'acceptation](ch6-revocation.md).
+CH6 reste ouvert : mesure CH3 publication → application, borne physique GPU et
+sémantique de ré-admission au genesis à valider.
+
 ### Objectif
 
 Retirer l'accès d'un membre **en moins de cinq secondes**, sans reconstruire le

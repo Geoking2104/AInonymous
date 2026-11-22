@@ -33,6 +33,7 @@ impl SessionRegistry {
 pub struct QuicListener {
     endpoint: quinn::Endpoint,
     pending_sessions: Arc<Mutex<HashMap<Vec<u8>, SessionOffer>>>,
+    revocations: Option<crate::revocation::RevocationGate>,
 }
 
 impl QuicListener {
@@ -43,7 +44,12 @@ impl QuicListener {
         Ok(Self {
             endpoint,
             pending_sessions: Arc::new(Mutex::new(HashMap::new())),
+            revocations: None,
         })
+    }
+
+    pub fn set_revocations(&mut self, gate: crate::revocation::RevocationGate) {
+        self.revocations = Some(gate);
     }
 
     pub fn local_addr(&self) -> Result<SocketAddr> {
@@ -82,9 +88,10 @@ impl QuicListener {
         while let Some(incoming) = self.endpoint.accept().await {
             let sessions = self.pending_sessions.clone();
             let handler = handler.clone();
+            let revocations = self.revocations.clone();
 
             tokio::spawn(async move {
-                match Self::accept_connection(incoming, sessions, handler).await {
+                match Self::accept_connection(incoming, sessions, revocations, handler).await {
                     Ok(()) => debug!("Connexion QUIC traitée"),
                     Err(e) => warn!("Erreur connexion QUIC: {}", e),
                 }
@@ -95,6 +102,7 @@ impl QuicListener {
     async fn accept_connection<F, Fut>(
         incoming: quinn::Incoming,
         sessions: Arc<Mutex<HashMap<Vec<u8>, SessionOffer>>>,
+        revocations: Option<crate::revocation::RevocationGate>,
         handler: F,
     ) -> Result<(), QuicError>
     where
@@ -169,6 +177,12 @@ impl QuicListener {
                 "clé publique client non autorisée".into(),
             ));
         }
+        if let Some(gate) = &revocations {
+            if let Err(error) = gate.check(&actual_key) {
+                conn.close(0xC6u32.into(), error.to_string().as_bytes());
+                return Err(error);
+            }
+        }
         info!("mTLS client vérifié: {}", hex::encode(actual_key));
 
         // mTLS OK — consommer MAINTENANT le token à usage unique. Une course
@@ -197,6 +211,10 @@ impl QuicListener {
             "Session QUIC authentifiée (couches {:?})",
             offer.layer_range
         );
+        let _active = match &revocations {
+            Some(gate) => Some(gate.track(actual_key, conn.clone())?),
+            None => None,
+        };
         handler(conn, offer).await;
         Ok(())
     }

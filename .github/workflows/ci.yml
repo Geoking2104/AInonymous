@@ -37,6 +37,9 @@ jobs:
       - name: Test workspace
         run: cargo test --locked --workspace
 
+      - name: Test pipeline cancellation without GPU dependencies
+        run: python3 -m unittest discover -s scripts/tests -v
+
       - name: Run Clippy (warnings are errors)
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 

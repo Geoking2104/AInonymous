@@ -162,6 +162,7 @@ dependencies = [
 name = "ainonymous-quic"
 version = "0.1.0"
 dependencies = [
+ "ainonymous-revocation",
  "ainonymous-types",
  "anyhow",
  "bytes",
@@ -184,6 +185,16 @@ dependencies = [
  "wide",
  "x509-parser 0.16.0",
  "zstd",
+]
+
+[[package]]
+name = "ainonymous-revocation"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

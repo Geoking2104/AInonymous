@@ -155,6 +155,13 @@ impl PipelineClient {
         Ok(resp.json::<DecodeResponse>().await?)
     }
 
+    pub async fn cancel(&self, request_id: &str, reason: &str) -> Result<()> {
+        self.http.post(format!("{}/cancel", self.base_url))
+            .json(&serde_json::json!({"request_id": request_id, "reason": reason}))
+            .send().await?.error_for_status()?;
+        Ok(())
+    }
+
     /// Libère le KV-cache d'une requête terminée
     pub async fn clear(&self, request_id: &str) -> Result<()> {
         self.http

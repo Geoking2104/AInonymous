@@ -35,6 +35,8 @@ import struct
 import sys
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
+from functools import wraps
+from pipeline_jobs import PipelineJobs, JobCancelled
 
 import numpy as np
 import torch
@@ -53,6 +55,21 @@ _model = None               # AutoModelForCausalLM (partiel, layers découpés)
 _tokenizer = None
 # KV-cache par request_id : dict[str, tuple[past_key_values...]]
 _kv_caches: Dict[str, Any] = {}
+_jobs = PipelineJobs()
+
+
+def controlled_job(function):
+    @wraps(function)
+    def run(req):
+        try:
+            with _jobs.work(req.request_id):
+                return function(req)
+        except JobCancelled as error:
+            _kv_caches.pop(req.request_id, None)
+            logger.warning("job failed request_id=%s reason=%s", req.request_id, error)
+            raise HTTPException(409, str(error)) from error
+    return run
+
 
 
 # ── Modèles Pydantic ──────────────────────────────────────────────────────────
@@ -244,6 +261,7 @@ def run_layers(
     decoder_layers = _model.model.layers
 
     for i in range(_cfg["layer_start"], _cfg["layer_end"]):
+        _jobs.check()
         layer = decoder_layers[i]
         if layer is None:
             continue
@@ -334,7 +352,8 @@ async def status():
 
 
 @app.post("/prefill", response_model=PrefillResponse)
-async def prefill(req: PrefillRequest):
+@controlled_job
+def prefill(req: PrefillRequest):
     """
     Traite le prompt complet (prefill pass).
     - Premier nœud  : accepte input_ids (liste d'entiers)
@@ -363,7 +382,7 @@ async def prefill(req: PrefillRequest):
             h, kvs = run_layers(h, use_cache=True)
 
         # Sauvegarder le KV-cache pour les passes de décodage suivantes
-        _kv_caches[req.request_id] = kvs
+        _jobs.commit(lambda: _kv_caches.__setitem__(req.request_id, kvs))
 
         if is_last:
             # IMPORTANT : ne pas rappeler run_layers ici — h est déjà sorti des
@@ -390,6 +409,8 @@ async def prefill(req: PrefillRequest):
                 is_last_node=False,
             )
 
+    except JobCancelled:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -398,7 +419,8 @@ async def prefill(req: PrefillRequest):
 
 
 @app.post("/decode", response_model=DecodeResponse)
-async def decode(req: DecodeRequest):
+@controlled_job
+def decode(req: DecodeRequest):
     """
     Génère un token supplémentaire en utilisant le KV-cache existant.
     Appelé en boucle par le coordinator pour chaque token généré.
@@ -436,8 +458,7 @@ async def decode(req: DecodeRequest):
             h, new_kvs = run_layers(h, past_key_values=past_kv, use_cache=True)
 
         # Mettre à jour le KV-cache (fusion avec l'existant)
-        for k, v in new_kvs.items():
-            _kv_caches[req.request_id][k] = v
+        _jobs.commit(lambda: _kv_caches[req.request_id].update(new_kvs))
 
         if is_last:
             # Nœud final : norm + lm_head, un logit par position d'entrée.
@@ -469,11 +490,32 @@ async def decode(req: DecodeRequest):
                 is_last_node=False,
             )
 
+    except JobCancelled:
+        raise
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Erreur decode %s", req.request_id)
         raise HTTPException(500, str(e))
+
+
+class CancelRequest(BaseModel):
+    request_id: str
+    reason: str
+
+
+@app.post("/cancel")
+async def cancel(req: CancelRequest):
+    _jobs.cancel(req.request_id, req.reason)
+    _kv_caches.pop(req.request_id, None)
+    logger.warning("job failed request_id=%s reason=%s", req.request_id, req.reason)
+    return {"request_id": req.request_id, "status": "failed", "reason": req.reason}
+
+
+@app.get("/jobs/{request_id}")
+async def job_status(request_id: str):
+    reason = _jobs.failure(request_id)
+    return {"request_id": request_id, "status": "failed" if reason else "unknown", "reason": reason}
 
 
 @app.post("/clear")
