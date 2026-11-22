@@ -41,8 +41,35 @@ entrypoint validates both origins, rejects the built-in public endpoints and
 writes its effective configuration to the container's temporary filesystem. The
 hostnames must resolve inside the container and their TLS certificates must be
 trusted by the conductor. Credentials, paths other than `/`, query strings and
-fragments are rejected. This mode assumes the services are reachable over a
-customer-controlled network and require no additional application credential.
+fragments are rejected.
+
+### Services that require credentials
+
+Stage each service's operator-issued authentication material as a separate file.
+Supply the exact bytes expected by that service, including a newline only if
+it is part of the credential. The renderer performs Holochain's configuration
+encoding. Keep the source files outside version control and make them readable
+by the conductor container's UID 10000. The credentialed deployment adds
+the authentication override to the same Compose command.
+
+```bash
+export AINON_BOOTSTRAP_AUTH_SOURCE=/path/to/secrets/bootstrap-credential
+export AINON_RELAY_AUTH_SOURCE=/path/to/secrets/relay-credential
+docker compose -p ainonymous-private-pilot -f docker-compose.yml \
+  -f compose.private-discovery.yaml -f compose.private-discovery-auth.yaml up --build -d --wait
+```
+
+Only the conductor receives these two secret mounts. Its environment contains
+the file paths. The renderer writes the credentials to a mode-0600 file on
+the container's temporary filesystem. Missing, unreadable or empty configured
+files stop startup. When just one service requires credentials, a site Compose
+override can mount that single secret and set only `AINON_BOOTSTRAP_AUTH_FILE`
+or `AINON_RELAY_AUTH_FILE` to its in-container path.
+
+To rotate, issue a replacement with the service, update the corresponding
+source file, then rerun the same Compose project and file set with
+`up -d --force-recreate --wait`. Verify connectivity before retiring the old
+credential under the service's rotation policy.
 
 This override selects conductor discovery endpoints. The bundled hApps keep
 their existing admission settings. Qualifying the enterprise topology still

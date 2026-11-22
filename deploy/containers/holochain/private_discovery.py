@@ -1,10 +1,13 @@
 """Render the conductor config for the Compose private-discovery mode."""
 
+import argparse
+import base64
 import ipaddress
 import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 
 import yaml
 
@@ -48,19 +51,57 @@ def endpoint(name):
     return value
 
 
-def render(base, output):
+def conductor_config(base, private_file):
     network = {
         "bootstrap_url": endpoint("AINON_BOOTSTRAP_URL"),
         "relay_url": endpoint("AINON_RELAY_URL"),
         "advanced": None,
     }
+    for service in ("bootstrap", "relay"):
+        variable = f"AINON_{service.upper()}_AUTH_FILE"
+        if variable not in os.environ:
+            continue
+        if not private_file:
+            raise ValueError("discovery credentials require --private-file")
+        path = Path(os.environ[variable])
+        try:
+            if not path.is_file():
+                raise ValueError(f"{variable} must point to a readable regular file")
+            material = path.read_bytes()
+        except OSError:
+            raise ValueError(f"{variable} must point to a readable regular file") from None
+        if not material:
+            raise ValueError(f"{variable} is empty")
+        # Holochain 0.7.0's conductor builder decodes with BASE64_STANDARD.
+        network[f"base64_auth_material_{service}"] = base64.b64encode(material).decode("ascii")
     config = yaml.safe_load(base.read_text(encoding="utf-8"))
     config["network"] = network
-    yaml.safe_dump(config, output, sort_keys=False)
+    return config
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("base", type=Path)
+    parser.add_argument("--private-file", action="store_true",
+                        help="write an owner-only temporary file and print its path")
+    args = parser.parse_args()
+    config = conductor_config(args.base, args.private_file)
+    if args.private_file:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="ainonymous-conductor.",
+                                         suffix=".yaml", delete=False) as output:
+            try:
+                yaml.safe_dump(config, output, sort_keys=False)
+                output.flush()
+            except BaseException:
+                Path(output.name).unlink(missing_ok=True)
+                raise
+        print(output.name)
+    else:
+        yaml.safe_dump(config, sys.stdout, sort_keys=False)
 
 
 if __name__ == "__main__":
     try:
-        render(Path(sys.argv[1]), sys.stdout)
+        main()
     except ValueError as exc:
         sys.exit(str(exc))

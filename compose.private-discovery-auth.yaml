@@ -1,0 +1,14 @@
+services:
+  holochain:
+    environment:
+      AINON_BOOTSTRAP_AUTH_FILE: /run/secrets/discovery_bootstrap_auth
+      AINON_RELAY_AUTH_FILE: /run/secrets/discovery_relay_auth
+    secrets:
+      - discovery_bootstrap_auth
+      - discovery_relay_auth
+
+secrets:
+  discovery_bootstrap_auth:
+    file: ${AINON_BOOTSTRAP_AUTH_SOURCE:?Set the path to the bootstrap credential file}
+  discovery_relay_auth:
+    file: ${AINON_RELAY_AUTH_SOURCE:?Set the path to the relay credential file}
