@@ -36,6 +36,27 @@ pub struct HolochainClient {
     config: DaemonConfig,
 }
 
+// The shipped inference-mesh zome uses a PascalCase "type" discriminator.
+fn decode_conductor_plan(mut value: Value, local_solo_agent: Option<&str>) -> Result<ExecutionPlan> {
+    if let Some(fields) = value.as_object_mut() {
+        if let Some(kind) = fields.remove("type") {
+            anyhow::ensure!(!fields.contains_key("mode"), "ambiguous execution plan");
+            let mode = match kind.as_str() {
+                Some("Solo") => "solo",
+                Some("PipelineSplit") => "pipeline_split",
+                Some("ExpertShard") => "expert_shard",
+                _ => anyhow::bail!("unknown conductor execution plan type"),
+            };
+            fields.insert("mode".into(), Value::String(mode.into()));
+        }
+    }
+    let plan = serde_json::from_value(value)?;
+    if let (Some(local), ExecutionPlan::Solo { node, .. }) = (local_solo_agent, &plan) {
+        anyhow::ensure!(node == local, "remote solo execution is unavailable on this daemon");
+    }
+    Ok(plan)
+}
+
 impl HolochainClient {
     pub async fn connect(config: &DaemonConfig) -> Result<Self> {
         let membrane_proof = config.holochain.membrane_proof.clone();
@@ -239,6 +260,10 @@ impl HolochainClient {
             )
             .await?;
 
+        if let Backend::Conductor(client) = &self.backend {
+            let local = self.config.conductor_only.then(|| client.local_agent_id());
+            return decode_conductor_plan(resp, local.as_deref());
+        }
         Ok(serde_json::from_value(resp)?)
     }
 
@@ -978,6 +1003,38 @@ fn detect_compute_backends(
         GpuVendor::Amd { .. } => vec![ComputeBackend::Hip, ComputeBackend::Cpu],
         GpuVendor::Intel { .. } => vec![ComputeBackend::Vulkan, ComputeBackend::Cpu],
         GpuVendor::CpuOnly => vec![ComputeBackend::Cpu],
+    }
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::*;
+
+    #[test]
+    fn translates_shipped_zome_plans_to_the_daemon_api() {
+        let endpoint = "127.0.0.1:9000";
+        let pipeline = json!({"node":"worker","quic_endpoint":endpoint,"layer_start":0,"layer_end":7,"is_last":true});
+        let expert = json!({"node":"worker","quic_endpoint":endpoint,"expert_ids":[0],"has_trunk":true});
+        for (value, mode) in [
+            (json!({"type":"Solo","node":"local","quic_endpoint":endpoint}), "solo"),
+            (json!({"type":"PipelineSplit","stages":[pipeline]}), "pipeline_split"),
+            (json!({"type":"ExpertShard","stages":[expert],"trunk_node":"worker"}), "expert_shard"),
+        ] {
+            let plan = decode_conductor_plan(value, Some("local")).unwrap();
+            assert_eq!(serde_json::to_value(plan).unwrap()["mode"], mode);
+        }
+    }
+
+    #[test]
+    fn refuses_remote_solo_and_invalid_or_conflicting_responses() {
+        let solo = json!({"mode":"solo","node":"remote","quic_endpoint":"127.0.0.1:9000"});
+        assert!(decode_conductor_plan(solo.clone(), None).is_ok());
+        assert!(decode_conductor_plan(solo.clone(), Some("local")).is_err());
+        let mut ambiguous = solo;
+        ambiguous["type"] = json!("Solo");
+        for invalid in [ambiguous, json!({"type":"Unknown"}), json!({"type":"PipelineSplit"})] {
+            assert!(decode_conductor_plan(invalid, None).is_err());
+        }
     }
 }
 

@@ -186,6 +186,9 @@ pub struct CoordinatorResult {
 ///
 /// Retourne `None` si un endpoint QUIC est manquant/invalide dans un plan Pipeline.
 pub fn static_plan_from_config(config: &DaemonConfig) -> Option<ExecutionPlan> {
+    if config.conductor_only {
+        return None;
+    }
     if config.pipeline_stages.is_empty() {
         // Plan Solo : ce nœud possède le modèle entier, on utilise llama-server local.
         let loopback: SocketAddr = format!("127.0.0.1:{}", config.quic_port).parse().ok()?;

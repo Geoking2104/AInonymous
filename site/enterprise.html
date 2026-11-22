@@ -19,7 +19,7 @@
       --amber: #f5c475;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg); color: var(--text);
@@ -266,6 +266,7 @@
     .deploy-icon { font-size: 26px; margin-bottom: 14px; }
     .deploy-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
     .deploy-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+    .deploy-card a { color: var(--accent2); text-decoration: underline; text-underline-offset: 0.15em; }
     .deploy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
     .dtag { font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 600; }
     .dtag-p { background: rgba(124,109,235,0.12); color: var(--accent); }
@@ -761,17 +762,17 @@
 <!-- DEPLOYMENT MODES -->
 <div class="section" id="deploiement" style="padding-top: 0">
   <div class="eyebrow">Modes de déploiement</div>
-  <h2>Du pilote à l'échelle groupe.</h2>
-  <p class="section-sub">Démarrez petit, scalez sans migration — l'architecture est identique à 5 ou 5 000 nœuds.</p>
+  <h2>Pilote privé en entreprise</h2>
+  <p class="section-sub">Le pilote s’adresse aux équipes qui évaluent un assistant pour leurs procédures internes. Les déploiements de plus grande taille ci-dessous sont des scénarios envisagés. Leurs capacités et leurs délais restent à mesurer sur le terrain.</p>
   <div class="deploy-grid">
     <div class="deploy-card">
       <div class="deploy-icon">🌱</div>
       <h3>Pilote équipe</h3>
-      <p>10–30 machines, réseau LAN. Idéal pour valider le cas d'usage sur une équipe tech ou R&D. Déploiement en moins d'une journée.</p>
+      <p>L’opérateur indique les services privés d’amorçage et de relais. Le démon demande un plan au conducteur Holochain et renvoie HTTP 503 si aucun nœud de calcul n’est disponible. La découverte est testée sur une machine. La qualification sur deux hôtes physiques, avec les sorties vers Internet bloquées, reste à réaliser.</p>
+      <p><a href="https://github.com/Geoking2104/AInonymous/blob/main/deploy/containers/README.md#operator-controlled-conductor-discovery">Configurer la découverte privée</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/ENTERPRISE_PILOT_SPEC.md">Consulter les tests de qualification</a></p>
       <div class="deploy-tags">
-        <span class="dtag dtag-t">Gemma4-E4B</span>
-        <span class="dtag dtag-t">LAN</span>
-        <span class="dtag dtag-a">1 jour</span>
+        <span class="dtag dtag-t">Découverte privée</span>
+        <span class="dtag dtag-a">Alpha</span>
       </div>
     </div>
     <div class="deploy-card featured">

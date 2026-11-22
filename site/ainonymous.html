@@ -20,7 +20,7 @@
       --amber: #f5c475;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg); color: var(--text);
@@ -271,6 +271,7 @@
     #enterprise .deploy-icon { font-size: 26px; margin-bottom: 14px; }
     #enterprise .deploy-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
     #enterprise .deploy-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+    #enterprise .deploy-card a { color: var(--accent2); text-decoration: underline; text-underline-offset: 0.15em; }
     #enterprise .deploy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
     #enterprise .dtag { font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 600; }
     #enterprise .dtag-p { background: rgba(124,109,235,0.12); color: var(--accent); }
@@ -461,7 +462,7 @@ bash scripts/build-happ.sh release</pre>
       </thead>
       <tbody>
         <tr><td><strong>P1</strong></td><td>Mesurer le calcul réparti sur au moins deux machines physiques (LAN, puis Tailscale/VPN) : TTFT, tok/s, perte d'un nœud — portes G4/G7/G8</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/50">CH3 #50</a> · <a href="https://github.com/Geoking2104/AInonymous/issues/30">S4 #30</a> — bloqué par l'accès à une 2ᵉ machine</td></tr>
-        <tr><td><strong>P1</strong></td><td>Bootstrap et relais privés opérés par l'administrateur du mesh (aujourd'hui : valeurs publiques par défaut de Holochain)</td><td>Reste ouvert de la porte SG1 (<a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a>) ; décision d'hébergement du relais</td></tr>
+        <tr><td><strong>P1</strong></td><td>Qualifier les services privés d’amorçage et de relais sur deux hôtes physiques</td><td>Reste ouvert de la porte SG1 (<a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a>) ; décision d'hébergement du relais</td></tr>
         <tr><td><strong>P2</strong></td><td>Suivi des métriques : latence moyenne par modèle pas encore agrégée dans <code>/v1/models</code> ; <code>/mesh/infer</code> ne renvoie pas le nombre de jetons du prompt</td><td><code>crates/ainonymous-proxy</code>, <code>crates/ainonymous-daemon/src/router.rs</code></td></tr>
         <tr><td><strong>P2</strong></td><td>Révocation en temps réel d'un membre (deny list, arrêt du job en cours, objectif &lt; 5 s)</td><td><a href="https://github.com/Geoking2104/AInonymous/pull/57">PR #57</a> en brouillon (nouvel epoch du registre) ; mesure du délai en attente du banc CH3 — <a href="https://github.com/Geoking2104/AInonymous/issues/53">CH6 #53</a></td></tr>
         <tr><td><strong>P2</strong></td><td>Tests négatifs restants : rejeu de preuve entre réseaux, mauvaise clé de transport, capacités périmées ; fuzzing des trames et de la contre-pression</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/32">#32</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a></td></tr>
@@ -500,7 +501,7 @@ bash scripts/build-happ.sh release</pre>
       </thead>
       <tbody>
         <tr><td><strong>P1</strong></td><td>Measure distributed inference on at least two physical machines (LAN, then Tailscale/VPN): TTFT, tok/s, node loss — gates G4/G7/G8</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/50">CH3 #50</a> · <a href="https://github.com/Geoking2104/AInonymous/issues/30">S4 #30</a> — blocked on access to a 2nd machine</td></tr>
-        <tr><td><strong>P1</strong></td><td>Private bootstrap and relay operated by the mesh administrator (today: Holochain's public defaults)</td><td>Still open part of the SG1 gate (<a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a>); relay hosting decision</td></tr>
+        <tr><td><strong>P1</strong></td><td>Qualify the operator’s private bootstrap and relay on two physical hosts</td><td>Still open part of the SG1 gate (<a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a>); relay hosting decision</td></tr>
         <tr><td><strong>P2</strong></td><td>Metrics follow-up: per-model average latency not aggregated yet in <code>/v1/models</code>; <code>/mesh/infer</code> does not report prompt tokens</td><td><code>crates/ainonymous-proxy</code>, <code>crates/ainonymous-daemon/src/router.rs</code></td></tr>
         <tr><td><strong>P2</strong></td><td>Real-time member revocation (deny list, stop the running job, target &lt; 5 s)</td><td><a href="https://github.com/Geoking2104/AInonymous/pull/57">PR #57</a> in draft (new registry epoch); latency measurement waits for the CH3 bench — <a href="https://github.com/Geoking2104/AInonymous/issues/53">CH6 #53</a></td></tr>
         <tr><td><strong>P2</strong></td><td>Remaining negative tests: cross-network proof replay, wrong transport key, stale capabilities; frame and backpressure fuzzing</td><td><a href="https://github.com/Geoking2104/AInonymous/issues/32">#32</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/ROADMAP.md">ROADMAP</a></td></tr>
@@ -571,13 +572,13 @@ bash scripts/build-happ.sh release</pre>
         <tr><td>Admission à la genèse dans le zome d'intégrité</td><td class="col ok">✓ toujours active (lue dans les propriétés de la DNA, plus optionnelle à la compilation) ; signature ed25519 vérifiée contre la clé d'administrateur, preuve liée à l'agent et au <code>network_id</code></td></tr>
         <tr><td>Installation d'une hApp avec preuve, côté conducteur</td><td class="col ok">✓ via les <em>role settings</em> de Holochain 0.7 ; testé avec deux conducteurs réels (CI « SG1 »)</td></tr>
         <tr><td>Outil de génération / vérification de preuve</td><td class="col ok">✓ <code>tools/private-network-proof</code></td></tr>
-        <tr><td>Bootstrap / relais privés opérés par l'administrateur</td><td class="no">✗ pas encore : les conducteurs utilisent les valeurs publiques par défaut</td></tr>
+        <tr><td>Bootstrap / relais privés opérés par l'administrateur</td><td>Configurables dans le profil Compose privé. La qualification sur deux hôtes reste à réaliser.</td></tr>
         <tr><td>Expiration / révocation de la preuve</td><td class="no">✗ l'expiration n'est qu'un contrôle à l'émission (horloge non fiable à la genèse) ; révocation en temps réel en cours (PR #57, brouillon)</td></tr>
         <tr><td>Proof-of-work à l'admission, liste blanche d'agents</td><td class="no">✗ pas implémenté — architecture cible uniquement</td></tr>
       </tbody>
     </table>
     <p style="margin-top:16px; margin-bottom:48px; color:var(--muted); font-size:14px;">
-      L'admission par preuve fonctionne et est testée en CI ; ce n'est pas encore une fonctionnalité clé-en-main — relais privés, révocation et audit restent à faire avant un déploiement en consortium fermé.
+      La CI teste l’admission par preuve et la découverte privée sur une machine. La qualification sur deux hôtes, la révocation et l’audit restent nécessaires pour un déploiement en consortium fermé.
     </p>
 
     <div class="eyebrow">Positionnement</div>
@@ -679,13 +680,13 @@ hybridnode --config hybridnode/configs/mon-projet.hybridnode.yaml</pre>
         <tr><td>Genesis admission in the integrity zome</td><td class="col ok">✓ always on (read from DNA properties, no longer a compile-time option); ed25519 signature checked against the admin key, proof bound to the agent and <code>network_id</code></td></tr>
         <tr><td>Installing a hApp with a proof, conductor-side</td><td class="col ok">✓ via Holochain 0.7 role settings; tested with two real conductors (CI “SG1”)</td></tr>
         <tr><td>Proof generation / verification tool</td><td class="col ok">✓ <code>tools/private-network-proof</code></td></tr>
-        <tr><td>Private bootstrap / relay operated by the administrator</td><td class="no">✗ not yet: conductors use the public defaults</td></tr>
+        <tr><td>Private bootstrap / relay operated by the administrator</td><td>Configurable in the private Compose profile. Two-host qualification is pending.</td></tr>
         <tr><td>Proof expiration / revocation</td><td class="no">✗ expiry is only an issuance control (clock not trusted at genesis); real-time revocation in progress (PR #57, draft)</td></tr>
         <tr><td>Proof-of-work at admission, trusted-agent allowlist</td><td class="no">✗ not implemented — target architecture only</td></tr>
       </tbody>
     </table>
     <p style="margin-top:16px; margin-bottom:48px; color:var(--muted); font-size:14px;">
-      Proof-based admission works and is tested in CI; it is not an off-the-shelf feature yet — private relays, revocation and an audit are still needed before any closed-consortium deployment.
+      CI exercises proof-based admission and private discovery on one machine. Closed-consortium deployment still requires two-host qualification, revocation and an audit.
     </p>
 
     <div class="eyebrow">Positioning</div>
@@ -1186,17 +1187,17 @@ hybridnode --config hybridnode/configs/myproject.hybridnode.yaml</pre>
 <!-- DEPLOYMENT MODES -->
 <div class="section" id="ent-fr-deploiement" style="padding-top: 0">
   <div class="eyebrow">Modes de déploiement</div>
-  <h2>Du pilote à l'échelle groupe.</h2>
-  <p class="section-sub">Démarrez petit, scalez sans migration — l'architecture est identique à 5 ou 5 000 nœuds.</p>
+  <h2>Pilote privé en entreprise</h2>
+  <p class="section-sub">Le pilote s’adresse aux équipes qui évaluent un assistant pour leurs procédures internes. Les déploiements de plus grande taille ci-dessous sont des scénarios envisagés. Leurs capacités et leurs délais restent à mesurer sur le terrain.</p>
   <div class="deploy-grid">
     <div class="deploy-card">
       <div class="deploy-icon">🌱</div>
       <h3>Pilote équipe</h3>
-      <p>10–30 machines, réseau LAN. Idéal pour valider le cas d'usage sur une équipe tech ou R&D. Déploiement en moins d'une journée.</p>
+      <p>L’opérateur indique les services privés d’amorçage et de relais. Le démon demande un plan au conducteur Holochain et renvoie HTTP 503 si aucun nœud de calcul n’est disponible. La découverte est testée sur une machine. La qualification sur deux hôtes physiques, avec les sorties vers Internet bloquées, reste à réaliser.</p>
+      <p><a href="https://github.com/Geoking2104/AInonymous/blob/main/deploy/containers/README.md#operator-controlled-conductor-discovery">Configurer la découverte privée</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/ENTERPRISE_PILOT_SPEC.md">Consulter les tests de qualification</a></p>
       <div class="deploy-tags">
-        <span class="dtag dtag-t">Gemma4-E4B</span>
-        <span class="dtag dtag-t">LAN</span>
-        <span class="dtag dtag-a">1 jour</span>
+        <span class="dtag dtag-t">Découverte privée</span>
+        <span class="dtag dtag-a">Alpha</span>
       </div>
     </div>
     <div class="deploy-card featured">
@@ -1688,17 +1689,17 @@ hybridnode --config hybridnode/configs/myproject.hybridnode.yaml</pre>
 <!-- DEPLOYMENT MODES -->
 <div class="section" id="ent-en-deployment" style="padding-top: 0">
   <div class="eyebrow">Deployment modes</div>
-  <h2>From pilot to enterprise scale.</h2>
-  <p class="section-sub">Start small, scale without migration — the architecture is identical at 5 or 5,000 nodes.</p>
+  <h2>Private enterprise pilot</h2>
+  <p class="section-sub">The pilot is for teams evaluating an assistant for internal procedures. The larger deployments below are planning scenarios. Their capacity and timelines still need field measurements.</p>
   <div class="deploy-grid">
     <div class="deploy-card">
       <div class="deploy-icon">🌱</div>
       <h3>Team pilot</h3>
-      <p>10–30 machines, LAN network. Ideal for validating the use case with a tech or R&D team. Deployment in under a day.</p>
+      <p>Operators supply private bootstrap and relay endpoints. The daemon asks the conductor for a plan and returns HTTP 503 when no worker is available. Discovery checks run on one machine. Qualification on two physical hosts with public egress blocked is pending.</p>
+      <p><a href="https://github.com/Geoking2104/AInonymous/blob/main/deploy/containers/README.md#operator-controlled-conductor-discovery">Configure private discovery</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/ENTERPRISE_PILOT_SPEC.md">Read the pilot acceptance tests</a></p>
       <div class="deploy-tags">
-        <span class="dtag dtag-t">Gemma4-E4B</span>
-        <span class="dtag dtag-t">LAN</span>
-        <span class="dtag dtag-a">1 day</span>
+        <span class="dtag dtag-t">Private discovery</span>
+        <span class="dtag dtag-a">Alpha</span>
       </div>
     </div>
     <div class="deploy-card featured">

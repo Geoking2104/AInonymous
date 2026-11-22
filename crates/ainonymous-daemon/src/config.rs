@@ -4,6 +4,9 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonConfig {
+    /// Deployment policy supplied by the process environment.
+    #[serde(skip)]
+    pub conductor_only: bool,
     pub daemon_port: u16,
     pub quic_port: u16,
     pub llama_server_port: u16,
@@ -180,6 +183,7 @@ impl Default for InferenceConfig {
 impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
+            conductor_only: false,
             daemon_port: 8890,
             quic_port: 9000,
             llama_server_port: 8081,
@@ -204,9 +208,9 @@ impl DaemonConfig {
     pub fn load() -> Result<Self> {
         let config_path = Self::resolve_config_path();
 
-        if config_path.exists() {
+        let mut config = if config_path.exists() {
             let content = std::fs::read_to_string(&config_path)?;
-            Ok(toml::from_str(&content)?)
+            toml::from_str(&content)?
         } else {
             let config = Self::default();
             if let Some(parent) = config_path.parent() {
@@ -214,8 +218,24 @@ impl DaemonConfig {
             }
             std::fs::write(&config_path, toml::to_string_pretty(&config)?)?;
             tracing::info!("Config par défaut créée: {:?}", config_path);
-            Ok(config)
+            config
+        };
+        if let Some(policy) = std::env::var_os("AINON_DISCOVERY_POLICY") {
+            anyhow::ensure!(policy == "conductor-only", "unknown AINON_DISCOVERY_POLICY");
+            config.enable_conductor_only()?;
         }
+        Ok(config)
+    }
+
+    fn enable_conductor_only(&mut self) -> Result<()> {
+        anyhow::ensure!(
+            self.holochain.backend == HolochainBackendKind::Conductor
+                && self.peers.is_empty()
+                && self.pipeline_stages.is_empty(),
+            "conductor-only discovery requires the conductor backend and empty peers and pipeline_stages"
+        );
+        self.conductor_only = true;
+        Ok(())
     }
 
     pub fn resolve_config_path() -> PathBuf {
@@ -261,6 +281,29 @@ mod tests {
             toml::from_str(include_str!("../../../scripts/testnet/daemon_t51.toml")).unwrap();
         assert_eq!(t51.daemon_port, 18890);
         assert_eq!(t51.holochain.backend, HolochainBackendKind::Conductor);
+    }
+
+    #[test]
+    fn private_policy_rejects_static_config_and_disables_the_implicit_solo_plan() {
+        let mut config = DaemonConfig::default();
+        assert!(crate::conductor::static_plan_from_config(&config).is_some());
+        config.enable_conductor_only().unwrap();
+        assert!(crate::conductor::static_plan_from_config(&config).is_none());
+        assert!(!toml::to_string(&config).unwrap().contains("conductor_only"));
+
+        let mut static_config: DaemonConfig =
+            toml::from_str(include_str!("../../../scripts/testnet/daemon_t41.toml")).unwrap();
+        assert!(static_config.enable_conductor_only().is_err());
+        let mut config = DaemonConfig::default();
+        config.peers.push(PeerConfig {
+            agent_id: "worker".into(), daemon_url: "http://localhost".into(), quic_endpoint: None,
+        });
+        assert!(config.enable_conductor_only().is_err());
+        config.peers.clear();
+        config.pipeline_stages.push(PipelineStageConfig {
+            agent_id: "worker".into(), layer_start: 0, layer_end: 7,
+        });
+        assert!(config.enable_conductor_only().is_err());
     }
 
     #[test]
