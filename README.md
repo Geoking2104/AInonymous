@@ -6,7 +6,13 @@ AInonymous is an experimental, agent-centric control plane for distributed LLM i
 
 **Website:** <https://geoking2104.github.io/AInonymous/> — includes an interactive setup guide ([`#rejoindre`](https://geoking2104.github.io/AInonymous/#rejoindre), English page [`index.en.html#join`](https://geoking2104.github.io/AInonymous/index.en.html#join)). Text version: [Rejoindre le réseau](docs/JOIN_NETWORK.md) (French).
 
-**Enterprise pilot planning:** The [functional and technical specification](docs/ENTERPRISE_PILOT_SPEC.md) defines the proposed internal procedures assistant, its trust boundaries and the evidence required for production.
+## Enterprise pilot
+
+The pilot use case is an assistant that answers staff questions about approved internal procedures. The private Compose profile lets an operator configure HTTPS bootstrap and relay services and mount credentials for each service. The daemon asks the Holochain conductor to select a plan. If no worker is available for the requested model, planning and inference return HTTP 503.
+
+The discovery checks run on one machine. Qualification still requires two physical hosts, blocked public egress and a private-service outage test. Request-level authorization and worker grants are separate pilot requirements.
+
+[Website overview](https://geoking2104.github.io/AInonymous/enterprise-en.html#deployment) · [Operator setup](deploy/containers/README.md#operator-controlled-conductor-discovery) · [Pilot requirements and acceptance tests](docs/ENTERPRISE_PILOT_SPEC.md)
 
 ## Architecture
 

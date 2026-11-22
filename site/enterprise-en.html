@@ -266,6 +266,7 @@
     .deploy-icon { font-size: 26px; margin-bottom: 14px; }
     .deploy-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
     .deploy-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+    .deploy-card a { color: var(--accent2); text-decoration: underline; text-underline-offset: 0.15em; }
     .deploy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
     .dtag { font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 600; }
     .dtag-p { background: rgba(124,109,235,0.12); color: var(--accent); }
@@ -761,17 +762,17 @@
 <!-- DEPLOYMENT MODES -->
 <div class="section" id="deployment" style="padding-top: 0">
   <div class="eyebrow">Deployment modes</div>
-  <h2>From pilot to enterprise scale.</h2>
-  <p class="section-sub">Start small, scale without migration — the architecture is identical at 5 or 5,000 nodes.</p>
+  <h2>Private enterprise pilot</h2>
+  <p class="section-sub">The pilot is for teams evaluating an assistant for internal procedures. The larger deployments below are planning scenarios. Their capacity and timelines still need field measurements.</p>
   <div class="deploy-grid">
     <div class="deploy-card">
       <div class="deploy-icon">🌱</div>
       <h3>Team pilot</h3>
-      <p>10–30 machines, LAN network. Ideal for validating the use case with a tech or R&D team. Deployment in under a day.</p>
+      <p>Operators supply private bootstrap and relay endpoints. The daemon asks the conductor for a plan and returns HTTP 503 when no worker is available. Discovery checks run on one machine. Qualification on two physical hosts with public egress blocked is pending.</p>
+      <p><a href="https://github.com/Geoking2104/AInonymous/blob/main/deploy/containers/README.md#operator-controlled-conductor-discovery">Configure private discovery</a> · <a href="https://github.com/Geoking2104/AInonymous/blob/main/docs/ENTERPRISE_PILOT_SPEC.md">Read the pilot acceptance tests</a></p>
       <div class="deploy-tags">
-        <span class="dtag dtag-t">Gemma4-E4B</span>
-        <span class="dtag dtag-t">LAN</span>
-        <span class="dtag dtag-a">1 day</span>
+        <span class="dtag dtag-t">Private discovery</span>
+        <span class="dtag dtag-a">Alpha</span>
       </div>
     </div>
     <div class="deploy-card featured">
