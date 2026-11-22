@@ -186,11 +186,22 @@ jobs:
           .bin/hc --version
           .bin/holochain --version
 
-      - name: Run the two-conductor admission test
+          curl --fail --location --silent --show-error \
+            https://github.com/holochain/holochain/releases/download/holochain-0.7.0/kitsune2-bootstrap-srv-iroh-relay-x86_64-unknown-linux-gnu \
+            --output .bin/bootstrap-relay
+          echo "7683f4f8baf94c8744d0aff8bc2355e792f65a5b5e3ecbbe90a30f774f30b5cb  .bin/bootstrap-relay" \
+            | sha256sum --check --strict
+          chmod 0755 .bin/bootstrap-relay
+
+      - name: Check peer record matching
+        run: python3 -m unittest discover -s scripts/sg1 -p 'test_*.py'
+
+      - name: Run two-conductor admission and private discovery
         env:
           HC_BIN: ${{ github.workspace }}/.bin/hc
           HOLOCHAIN_BIN: ${{ github.workspace }}/.bin/holochain
-        run: python3 scripts/sg1/run_sg1.py
+          BOOTSTRAP_RELAY_BIN: ${{ github.workspace }}/.bin/bootstrap-relay
+        run: python3 scripts/sg1/run_sg1.py --local-network
 
   configuration:
     name: Configuration schemas

@@ -31,7 +31,7 @@ current evidence:
 
 | Capability | Evidence |
 | --- | --- |
-| Private admission, two real conductors | [`scripts/sg1/run_sg1.py`](scripts/sg1/README.md) starts two Holochain 0.7 conductors and asserts that a signed `PrivateNetworkProof` is admitted, while a missing proof, a proof for another agent, another network id or another admin key are refused (CI job `SG1 two-conductor admission`) |
+| Private admission and discovery | [SG1](scripts/sg1/README.md) checks valid and invalid admission proofs on two Holochain 0.7 conductors. CI starts a loopback bootstrap and relay and verifies that each conductor discovers the other admitted agent. |
 | DNA epoch reproducibility | [`deploy/containers/repro/Dockerfile`](deploy/containers/repro/Dockerfile) rebuilds the pinned bundles byte for byte and checks them against the registry (CI job `Reproducible bundles`) |
 | Data-plane authentication | `crates/ainonymous-quic/tests/mtls_handshake.rs`, including the regression proving a refused client cannot burn a one-time session token |
 | Shared type contracts | `crates/ainonymous-types/tests/types_contract.rs` (activation wire format, warrants, node scoring, OpenAI request shapes) |
@@ -51,7 +51,7 @@ machines**.
 | Priority | Still to do | Tracking |
 | --- | --- | --- |
 | P1 | Measure distributed inference on two or more physical machines (LAN, then Tailscale/VPN): TTFT, tok/s, node loss — gates G4/G7/G8 | [CH3 #50](https://github.com/Geoking2104/AInonymous/issues/50), [S4 #30](https://github.com/Geoking2104/AInonymous/issues/30) |
-| P1 | Private bootstrap/relay operated by the mesh administrator (reference configs use Holochain's public defaults) | ROADMAP security gate 1 |
+| P1 | Qualify operator-managed bootstrap and relay on two physical hosts, with TLS and public egress blocked | ROADMAP security gate 1 |
 | P2 | Metrics follow-up: per-model average latency in `/v1/models` is not aggregated yet (`null`); `/mesh/infer` does not report prompt tokens | `crates/ainonymous-proxy`, `crates/ainonymous-daemon/src/router.rs` |
 | P2 | Real-time revocation | [PR #57](https://github.com/Geoking2104/AInonymous/pull/57) (draft), [CH6 #53](https://github.com/Geoking2104/AInonymous/issues/53) |
 | P2 | Remaining negative tests (cross-network replay, wrong transport key, stale capabilities) and frame/backpressure fuzzing; `ExpertShard` (MoE) plans computed but not executed by the daemon | [#32](https://github.com/Geoking2104/AInonymous/issues/32), ROADMAP |

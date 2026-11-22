@@ -10,7 +10,9 @@ End-to-end verification of the HybridNode admission model:
   * admission is refused without a proof, with a proof issued to another agent,
     with a proof for another network id, and with a proof signed by another
     administrator key;
-  * a fresh agent with a valid proof is still admitted afterwards (control).
+  * a fresh agent with a valid proof is still admitted afterwards (control);
+  * with --local-network, both admitted agents discover each other's address
+    on a relay started specifically for this test.
 
 Everything is built from the repository sources: the zomes, the private DNA
 variant, the app bundle and the ``private-network-proof`` tool. Nothing is
@@ -18,16 +20,18 @@ downloaded except the crates ``cargo`` needs.
 
 Usage (from the repository root, with ``hc``/``holochain`` 0.7.0 on PATH):
 
-    python3 scripts/sg1/run_sg1.py [--work-dir DIR] [--keep]
+    python3 scripts/sg1/run_sg1.py [--local-network] [--work-dir DIR] [--keep]
 
 Exit code 0 means every assertion passed.
 """
 
 import argparse
 import base64
+from contextlib import ExitStack
 import json
 import os
 import pathlib
+import re
 import shutil
 import socket
 import subprocess
@@ -173,8 +177,66 @@ def pack(hc, work_dir):
     return work_dir / "app" / "sg1-hybridnode.happ"
 
 
+def start_local_network(stack, binary, work_dir):
+    """Start the combined Kitsune2 bootstrap and iroh relay on loopback only."""
+    path = work_dir / "bootstrap-relay.log"
+    output = stack.enter_context(path.open("w", encoding="utf-8"))
+    process = subprocess.Popen(
+        [binary, "--listen", "127.0.0.1:0", "--quic-bind-addr", "127.0.0.1:0"],
+        stdout=output, stderr=subprocess.STDOUT,
+    )
+
+    def stop():
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+    stack.callback(stop)
+    deadline = time.monotonic() + 15
+    with path.open(encoding="utf-8") as reader:
+        pending = ""
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise RuntimeError("local bootstrap/relay exited during startup")
+            pending += reader.read()
+            match = re.search(r"^#kitsune2_bootstrap_srv#listening#(127\.0\.0\.1:\d+)#$",
+                              pending, re.MULTILINE)
+            if match:
+                return "http://" + match[1]
+            time.sleep(0.1)
+    raise RuntimeError("local bootstrap/relay did not announce a loopback endpoint")
+
+
+def discovered_peers(records, keys, relay_url):
+    """Match each remote record to the other cell's DNA and relay address."""
+    relay_address = re.compile(re.escape(relay_url) + r"/[^/?#]+")
+
+    def addresses(name, key):
+        # hc 0.7 includes agent_pub_key only for cells on this conductor.
+        return {
+            (entry["dna_hash"], entry["url"])
+            for entry in records[name]
+            if entry["agent_pub_key"] == key and entry["dna_hash"]
+            and relay_address.fullmatch(entry["url"] or "")
+        }
+
+    # At discovery time each fresh conductor has exactly one installed cell.
+    a, b = addresses("A", keys["A"]), addresses("B", keys["B"])
+    if len(a) != 1 or len(b) != 1:
+        return set()
+    addr_a, addr_b = a.pop(), b.pop()
+    if addr_a[0] != addr_b[0] or addr_a == addr_b:
+        return set()
+    return {name for name, peer in (("A", addr_b), ("B", addr_a))
+            if peer in addresses(name, None)}
+
+
 class Conductor:
-    def __init__(self, name, work_dir, holochain, passphrase):
+    def __init__(self, name, work_dir, holochain, passphrase, network_url=None):
         self.name = name
         self.root = work_dir / f"node-{name}"
         self.root.mkdir(parents=True, exist_ok=True)
@@ -195,6 +257,12 @@ admin_interfaces:
             encoding="utf-8",
             newline="\n",
         )
+        if network_url is not None:
+            # Only start_local_network supplies this URL. Its HTTP and QUIC
+            # listeners are bound to loopback for the lifetime of this test.
+            with config.open("a", encoding="utf-8") as out:
+                out.write(f"network:\n  bootstrap_url: {network_url}\n  relay_url: {network_url}\n"
+                          "  advanced:\n    irohTransport:\n      relayAllowPlainText: true\n")
         self.log_file = open(self.root / "conductor.log", "w", encoding="utf-8")
         self.proc = subprocess.Popen(
             [holochain, "-c", str(config), "--piped"],
@@ -214,6 +282,8 @@ admin_interfaces:
     def wait_ready(self, hc_bin, timeout=90):
         deadline = time.time() + timeout
         while time.time() < deadline:
+            if self.proc.poll() is not None:
+                return False
             if self.hc_call(hc_bin, "list-apps").returncode == 0:
                 return True
             time.sleep(1)
@@ -291,6 +361,8 @@ def main():
         default=None,
         help="directory with prebuilt hybridnode-*.wasm (skips the zome build)",
     )
+    parser.add_argument("--local-network", action="store_true",
+                        help="start a loopback bootstrap/relay and verify peer discovery")
     args = parser.parse_args()
 
     hc_bin = which("hc", "HC_BIN")
@@ -300,6 +372,7 @@ def main():
 
     results = []
     conductors = {}
+    services = ExitStack()
     try:
         if args.tool and args.wasm_dir:
             tool = pathlib.Path(args.tool).resolve()
@@ -331,8 +404,12 @@ def main():
         HAPP = happ
 
         passphrase = f"sg1-{os.urandom(6).hex()}"
+        network_url = None
+        if args.local_network:
+            binary = which("kitsune2-bootstrap-srv-iroh-relay", "BOOTSTRAP_RELAY_BIN")
+            network_url = start_local_network(services, binary, work_dir)
         for name in ("A", "B"):
-            conductors[name] = Conductor(name, work_dir, holochain_bin, passphrase)
+            conductors[name] = Conductor(name, work_dir, holochain_bin, passphrase, network_url)
         for name, c in conductors.items():
             if not c.wait_ready(hc_bin):
                 raise RuntimeError(f"conductor {name} never answered on {c.port}")
@@ -349,6 +426,26 @@ def main():
             if r.returncode == 0:
                 listed = f"sg1-{name.lower()}" in c.hc_call(hc_bin, "list-apps").stdout
                 results.append((f"app listed on node {name}", listed, ""))
+
+        if args.local_network:
+            for name, c in conductors.items():
+                r = c.hc_call(hc_bin, "enable-app", f"sg1-{name.lower()}")
+                if r.returncode:
+                    raise RuntimeError(f"could not enable SG1 app on {name}: {r.stderr}")
+            # Both agents must be discovered via the configured service.
+            deadline = time.monotonic() + 90
+            seen = set()
+            while len(seen) < 2 and time.monotonic() < deadline:
+                records = {}
+                for name, c in conductors.items():
+                    r = c.hc_call(hc_bin, "list-agents", timeout=10)
+                    records[name] = json.loads(r.stdout) if r.returncode == 0 else []
+                seen = discovered_peers(records, keys, network_url)
+                if len(seen) < 2:
+                    time.sleep(1)
+            for name in conductors:
+                results.append((f"node {name} discovered the other admitted agent",
+                                name in seen, "peer missing from the agent store"))
 
         a = conductors["A"]
         victim = a.new_agent(hc_bin)
@@ -393,9 +490,7 @@ def main():
     finally:
         for c in conductors.values():
             c.stop()
-        if not results:
-            import traceback
-            traceback.print_exc()
+        services.close()
         log("\n=== SG1 RESULTS ===")
         failures = 0
         for name, ok, detail in results:
@@ -408,9 +503,7 @@ def main():
             shutil.rmtree(work_dir, ignore_errors=True)
         else:
             log(f"artefacts kept in {work_dir}")
-        if not results:
-            failures = 1
-        sys.exit(1 if failures else 0)
+    sys.exit(1 if failures or not results else 0)
 
 
 HAPP = None
