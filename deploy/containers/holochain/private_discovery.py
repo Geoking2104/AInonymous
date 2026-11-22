@@ -82,13 +82,13 @@ def conductor_config(base, private_file):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("base", type=Path)
-    parser.add_argument("--private-file", action="store_true",
-                        help="write an owner-only temporary file and print its path")
+    parser.add_argument("--private-file", type=Path, metavar="DIR",
+                        help="write an owner-only temporary file in DIR and print its path")
     args = parser.parse_args()
-    config = conductor_config(args.base, args.private_file)
-    if args.private_file:
+    config = conductor_config(args.base, args.private_file is not None)
+    if args.private_file is not None:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="ainonymous-conductor.",
-                                         suffix=".yaml", delete=False) as output:
+                                         suffix=".yaml", dir=args.private_file, delete=False) as output:
             try:
                 yaml.safe_dump(config, output, sort_keys=False)
                 output.flush()

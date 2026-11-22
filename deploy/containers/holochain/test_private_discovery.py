@@ -16,7 +16,7 @@ BOOTSTRAP = "https://bootstrap.pilot.example:8443"
 RELAY = "https://relay.pilot.example"
 
 
-def render(bootstrap=BOOTSTRAP, relay=RELAY, *, settings=None, private_file=False):
+def render(bootstrap=BOOTSTRAP, relay=RELAY, *, settings=None, private_dir=None):
     env = {name: value for name, value in os.environ.items()
            if name not in ("AINON_BOOTSTRAP_URL", "AINON_RELAY_URL",
                            "AINON_BOOTSTRAP_AUTH_FILE", "AINON_RELAY_AUTH_FILE")}
@@ -26,8 +26,8 @@ def render(bootstrap=BOOTSTRAP, relay=RELAY, *, settings=None, private_file=Fals
         env["AINON_RELAY_URL"] = relay
     env.update(settings or {})
     cmd = [sys.executable, HERE / "private_discovery.py", BASE]
-    if private_file:
-        cmd.append("--private-file")
+    if private_dir is not None:
+        cmd.extend(["--private-file", private_dir])
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
 
 
@@ -39,10 +39,10 @@ class PrivateDiscoveryTests(unittest.TestCase):
                 (Path(tmp) / name).write_bytes(data)
             for services in [(), ("bootstrap",), ("relay",), ("bootstrap", "relay")]:
                 with self.subTest(services=services):
-                    settings = {"TMPDIR": tmp}
+                    settings = {}
                     for name in services:
                         settings[f"AINON_{name.upper()}_AUTH_FILE"] = str(Path(tmp) / name)
-                    result = render(settings=settings, private_file=True)
+                    result = render(settings=settings, private_dir=tmp)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     path = Path(result.stdout.strip())
                     self.assertEqual(path.parent, Path(tmp))
@@ -65,14 +65,24 @@ class PrivateDiscoveryTests(unittest.TestCase):
             empty.touch()
             for source in ["", str(folder), str(folder / "missing"), str(empty)]:
                 with self.subTest(source=source):
-                    settings = {"TMPDIR": tmp, "AINON_BOOTSTRAP_AUTH_FILE": str(bootstrap),
+                    settings = {"AINON_BOOTSTRAP_AUTH_FILE": str(bootstrap),
                                 "AINON_RELAY_AUTH_FILE": source}
-                    result = render(settings=settings, private_file=True)
+                    result = render(settings=settings, private_dir=tmp)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(result.stdout, "")
                     self.assertIn("AINON_RELAY_AUTH_FILE", result.stderr)
                     self.assertNotIn("synthetic-bootstrap-secret", result.stderr)
                     self.assertFalse(list(folder.glob("ainonymous-conductor.*")))
+
+    def test_unavailable_private_directory_never_falls_back_to_tmpdir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            secret = Path(tmp) / "bootstrap"
+            secret.write_bytes(b"synthetic-bootstrap-secret")
+            result = render(settings={"TMPDIR": tmp, "AINON_BOOTSTRAP_AUTH_FILE": str(secret)},
+                            private_dir=Path(tmp) / "unavailable")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(list(Path(tmp).glob("ainonymous-conductor.*")))
 
     def test_credentials_cannot_be_rendered_to_stdout(self):
         with tempfile.TemporaryDirectory() as tmp:
