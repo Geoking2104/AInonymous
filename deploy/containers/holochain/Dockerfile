@@ -6,7 +6,7 @@ ARG HC_SHA256
 
 RUN test -n "$HOLOCHAIN_SHA256" && test -n "$HC_SHA256" \
     && apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl socat \
+    && apt-get install --yes --no-install-recommends ca-certificates curl python3-yaml socat \
     && curl --fail --location --silent --show-error \
        "https://github.com/holochain/holochain/releases/download/holochain-${HOLOCHAIN_VERSION}/holochain-x86_64-unknown-linux-gnu" \
        --output /usr/local/bin/holochain \
@@ -25,6 +25,7 @@ RUN groupadd --gid 10000 holochain \
     && install -d -o holochain -g holochain -m 0755 /opt/happs
 
 COPY --chown=holochain:holochain deploy/containers/holochain/conductor.yaml /etc/holochain/conductor.yaml
+COPY deploy/containers/holochain/private_discovery.py /usr/local/lib/ainonymous/private_discovery.py
 COPY --chown=holochain:holochain deploy/containers/holochain/entrypoint.sh /usr/local/bin/ainonymous-holochain-entrypoint
 
 RUN chmod 0755 /usr/local/bin/ainonymous-holochain-entrypoint

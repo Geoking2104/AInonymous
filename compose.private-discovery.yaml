@@ -1,0 +1,6 @@
+services:
+  holochain:
+    command: ["private-discovery"]
+    environment:
+      AINON_BOOTSTRAP_URL: ${AINON_BOOTSTRAP_URL:?Set the operator HTTPS bootstrap URL}
+      AINON_RELAY_URL: ${AINON_RELAY_URL:?Set the operator HTTPS relay URL}
