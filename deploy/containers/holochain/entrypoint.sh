@@ -41,11 +41,10 @@ if [ "$#" -gt 0 ]; then
         echo "ERROR: expected the private-discovery argument or no arguments" >&2
         exit 1
     fi
-    PRIVATE_CONFIG=$(mktemp /tmp/ainonymous-conductor.XXXXXX)
-    python3 /usr/local/lib/ainonymous/private_discovery.py "$CONDUCTOR_CONFIG" > "$PRIVATE_CONFIG"
+    PRIVATE_CONFIG=$(python3 /usr/local/lib/ainonymous/private_discovery.py "$CONDUCTOR_CONFIG" --private-file /tmp)
     CONDUCTOR_CONFIG=$PRIVATE_CONFIG
-elif [ -n "${AINON_BOOTSTRAP_URL+x}${AINON_RELAY_URL+x}" ]; then
-    echo "ERROR: operator endpoints require the private-discovery argument" >&2
+elif [ -n "${AINON_BOOTSTRAP_URL+x}${AINON_RELAY_URL+x}${AINON_BOOTSTRAP_AUTH_FILE+x}${AINON_RELAY_AUTH_FILE+x}" ]; then
+    echo "ERROR: operator discovery settings require the private-discovery argument" >&2
     exit 1
 fi
 

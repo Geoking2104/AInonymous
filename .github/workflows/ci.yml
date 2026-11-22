@@ -130,6 +130,35 @@ jobs:
           fi
           grep -F 'AINON_RELAY_URL must be an operator HTTPS origin' private-startup.log
 
+      - name: Check private discovery credentials in the conductor image
+        env:
+          AINON_BOOTSTRAP_URL: https://bootstrap.pilot.example
+          AINON_RELAY_URL: https://relay.pilot.example
+          AINON_BOOTSTRAP_AUTH_SOURCE: ./deploy/secrets/ci-discovery-bootstrap
+          AINON_RELAY_AUTH_SOURCE: ./deploy/secrets/ci-discovery-relay
+        run: |
+          printf %s synthetic-bootstrap > "$AINON_BOOTSTRAP_AUTH_SOURCE"
+          printf %s synthetic-relay > "$AINON_RELAY_AUTH_SOURCE"
+          compose=(docker compose -p ainonymous-hc07-v3-ci -f docker-compose.yml
+                   -f compose.private-discovery.yaml -f compose.private-discovery-auth.yaml)
+          "${compose[@]}" run --rm --no-deps -T --entrypoint python3 holochain - <<'PY'
+          import base64, pathlib, subprocess, yaml
+          path = subprocess.check_output(["python3", "/usr/local/lib/ainonymous/private_discovery.py",
+                                          "/etc/holochain/conductor.yaml", "--private-file", "/tmp"], text=True).strip()
+          config = pathlib.Path(path)
+          assert config.stat().st_mode & 0o777 == 0o600
+          network = yaml.safe_load(config.read_text())["network"]
+          for name in ("bootstrap", "relay"):
+              assert base64.b64decode(network["base64_auth_material_" + name], validate=True) == ("synthetic-" + name).encode()
+          config.unlink()
+          PY
+          : > "$AINON_RELAY_AUTH_SOURCE"
+          if timeout 45s "${compose[@]}" run --rm --no-deps -T holochain > discovery-auth-startup.log 2>&1; then
+            echo "Empty relay credential was accepted" >&2
+            exit 1
+          fi
+          grep -F 'AINON_RELAY_AUTH_FILE is empty' discovery-auth-startup.log
+
       - name: Reprovision ephemeral container stack
         run: |
           docker compose --project-name ainonymous-hc07-v3-ci up \
