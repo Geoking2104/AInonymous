@@ -25,8 +25,8 @@ pub struct Conductor {
 
 impl Conductor {
     pub async fn new(config: DaemonConfig) -> Result<Self> {
-        let pipeline = PipelineClient::new(config.pipeline_server_port);
-        let llama = LlamaClient::new(config.llama_server_port);
+        let pipeline = PipelineClient::new(&config)?;
+        let llama = LlamaClient::new(&config)?;
         let speculative_k = config.inference.speculative_k;
 
         // Vérifier que le pipeline_server.py tourne ; récupérer l'EOS token

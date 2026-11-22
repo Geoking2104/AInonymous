@@ -5,8 +5,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-/// URL du pipeline server local (configuré via DaemonConfig)
-const DEFAULT_PIPELINE_PORT: u16 = 9340;
+use crate::DaemonConfig;
 
 // ── Requêtes / réponses (mirror de pipeline_server.py) ─────────────────────
 
@@ -85,18 +84,12 @@ pub struct PipelineClient {
 }
 
 impl PipelineClient {
-    pub fn new(port: u16) -> Self {
-        Self {
-            base_url: format!("http://127.0.0.1:{}", port),
-            http: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
-                .build()
-                .expect("HTTP client"),
-        }
-    }
-
-    pub fn local() -> Self {
-        Self::new(DEFAULT_PIPELINE_PORT)
+    pub fn new(config: &DaemonConfig) -> Result<Self> {
+        let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120));
+        Ok(Self {
+            base_url: format!("http://127.0.0.1:{}", config.pipeline_server_port),
+            http: config.build_runtime_http(builder)?,
+        })
     }
 
     /// Vérifie que le pipeline_server.py tourne et est prêt
@@ -157,12 +150,13 @@ impl PipelineClient {
 
     /// Libère le KV-cache d'une requête terminée
     pub async fn clear(&self, request_id: &str) -> Result<()> {
-        self.http
+        let resp = self.http
             .post(format!("{}/clear", self.base_url))
             .json(&serde_json::json!({ "request_id": request_id }))
             .send()
             .await
             .context("POST /clear échoué")?;
+        anyhow::ensure!(resp.status().is_success(), "pipeline_server /clear returned {}", resp.status());
         Ok(())
     }
 

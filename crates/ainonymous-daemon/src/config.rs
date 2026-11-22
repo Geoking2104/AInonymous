@@ -238,6 +238,17 @@ impl DaemonConfig {
         Ok(())
     }
 
+    /// Apply the deployment policy after configuring timeouts for each local runtime.
+    pub fn build_runtime_http(
+        &self,
+        mut builder: reqwest::ClientBuilder,
+    ) -> reqwest::Result<reqwest::Client> {
+        if self.conductor_only {
+            builder = builder.no_proxy().redirect(reqwest::redirect::Policy::none());
+        }
+        builder.build()
+    }
+
     pub fn resolve_config_path() -> PathBuf {
         if let Ok(p) = std::env::var("AINON_CONFIG") {
             return PathBuf::from(p);
