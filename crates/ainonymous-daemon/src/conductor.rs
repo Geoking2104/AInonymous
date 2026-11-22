@@ -7,7 +7,7 @@ use ainonymous_types::inference::{ActivationHeader, GeneratedToken, FinishReason
 use ainonymous_types::ExecutionPlan;
 use crate::{DaemonConfig, holochain::HolochainClient};
 use crate::pipeline_client::{PipelineClient, PrefillRequest, DecodeRequest};
-use crate::llama::LlamaClient;
+use crate::llama::{LlamaClient, MeasuredUsage};
 
 /// Orchestrateur central du daemon
 pub struct Conductor {
@@ -174,6 +174,8 @@ pub async fn handle_pipeline_session(
 pub struct CoordinatorResult {
     pub text: String,
     pub token_count: u32,
+    pub usage: MeasuredUsage,
+    pub coordinator_ttft_ms: Option<u64>,
     pub node_ids: Vec<String>,
     /// Taux d'acceptation spéculatif (None si spéculatif désactivé).
     pub speculative_acceptance_rate: Option<f32>,
@@ -248,6 +250,8 @@ pub async fn run_solo_inference(
     Ok(CoordinatorResult {
         text: result.text,
         token_count: result.token_count,
+        usage: result.usage,
+        coordinator_ttft_ms: None,
         node_ids: vec![node_id.to_string()],
         speculative_acceptance_rate: None,
     })
@@ -294,10 +298,12 @@ pub async fn run_pipeline_inference(params: PipelineInference<'_>) -> Result<Coo
     let next = stages.get(1);
 
     // 1. Tokenisation (déléguée au tokenizer du modèle, 1er nœud)
+    let started = std::time::Instant::now();
     let token_ids = pipeline.tokenize(messages).await.context("tokenisation prompt")?;
     if token_ids.is_empty() {
         anyhow::bail!("tokenisation vide");
     }
+    let prompt_tokens = u32::try_from(token_ids.len()).context("prompt token count exceeds u32")?;
     let request_id = uuid::Uuid::new_v4().to_string();
     info!(
         "Coordinateur : {} tokens d'entrée, {} étage(s), req={}",
@@ -326,6 +332,7 @@ pub async fn run_pipeline_inference(params: PipelineInference<'_>) -> Result<Coo
     // 3. Passe de prefill (prompt complet), puis boucle de decode
     let mut tok = send_pass_and_recv(&session, &request_id, first.layer_end, &token_ids)
         .await.context("passe prefill")?;
+    let coordinator_ttft_ms = started.elapsed().as_millis() as u64;
 
     let mut spec_proposed: u32 = 0;
     let mut spec_accepted: u32 = 0;
@@ -424,6 +431,11 @@ pub async fn run_pipeline_inference(params: PipelineInference<'_>) -> Result<Coo
     Ok(CoordinatorResult {
         text,
         token_count: out_ids.len() as u32,
+        usage: MeasuredUsage {
+            prompt_tokens: Some(prompt_tokens),
+            completion_tokens: Some(out_ids.len() as u32),
+        },
+        coordinator_ttft_ms: Some(coordinator_ttft_ms),
         node_ids: stages.iter().map(|s| s.node.clone()).collect(),
         speculative_acceptance_rate,
     })

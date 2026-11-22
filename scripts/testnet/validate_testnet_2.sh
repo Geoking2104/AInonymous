@@ -274,6 +274,9 @@ else
 
   assert_not_empty "content non vide"          "$CONTENT"
   assert_gt        "token_count > 0"           "$TOKEN_COUNT" 0
+  assert_gt        "measured prefill tokens"   "$(jq -r '.usage.prompt_tokens // 0' <<< "$RESP")" 0
+  assert           "measured output tokens"    "$(jq -r '.usage.completion_tokens' <<< "$RESP")" "$TOKEN_COUNT"
+  assert           "coordinator TTFT present"   "$(jq -r '.coordinator_ttft_ms | type' <<< "$RESP")" "number"
   assert_gt        "node_ids a 2 nœuds"        "$NODE_COUNT" 1
   assert           "execution_mode=pipeline"   "$EXEC_MODE" "pipeline_split"
 

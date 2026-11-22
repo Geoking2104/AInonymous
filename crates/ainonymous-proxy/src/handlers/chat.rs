@@ -143,7 +143,8 @@ async fn mesh_pipeline_response(
     match state.mesh.run_mesh_inference(&req.model, &messages, req.max_tokens).await {
         Ok(v) => {
             let content = v["content"].as_str().unwrap_or("").to_string();
-            let completion_tokens = v["token_count"].as_u64().unwrap_or(0) as u32;
+            let usage = pipeline_usage(&v);
+            let completion_tokens = usage.completion_tokens;
             let node_ids: Vec<String> = v["node_ids"].as_array()
                 .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
                 .unwrap_or_default();
@@ -156,14 +157,12 @@ async fn mesh_pipeline_response(
 
             info!("✓ {} (pipeline_split, {} nœuds) — {}ms", req.model, nodes_used, latency);
 
-            // prompt_tokens : le daemon (/mesh/infer) ne le renvoie pas ; 0 comme
-            // dans `usage` ci-dessous, en attendant qu'il soit exposé.
             spawn_publish_metrics(state.clone(), InferenceMetrics {
                 request_id: Uuid::new_v4(),
                 model_id: req.model.clone(),
                 total_latency_ms: latency,
                 tokens_per_second: tps,
-                prompt_tokens: 0,
+                prompt_tokens: usage.prompt_tokens,
                 completion_tokens,
                 nodes_used,
                 execution_mode: "pipeline_split".into(),
@@ -181,11 +180,7 @@ async fn mesh_pipeline_response(
                     message: AssistantMessage { role: "assistant", content },
                     finish_reason: Some("stop".into()),
                 }],
-                usage: UsageStats {
-                    prompt_tokens: 0,
-                    completion_tokens,
-                    total_tokens: completion_tokens,
-                },
+                usage,
                 ainonymous: Some(AInonymousMeta {
                     execution_mode: "pipeline_split".into(),
                     nodes_used,
@@ -336,4 +331,36 @@ fn spawn_publish_metrics(state: Arc<AppState>, metrics: InferenceMetrics) {
     tokio::spawn(async move {
         state.mesh.publish_metrics(&metrics).await;
     });
+}
+
+/// Older daemons only supply the output count in `token_count`.
+fn pipeline_usage(response: &Value) -> UsageStats {
+    let count = |value: &Value| value.as_u64().and_then(|n| u32::try_from(n).ok());
+    let usage = &response["usage"];
+    let prompt_tokens = count(&usage["prompt_tokens"]).unwrap_or(0);
+    let completion_tokens = count(&usage["completion_tokens"])
+        .or_else(|| count(&response["token_count"]))
+        .unwrap_or(0);
+    UsageStats {
+        prompt_tokens,
+        completion_tokens,
+        total_tokens: prompt_tokens.saturating_add(completion_tokens),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pipeline_usage;
+    use serde_json::json;
+
+    #[test]
+    fn pipeline_usage_includes_prefill_and_accepts_legacy_daemons() {
+        let measured = pipeline_usage(&json!({
+            "token_count": 7,
+            "usage": {"prompt_tokens": 11, "completion_tokens": 7}
+        }));
+        assert_eq!((measured.prompt_tokens, measured.completion_tokens, measured.total_tokens), (11, 7, 18));
+        let legacy = pipeline_usage(&json!({"token_count": 7}));
+        assert_eq!((legacy.prompt_tokens, legacy.completion_tokens, legacy.total_tokens), (0, 7, 7));
+    }
 }
