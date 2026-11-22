@@ -189,7 +189,7 @@ impl MeshClient {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use axum::{
         extract::Query,
@@ -208,7 +208,7 @@ mod tests {
 
     /// Faux daemon unique (l'URL du daemon est fixée une seule fois par
     /// processus), servi depuis un thread dédié.
-    fn fake_daemon_url() -> String {
+    pub(crate) fn fake_daemon_url() -> String {
         static URL: OnceLock<String> = OnceLock::new();
         URL.get_or_init(|| {
             let (tx, rx) = std::sync::mpsc::channel();
@@ -216,6 +216,20 @@ mod tests {
                 let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
                 rt.block_on(async move {
                     let app = Router::new()
+                        .route("/mesh/plan", post(|Json(req): Json<Value>| async move {
+                            if req["model_id"].as_str().unwrap_or_default().starts_with("mesh-") {
+                                Json(serde_json::json!({"mode": "pipeline_split", "stages": []}))
+                            } else {
+                                Json(serde_json::json!({"mode": "solo", "node": "local", "quic_endpoint": "127.0.0.1:9001"}))
+                            }
+                        }))
+                        .route("/mesh/infer", post(|Json(req): Json<Value>| async move {
+                            match req["model_id"].as_str() {
+                                Some("mesh-ok") => Json(serde_json::json!({"content": "two words"})).into_response(),
+                                Some("mesh-malformed") => Json(serde_json::json!({})).into_response(),
+                                _ => (StatusCode::BAD_GATEWAY, "internal fixture details").into_response(),
+                            }
+                        }))
                         .route(
                             "/mesh/nodes",
                             get(|uri: axum::http::Uri, Query(q): Query<HashMap<String, String>>| async move {

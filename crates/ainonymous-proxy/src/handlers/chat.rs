@@ -1,15 +1,13 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::{IntoResponse, Response, Sse},
+    response::{IntoResponse, Response},
     Json,
 };
-use axum::response::sse::Event;
-use futures::stream::StreamExt;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use ainonymous_types::api::*;
@@ -28,7 +26,7 @@ pub async fn chat_completions(
     debug!("Requête chat/{} stream={}", model_id, req.stream);
 
     if req.stream {
-        handle_streaming(state, req, request_id, start).await.into_response()
+        super::streaming::response(state, req, request_id).into_response()
     } else {
         handle_blocking(state, req, request_id, start).await.into_response()
     }
@@ -205,98 +203,6 @@ async fn mesh_pipeline_response(
     }
 }
 
-async fn handle_streaming(
-    state: Arc<AppState>,
-    req: ChatCompletionRequest,
-    request_id: String,
-    _start: Instant,
-) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
-    let model = req.model.clone();
-    let id = request_id.clone();
-
-    let stream = async_stream::stream! {
-        // Événement initial : rôle assistant
-        let first = ChatCompletionChunk::first(&id, &model);
-        yield Ok(Event::default().data(serde_json::to_string(&first).unwrap()));
-
-        // Routage Phase 2 : pipeline-split ou llama-server local
-        let use_mesh = state.mesh.get_execution_plan(&model).await
-            .map(|p| matches!(p, ExecutionPlan::PipelineSplit { .. }))
-            .unwrap_or(false);
-
-        if use_mesh {
-            // Inférence distribuée : appel bloquant → émission mot-à-mot
-            let messages = serde_json::to_value(&req.messages)
-                .unwrap_or_else(|_| serde_json::json!([]));
-            match state.mesh.run_mesh_inference(&model, &messages, req.max_tokens).await {
-                Ok(v) => {
-                    let content = v["content"].as_str().unwrap_or("").to_string();
-                    for word in content.split_inclusive(' ') {
-                        let chunk = ChatCompletionChunk::token(&id, &model, word);
-                        yield Ok(Event::default().data(serde_json::to_string(&chunk).unwrap()));
-                    }
-                }
-                Err(e) => warn!("Inférence mesh (stream) échouée: {}", e),
-            }
-        } else {
-            // Appel llama-server en streaming
-            let llama_url = state.config.llama_server_url.clone();
-            let llama_req = build_llama_request(&req, true);
-            let client = reqwest::Client::new();
-            match client
-                .post(format!("{}/v1/chat/completions", llama_url))
-                .json(&llama_req)
-                .send()
-                .await
-            {
-                Ok(resp) => {
-                    let mut byte_stream = resp.bytes_stream();
-
-                    while let Some(chunk_result) = byte_stream.next().await {
-                        match chunk_result {
-                            Ok(bytes) => {
-                                // Parser les SSE de llama-server et les re-émettre
-                                let text = String::from_utf8_lossy(&bytes);
-                                for line in text.lines() {
-                                    if let Some(data) = line.strip_prefix("data: ") {
-                                        if data == "[DONE]" {
-                                            break;
-                                        }
-                                        if let Ok(v) = serde_json::from_str::<Value>(data) {
-                                            if let Some(content) = v["choices"][0]["delta"]["content"].as_str() {
-                                                let chunk = ChatCompletionChunk::token(&id, &model, content);
-                                                yield Ok(Event::default()
-                                                    .data(serde_json::to_string(&chunk).unwrap()));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Erreur stream: {}", e);
-                                break;
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("Connexion llama-server stream: {}", e);
-                }
-            }
-        }
-
-        // Chunk final
-        let done = ChatCompletionChunk::done(&id, &model);
-        yield Ok(Event::default().data(serde_json::to_string(&done).unwrap()));
-        yield Ok(Event::default().data("[DONE]"));
-    };
-
-    Sse::new(stream).keep_alive(
-        axum::response::sse::KeepAlive::new()
-            .interval(std::time::Duration::from_secs(15))
-    )
-}
-
 /// POST /v1/completions (text completion legacy)
 pub async fn completions(
     State(_state): State<Arc<AppState>>,
@@ -318,7 +224,7 @@ pub async fn embeddings(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-fn build_llama_request(req: &ChatCompletionRequest, stream: bool) -> Value {
+pub(super) fn build_llama_request(req: &ChatCompletionRequest, stream: bool) -> Value {
     serde_json::json!({
         "model": req.model,
         "messages": req.messages,

@@ -56,6 +56,18 @@ Clients must treat these as terminal for the current operation:
 
 Retry only idempotent discovery reads automatically. Installation, plan creation and inference submission require application-level idempotency keys before transparent retry is safe.
 
+### Streamed chat completions
+
+For `POST /v1/chat/completions` with `stream: true`, the proxy sends server-sent events. Retain the request ID in the first chat chunk. A completed generation has a final choice with a finish reason, followed by the `[DONE]` marker. The solo path preserves the model server's finish reason when supplied.
+
+If inference fails after streaming starts, the final data event has the following shape and the connection closes immediately:
+
+```json
+{"id":"chatcmpl-ainon-example","error":{"type":"upstream_error","code":"STREAM_INTERRUPTED","message":"Model stream ended before completion"}}
+```
+
+An error event or an unexpected disconnect leaves any text already delivered incomplete. Clients should inspect the terminal event even when the initial HTTP status was 200. Pipeline inference still produces its text events once the coordinator returns the complete result.
+
 ## Serialization
 
 Zome payloads use Holochain's serialized-bytes representation. HTTP uses JSON. QUIC frames use the codec in `ainonymous-quic`; peers must enforce maximum frame and transfer sizes before allocating buffers.
