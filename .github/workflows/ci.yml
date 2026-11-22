@@ -83,6 +83,10 @@ jobs:
           .bin/holochain --config-schema > conductor.schema.json
           python -m pip install --disable-pip-version-check PyYAML jsonschema
           python -c "import json,yaml,jsonschema; jsonschema.validate(yaml.safe_load(open('deploy/containers/holochain/conductor.yaml')), json.load(open('conductor.schema.json')))"
+          python -m unittest discover -s deploy/containers/holochain -p 'test_*.py'
+          AINON_BOOTSTRAP_URL=https://bootstrap.pilot.example AINON_RELAY_URL=https://relay.pilot.example \
+            python3 deploy/containers/holochain/private_discovery.py deploy/containers/holochain/conductor.yaml > private-conductor.yaml
+          python -c "import json,yaml,jsonschema; jsonschema.validate(yaml.safe_load(open('private-conductor.yaml')), json.load(open('conductor.schema.json')))"
           .bin/hc client call --help | tee hc-client-call-help.txt
           grep -q new-agent hc-client-call-help.txt
           grep -q list-app-ws hc-client-call-help.txt
@@ -113,9 +117,21 @@ jobs:
           printf '%s' 'ci-only-placeholder' > deploy/secrets/holochain_keystore_password
           docker compose --project-name ainonymous-hc07-v3 config --quiet
 
+      - name: Build ephemeral container stack
+        run: docker compose --project-name ainonymous-hc07-v3-ci build --pull
+
+      - name: Refuse plaintext relay at private conductor startup
+        run: |
+          if AINON_BOOTSTRAP_URL=https://bootstrap.pilot.example AINON_RELAY_URL=http://relay.pilot.example \
+            timeout 45s docker compose --project-name ainonymous-hc07-v3-ci -f docker-compose.yml -f compose.private-discovery.yaml \
+            run --rm --no-deps -T holochain > private-startup.log 2>&1; then
+            echo "Plaintext relay was accepted" >&2
+            exit 1
+          fi
+          grep -F 'AINON_RELAY_URL must be an operator HTTPS origin' private-startup.log
+
       - name: Reprovision ephemeral container stack
         run: |
-          docker compose --project-name ainonymous-hc07-v3-ci build --pull
           docker compose --project-name ainonymous-hc07-v3-ci up \
             --detach --wait --wait-timeout 240
           docker compose --project-name ainonymous-hc07-v3-ci ps

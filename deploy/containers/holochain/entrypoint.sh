@@ -5,6 +5,9 @@ STATE_DIR=/var/lib/holochain
 READY_FILE="$STATE_DIR/.provisioned-hc07-v3"
 PASSWORD_FILE=${HOLOCHAIN_KEYSTORE_PASSWORD_FILE:-/run/secrets/holochain_keystore_password}
 ADMIN_PORT=8888
+CONDUCTOR_CONFIG=/etc/holochain/conductor.yaml
+
+rm -f "$READY_FILE"
 
 if [ ! -r "$PASSWORD_FILE" ]; then
     echo "ERROR: the Holochain keystore password secret is missing or unreadable" >&2
@@ -26,15 +29,32 @@ cleanup() {
         kill -TERM "$CONDUCTOR_PID" 2>/dev/null || true
         wait "$CONDUCTOR_PID" 2>/dev/null || true
     fi
+    if [ -n "${PRIVATE_CONFIG:-}" ]; then
+        rm -f "$PRIVATE_CONFIG"
+    fi
 }
 trap cleanup INT TERM EXIT
+
+PRIVATE_CONFIG=
+if [ "$#" -gt 0 ]; then
+    if [ "$#" -ne 1 ] || [ "$1" != "private-discovery" ]; then
+        echo "ERROR: expected the private-discovery argument or no arguments" >&2
+        exit 1
+    fi
+    PRIVATE_CONFIG=$(mktemp /tmp/ainonymous-conductor.XXXXXX)
+    python3 /usr/local/lib/ainonymous/private_discovery.py "$CONDUCTOR_CONFIG" > "$PRIVATE_CONFIG"
+    CONDUCTOR_CONFIG=$PRIVATE_CONFIG
+elif [ -n "${AINON_BOOTSTRAP_URL+x}${AINON_RELAY_URL+x}" ]; then
+    echo "ERROR: operator endpoints require the private-discovery argument" >&2
+    exit 1
+fi
 
 # The daemon intentionally binds its local API to loopback. This proxy exposes
 # it only through the host-loopback port mapping without exposing Holochain.
 socat TCP-LISTEN:8892,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:8890 &
 API_PROXY_PID=$!
 
-holochain --piped --config-path /etc/holochain/conductor.yaml < "$PASSWORD_FILE" &
+holochain --piped --config-path "$CONDUCTOR_CONFIG" < "$PASSWORD_FILE" &
 CONDUCTOR_PID=$!
 
 attempt=0
@@ -86,7 +106,6 @@ install_app() {
     fi
 }
 
-rm -f "$READY_FILE"
 install_app ainonymous /opt/happs/ainonymous-core.happ 8889
 install_app hybridnode /opt/happs/hybridnode.happ 8891
 umask 077

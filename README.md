@@ -51,7 +51,7 @@ machines**.
 | Priority | Still to do | Tracking |
 | --- | --- | --- |
 | P1 | Measure distributed inference on two or more physical machines (LAN, then Tailscale/VPN): TTFT, tok/s, node loss — gates G4/G7/G8 | [CH3 #50](https://github.com/Geoking2104/AInonymous/issues/50), [S4 #30](https://github.com/Geoking2104/AInonymous/issues/30) |
-| P1 | Qualify operator-managed bootstrap and relay on two physical hosts, with TLS and public egress blocked | ROADMAP security gate 1 |
+| P1 | Qualify the [private-discovery Compose configuration](deploy/containers/README.md#operator-controlled-conductor-discovery) on two physical hosts, with TLS and public egress blocked | ROADMAP security gate 1 |
 | P2 | Metrics follow-up: per-model average latency in `/v1/models` is not aggregated yet (`null`); `/mesh/infer` does not report prompt tokens | `crates/ainonymous-proxy`, `crates/ainonymous-daemon/src/router.rs` |
 | P2 | Real-time revocation | [PR #57](https://github.com/Geoking2104/AInonymous/pull/57) (draft), [CH6 #53](https://github.com/Geoking2104/AInonymous/issues/53) |
 | P2 | Remaining negative tests (cross-network replay, wrong transport key, stale capabilities) and frame/backpressure fuzzing; `ExpertShard` (MoE) plans computed but not executed by the daemon | [#32](https://github.com/Geoking2104/AInonymous/issues/32), ROADMAP |
