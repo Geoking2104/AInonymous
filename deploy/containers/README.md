@@ -43,6 +43,16 @@ hostnames must resolve inside the container and their TLS certificates must be
 trusted by the conductor. Credentials, paths other than `/`, query strings and
 fragments are rejected.
 
+The override also sets `AINON_DISCOVERY_POLICY=conductor-only` on the AInonymous
+daemon. A persisted static backend, peer list, or pipeline stage list prevents
+daemon startup. Both `/mesh/plan` and `/mesh/infer` consult the conductor.
+An unavailable plan or a solo assignment to another machine returns HTTP 503.
+The development HTTP session-negotiation route is disabled in this mode.
+
+This policy applies to the daemon. The standalone development proxy has its
+own local inference fallback. The enterprise gateway, worker execution grants
+and network egress controls still need separate qualification.
+
 ### Services that require credentials
 
 Stage each service's operator-issued authentication material as a separate file.

@@ -111,6 +111,10 @@ impl ConductorClient {
         })
     }
 
+    pub fn local_agent_id(&self) -> String {
+        self.app.cached_app_info().agent_pub_key.to_string()
+    }
+
     pub fn membrane_proof(&self) -> Option<&[u8]> {
         self.membrane_proof.as_deref()
     }

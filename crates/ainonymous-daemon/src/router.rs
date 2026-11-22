@@ -50,7 +50,11 @@ pub fn build(
         identity_path,
     };
 
-    Router::new()
+    let mut router = Router::new();
+    if !state.config.conductor_only {
+        router = router.route("/mesh/session/negotiate", post(session_negotiate));
+    }
+    router
         // Liveness check
         .route("/health", get(health))
         // Endpoints pour le proxy ainonymous-proxy
@@ -60,8 +64,6 @@ pub fn build(
         .route("/mesh/metrics", post(mesh_metrics))
         .route("/mesh/blackboard/post", post(blackboard_post))
         .route("/mesh/blackboard/search", post(blackboard_search))
-        // Plan de contrôle : négociation de session QUIC entre pairs
-        .route("/mesh/session/negotiate", post(session_negotiate))
         // Coordinateur : inférence distribuée (pipeline-split)
         .route("/mesh/infer", post(mesh_infer))
         // Endpoints internes (zome calls via daemon)

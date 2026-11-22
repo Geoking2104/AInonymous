@@ -165,6 +165,35 @@ jobs:
             --detach --wait --wait-timeout 240
           docker compose --project-name ainonymous-hc07-v3-ci ps
 
+      - name: Verify conductor-only daemon routing
+        env:
+          AINON_BOOTSTRAP_URL: https://bootstrap.pilot.example
+          AINON_RELAY_URL: https://relay.pilot.example
+        run: |
+          # Reuse the running CI conductor. Only the daemon uses the pilot override here.
+          docker compose -p ainonymous-hc07-v3-ci -f docker-compose.yml -f compose.private-discovery.yaml \
+            up --no-deps --detach --wait --wait-timeout 120 ainonymous-daemon
+          python3 - <<'PY'
+          import json
+          from urllib.error import HTTPError
+          from urllib.request import Request, urlopen
+
+          for route, body, expected in [
+              ("plan", {"model_id": "unregistered-pilot-fixture"}, 503),
+              ("infer", {"model_id": "unregistered-pilot-fixture", "messages": []}, 503),
+              ("session/negotiate", {"requester_pubkey": [0] * 32}, 404),
+          ]:
+              req = Request("http://127.0.0.1:8890/mesh/" + route, data=json.dumps(body).encode(),
+                            headers={"Content-Type": "application/json"})
+              try:
+                  with urlopen(req, timeout=15) as response:
+                      code = response.status
+              except HTTPError as exc:
+                  code = exc.code
+              assert code == expected, (route, code, expected)
+              print(route, code)
+          PY
+
       - name: Print container logs on failure
         if: failure()
         run: docker compose --project-name ainonymous-hc07-v3-ci logs --no-color || true
