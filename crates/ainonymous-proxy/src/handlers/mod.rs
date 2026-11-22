@@ -1,6 +1,7 @@
 pub mod chat;
 pub mod models;
 pub mod mesh;
+mod streaming;
 
 use axum::{extract::State, response::IntoResponse, Json};
 use std::sync::Arc;
