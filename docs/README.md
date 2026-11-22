@@ -21,6 +21,7 @@ This directory contains the maintained documentation for the Holochain 0.7 gener
 - [API reference](API_SPEC.md) — supported local HTTP and zome boundaries
 - [Network data plane](NETWORK.md) — QUIC identity binding and traffic flow
 - [Two-node testnet](TESTNET_2NODES.md) — local validation procedure
+- [CH3/S4 measurement campaign](campaign/PROTOCOL.md) — protocol for two-real-machines QUIC/mTLS measurements (PC and Android phone), with the scripts/campaign/ kit
 - [PyTorch integration](PYTORCH_INTEGRATION.md) — experimental Python adapter
 - [Architecture review](ZK_AIS_GATENYM_ARCHITECTURE_REVIEW.md) — consolidated findings and disposition
 
