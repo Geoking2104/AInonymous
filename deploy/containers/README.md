@@ -49,6 +49,13 @@ daemon startup. Both `/mesh/plan` and `/mesh/infer` consult the conductor.
 An unavailable plan or a solo assignment to another machine returns HTTP 503.
 The development HTTP session-negotiation route is disabled in this mode.
 
+The daemon connects directly to its configured llama-server and pipeline ports
+on `127.0.0.1` in the shared network namespace. Its runtime HTTP clients ignore
+proxy settings and refuse redirects for readiness checks, tokenization, inference
+and cache clearing. Run the approved runtimes in this namespace. The host operator
+still needs to restrict outbound connections made by those processes and by the
+conductor.
+
 This policy applies to the daemon. The standalone development proxy has its
 own local inference fallback. The enterprise gateway, worker execution grants
 and network egress controls still need separate qualification.

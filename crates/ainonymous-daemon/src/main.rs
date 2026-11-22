@@ -10,6 +10,8 @@ mod llama;
 mod router;
 mod heartbeat;
 mod pipeline_client;
+#[cfg(test)]
+mod runtime_http_tests;
 
 use std::sync::Arc;
 use anyhow::Result;
@@ -60,7 +62,7 @@ async fn main() -> Result<()> {
 
     // Démarrer llama-server si pas déjà en cours (non-fatal : le mode mesh/
     // pipeline n'en dépend pas).
-    let llama = llama::LlamaManager::new(config.clone());
+    let llama = llama::LlamaManager::new(config.clone())?;
     if !llama.is_running().await {
         info!("Démarrage llama-server...");
         if let Err(e) = llama.start().await {

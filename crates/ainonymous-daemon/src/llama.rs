@@ -57,14 +57,12 @@ pub struct SoloResult {
 }
 
 impl LlamaClient {
-    pub fn new(port: u16) -> Self {
-        Self {
-            base_url: format!("http://127.0.0.1:{}", port),
-            http: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(300))
-                .build()
-                .expect("reqwest client"),
-        }
+    pub fn new(config: &DaemonConfig) -> Result<Self> {
+        let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(300));
+        Ok(Self {
+            base_url: format!("http://127.0.0.1:{}", config.llama_server_port),
+            http: config.build_runtime_http(builder)?,
+        })
     }
 
     /// Vérifie que llama-server répond sur `/health`.
@@ -262,18 +260,20 @@ pub fn estimate_vram_simple(
 /// Gestionnaire du processus llama-server
 pub struct LlamaManager {
     config: DaemonConfig,
+    health_http: reqwest::Client,
     process: Arc<Mutex<Option<Child>>>,
 }
 
 impl LlamaManager {
-    pub fn new(config: DaemonConfig) -> Self {
-        Self { config, process: Arc::new(Mutex::new(None)) }
+    pub fn new(config: DaemonConfig) -> Result<Self> {
+        let health_http = config.build_runtime_http(reqwest::Client::builder())?;
+        Ok(Self { config, health_http, process: Arc::new(Mutex::new(None)) })
     }
 
     /// Vérifier si llama-server répond sur le port configuré
     pub async fn is_running(&self) -> bool {
         let url = format!("http://127.0.0.1:{}/health", self.config.llama_server_port);
-        reqwest::get(&url).await
+        self.health_http.get(url).send().await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
     }
